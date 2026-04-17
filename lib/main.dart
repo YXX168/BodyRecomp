@@ -50,7 +50,7 @@ class WorkoutTheme {
 
 const themes = {
   AppTheme.blue: WorkoutTheme(
-    name: '极光蓝', emoji: '',
+    name: '极光·霜冻蓝', emoji: '',
     bg: Color(0xFFF0F4FF),
     card: Color(0xFFFFFFFF),
     primary: Color(0xFF2563EB),
@@ -67,7 +67,7 @@ const themes = {
     navbarBg: Color(0xFFFFFFFF),
   ),
   AppTheme.green: WorkoutTheme(
-    name: '翡翠绿', emoji: '',
+    name: '翡翠·森林绿', emoji: '',
     bg: Color(0xFFF0FDF4),
     card: Color(0xFFFFFFFF),
     primary: Color(0xFF059669),
@@ -84,7 +84,7 @@ const themes = {
     navbarBg: Color(0xFFFFFFFF),
   ),
   AppTheme.pink: WorkoutTheme(
-    name: '玫瑰粉', emoji: '',
+    name: '玫瑰·樱花粉', emoji: '',
     bg: Color(0xFFFDF2F8),
     card: Color(0xFFFFFFFF),
     primary: Color(0xFFDB2777),
@@ -101,7 +101,7 @@ const themes = {
     navbarBg: Color(0xFFFFFFFF),
   ),
   AppTheme.purple: WorkoutTheme(
-    name: '星云紫', emoji: '',
+    name: '星云·宇宙紫', emoji: '',
     bg: Color(0xFFFAF5FF),
     card: Color(0xFFFFFFFF),
     primary: Color(0xFF7C3AED),
@@ -118,7 +118,7 @@ const themes = {
     navbarBg: Color(0xFFFFFFFF),
   ),
   AppTheme.orange: WorkoutTheme(
-    name: '炽焰橙', emoji: '',
+    name: '日落·炽焰橙', emoji: '',
     bg: Color(0xFFFFF7ED),
     card: Color(0xFFFFFFFF),
     primary: Color(0xFFEA580C),
