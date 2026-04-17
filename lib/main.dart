@@ -32,7 +32,7 @@ class WorkoutTheme {
 
   const WorkoutTheme({
     required this.name,
-    required this.emoji,
+    this.emoji = '',
     required this.bg,
     required this.card,
     required this.primary,
@@ -329,7 +329,7 @@ class _AnimatedNoteState extends State<AnimatedNote> with SingleTickerProviderSt
   }
 
   @override
-  void dispose() { _c.dispose(); _size.dispose(); _fade.dispose(); super.dispose(); }
+  void dispose() { _c.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
@@ -377,10 +377,10 @@ class _PulseIconState extends State<_PulseIcon> with SingleTickerProviderStateMi
       animation: _c,
       builder: (context, _) {
         final v = _c.value;
-        final r1op = math.max(0, 0.35 * (1 - v));
+        final r1op = math.max(0, 0.35 * (1 - v)).toDouble();
         final r1sz = widget.size + 28 * v;
         final v2 = (v + 0.5) % 1.0;
-        final r2op = math.max(0, 0.2 * (1 - v2));
+        final r2op = math.max(0, 0.2 * (1 - v2)).toDouble();
         final r2sz = widget.size + 20 * v2;
         final glowOp = 0.15 + 0.1 * math.sin(v * math.pi * 2);
         return Stack(
@@ -481,7 +481,7 @@ class RecompApp extends StatelessWidget {
         theme: ThemeData(
           brightness: dark ? Brightness.dark : Brightness.light,
           scaffoldBackgroundColor: t.bg,
-          colorScheme: ColorScheme(brightness: dark ? Brightness.dark : Brightness.light, primary: t.primary, secondary: t.accent, surface: t.card, onSurface: t.text1),
+          colorScheme: ColorScheme(brightness: dark ? Brightness.dark : Brightness.light, primary: t.primary, onPrimary: Colors.white, secondary: t.accent, onSecondary: Colors.white, surface: t.card, onSurface: t.text1),
           appBarTheme: AppBarTheme(backgroundColor: t.bg, foregroundColor: t.text1, elevation: 0, scrolledUnderElevation: dark ? 0.2 : 0.5),
           cardTheme: CardThemeData(color: t.card, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: t.border, width: 1))),
           useMaterial3: true,
@@ -984,11 +984,13 @@ class ThemePage extends StatelessWidget {
           return FadeScaleEntry(index: i, child: Padding(padding: const EdgeInsets.only(bottom: 8), child: PressScale(
             onTap: () => inh.setTheme(m),
             child: AnimatedContainer(duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic,
-              color: sel ? mt.primary.withOpacity(0.06) : null,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14),
-                side: BorderSide(color: sel ? mt.primary : t.border, width: sel ? 2 : 1)),
-              boxShadow: sel && mt.isDark ? [BoxShadow(color: mt.primary.withOpacity(0.2), blurRadius: 16), BoxShadow(color: mt.accent.withOpacity(0.1), blurRadius: 24)]
-                  : sel ? [BoxShadow(color: mt.primary.withOpacity(0.3), blurRadius: 10)] : null,
+              decoration: BoxDecoration(
+                color: sel ? mt.primary.withOpacity(0.06) : null,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: sel ? mt.primary : t.border, width: sel ? 2 : 1),
+                boxShadow: sel && mt.isDark ? [BoxShadow(color: mt.primary.withOpacity(0.2), blurRadius: 16), BoxShadow(color: mt.accent.withOpacity(0.1), blurRadius: 24)]
+                    : sel ? [BoxShadow(color: mt.primary.withOpacity(0.3), blurRadius: 10)] : null,
+              ),
               child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), child: Row(children: [
                 // Swatch
                 AnimatedContainer(duration: const Duration(milliseconds: 300), width: 44, height: 44,
