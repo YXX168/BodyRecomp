@@ -481,7 +481,17 @@ class RecompApp extends StatelessWidget {
         theme: ThemeData(
           brightness: dark ? Brightness.dark : Brightness.light,
           scaffoldBackgroundColor: t.bg,
-          colorScheme: ColorScheme(brightness: dark ? Brightness.dark : Brightness.light, primary: t.primary, onPrimary: Colors.white, secondary: t.accent, onSecondary: Colors.white, surface: t.card, onSurface: t.text1),
+          colorScheme: ColorScheme(
+            brightness: dark ? Brightness.dark : Brightness.light,
+            primary: t.primary,
+            onPrimary: Colors.white,
+            secondary: t.accent,
+            onSecondary: Colors.white,
+            surface: t.card,
+            onSurface: t.text1,
+            error: t.warning,
+            onError: Colors.white,
+          ),
           appBarTheme: AppBarTheme(backgroundColor: t.bg, foregroundColor: t.text1, elevation: 0, scrolledUnderElevation: dark ? 0.2 : 0.5),
           cardTheme: CardThemeData(color: t.card, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: t.border, width: 1))),
           useMaterial3: true,
