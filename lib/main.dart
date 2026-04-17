@@ -284,6 +284,221 @@ const progressionPhases = [
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ANIMATION HELPERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Fade + Scale entry animation widget with stagger delay
+class FadeScaleEntry extends StatefulWidget {
+  final Widget child;
+  final int index;
+  final Duration delay;
+
+  const FadeScaleEntry({
+    super.key,
+    required this.child,
+    this.index = 0,
+    this.delay = const Duration(milliseconds: 50),
+  });
+
+  @override
+  State<FadeScaleEntry> createState() => _FadeScaleEntryState();
+}
+
+class _FadeScaleEntryState extends State<FadeScaleEntry>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fade;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+    _fade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+    );
+    _scale = Tween<double>(begin: 0.92, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    );
+    // Stagger delay
+    final stagger = widget.delay * widget.index;
+    Future.delayed(stagger, () {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fade,
+      child: ScaleTransition(
+        scale: _scale,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+/// Press scale animation (0.95) for interactive cards
+class PressScale extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+
+  const PressScale({super.key, required this.child, this.onTap});
+
+  @override
+  State<PressScale> createState() => _PressScaleState();
+}
+
+class _PressScaleState extends State<PressScale>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+      reverseDuration: const Duration(milliseconds: 180),
+    );
+    _scale = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _controller.forward(),
+      onTapUp: (_) {
+        _controller.reverse();
+        widget.onTap?.call();
+      },
+      onTapCancel: () => _controller.reverse(),
+      child: ScaleTransition(scale: _scale, child: widget.child),
+    );
+  }
+}
+
+/// Shimmer sweep animation for title text
+class ShimmerTitle extends StatefulWidget {
+  final String text;
+  final Color primary;
+  final Color accent;
+  final double fontSize;
+
+  const ShimmerTitle({
+    super.key,
+    required this.text,
+    required this.primary,
+    required this.accent,
+    this.fontSize = 26,
+  });
+
+  @override
+  State<ShimmerTitle> createState() => _ShimmerTitleState();
+}
+
+class _ShimmerTitleState extends State<ShimmerTitle>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _sweepCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _sweepCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _sweepCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _sweepCtrl,
+      builder: (context, child) {
+        return ShaderMask(
+          shaderCallback: (bounds) {
+            return LinearGradient(
+              colors: [widget.primary, widget.accent, widget.primary],
+              stops: const [
+                0.0,
+                _sweepCtrl.value * 0.6 + 0.2,
+                1.0,
+              ],
+              tileMode: TileMode.mirror,
+            ).createShader(bounds);
+          },
+          blendMode: BlendMode.srcIn,
+          child: child,
+        );
+      },
+      child: Text(
+        widget.text,
+        style: GoogleFonts.inter(
+          fontSize: widget.fontSize,
+          fontWeight: FontWeight.w900,
+          letterSpacing: -0.5,
+        ),
+      ),
+    );
+  }
+}
+
+/// Animated icon for bottom nav
+class AnimatedNavIcon extends StatelessWidget {
+  final IconData icon;
+  final bool selected;
+  final Color activeColor;
+  final Color inactiveColor;
+
+  const AnimatedNavIcon({
+    super.key,
+    required this.icon,
+    required this.selected,
+    required this.activeColor,
+    required this.inactiveColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOutBack,
+      transform: Matrix4.diagonal3Values(selected ? 1.18 : 1.0, selected ? 1.18 : 1.0, 1.0),
+      child: Icon(
+        icon,
+        size: 22,
+        color: Color.lerp(inactiveColor, activeColor, selected ? 1.0 : 0.0),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // THEME NOTIFIER — InheritedWidget for efficient theme propagation
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -323,14 +538,15 @@ class _ThemeStateState extends State<ThemeState> {
   void initState() {
     super.initState();
     SharedPreferences.getInstance().then((prefs) {
-      final idx = prefs.getInt('recomp_theme_v3') ?? 0;
+      final idx = prefs.getInt('recomp_theme_v4') ?? 0;
       if (mounted) setState(() => _mode = AppTheme.values[idx.clamp(0, AppTheme.values.length - 1)]);
     });
   }
 
   Future<void> setTheme(AppTheme mode) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('recomp_theme_v3', mode.index);
+    await prefs.setInt('recomp_theme_v4', mode.index);
+    HapticFeedback.selectionClick();
     setState(() => _mode = mode);
   }
 
@@ -407,7 +623,7 @@ class RecompApp extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MAIN PAGE — Bottom navigation with 4 tabs
+// MAIN PAGE — Bottom navigation with animated tab switching
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class MainPage extends StatefulWidget {
@@ -419,37 +635,119 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> {
   int _tabIndex = 0;
 
+  final List<Widget> _pages = const [
+    WorkoutPage(),
+    NutritionPage(),
+    ProgressionPage(),
+    ThemePage(),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final inherited = ThemeInherited.of(context);
     final t = inherited.theme;
 
     return Scaffold(
-      body: IndexedStack(
-        index: _tabIndex,
-        children: const [
-          WorkoutPage(),
-          NutritionPage(),
-          ProgressionPage(),
-          ThemePage(),
-        ],
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.02, 0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+              child: child,
+            ),
+          );
+        },
+        child: KeyedSubtree(
+          key: ValueKey(_tabIndex),
+          child: _pages[_tabIndex],
+        ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _tabIndex,
-        onTap: (i) => setState(() => _tabIndex = i),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.fitness_center), label: '训练'),
-          BottomNavigationBarItem(icon: Icon(Icons.restaurant), label: '饮食'),
-          BottomNavigationBarItem(icon: Icon(Icons.trending_up), label: '超负荷'),
-          BottomNavigationBarItem(icon: Icon(Icons.palette), label: '主题'),
-        ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: t.navbarBg,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 12,
+              offset: const Offset(0, -2),
+            ),
+          ],
+          border: Border(top: BorderSide(color: t.border, width: 0.5)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Row(
+              children: [
+                _buildNavItem(Icons.fitness_center, '训练', 0, t),
+                _buildNavItem(Icons.restaurant, '饮食', 1, t),
+                _buildNavItem(Icons.trending_up, '超负荷', 2, t),
+                _buildNavItem(Icons.palette, '主题', 3, t),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(IconData icon, String label, int index, WorkoutTheme t) {
+    final sel = index == _tabIndex;
+    return Expanded(
+      child: PressScale(
+        onTap: () {
+          if (_tabIndex != index) {
+            HapticFeedback.selectionClick();
+            setState(() => _tabIndex = index);
+          }
+        },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedNavIcon(
+              icon: icon,
+              selected: sel,
+              activeColor: t.primary,
+              inactiveColor: t.text4,
+            ),
+            const SizedBox(height: 2),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 250),
+              style: GoogleFonts.inter(
+                fontSize: 10,
+                fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                color: sel ? t.primary : t.text4,
+              ),
+              child: Text(label),
+            ),
+            // Active indicator dot
+            const SizedBox(height: 3),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutBack,
+              width: sel ? 16 : 0,
+              height: 3,
+              decoration: BoxDecoration(
+                color: t.primary,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// WORKOUT PAGE — Day selector + exercise list
+// WORKOUT PAGE — Day selector + exercise list with animations
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class WorkoutPage extends StatefulWidget {
@@ -461,36 +759,41 @@ class WorkoutPage extends StatefulWidget {
 class _WorkoutPageState extends State<WorkoutPage> {
   int _dayIndex = 0;
   Map<String, dynamic> _doneMap = {};
+  bool _loaded = false;
 
   @override
   void initState() {
     super.initState();
-    // Auto-select today
-    final today = DateTime.now().weekday; // 1=Mon, 7=Sun
-    if (today >= 1 && today <= 7) setState(() => _dayIndex = today - 1);
+    final today = DateTime.now().weekday;
+    if (today >= 1 && today <= 7) _dayIndex = today - 1;
     _loadProgress();
   }
 
   Future<void> _loadProgress() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('recomp_done_v3');
+    final raw = prefs.getString('recomp_done_v4');
     if (raw != null) {
-      try { setState(() => _doneMap = jsonDecode(raw) as Map<String, dynamic>); } catch (_) {}
+      try { _doneMap = jsonDecode(raw) as Map<String, dynamic>; } catch (_) {}
     }
+    // Mark loaded after a brief delay for entry animation
+    await Future.delayed(const Duration(milliseconds: 50));
+    if (mounted) setState(() => _loaded = true);
   }
 
   Future<void> _toggle(int dayIdx, int exIdx) async {
     final key = '$dayIdx\_$exIdx';
+    final wasDone = _doneMap.containsKey(key);
     setState(() {
-      if (_doneMap.containsKey(key)) {
+      if (wasDone) {
         _doneMap.remove(key);
+        HapticFeedback.lightImpact(); // Vibrate on cancel too
       } else {
         _doneMap[key] = true;
-        HapticFeedback.lightImpact();
+        HapticFeedback.mediumImpact(); // Stronger vibrate on complete
       }
     });
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('recomp_done_v3', jsonEncode(_doneMap));
+    await prefs.setString('recomp_done_v4', jsonEncode(_doneMap));
   }
 
   int _doneCount(int day) {
@@ -510,56 +813,64 @@ class _WorkoutPageState extends State<WorkoutPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // ── App Bar ──
+            // ── App Bar with shimmer title ──
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
               child: Row(
                 children: [
-                  // Title with PRIMARY color (NOT ShaderMask!)
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Body Recomp', style: GoogleFonts.inter(
-                          fontSize: 26, fontWeight: FontWeight.w900,
-                          color: t.primary, letterSpacing: -0.5,
-                        )),
+                        ShimmerTitle(
+                          text: 'Body Recomp',
+                          primary: t.primary,
+                          accent: t.primaryLight,
+                          fontSize: 26,
+                        ),
                         Text('27M \u00B7 173cm \u00B7 72.5kg \u00B7 BMI 24.2', style: GoogleFonts.inter(
                           fontSize: 11, color: t.text3, fontWeight: FontWeight.w500,
                         )),
                       ],
                     ),
                   ),
-                  // Stats pill
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: t.primary.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(20),
+                  PressScale(
+                    onTap: () => HapticFeedback.lightImpact(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: t.primary.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text('目标 68-70kg', style: GoogleFonts.inter(
+                        fontSize: 11, fontWeight: FontWeight.w700, color: t.primary,
+                      )),
                     ),
-                    child: Text('目标 68-70kg', style: GoogleFonts.inter(
-                      fontSize: 11, fontWeight: FontWeight.w700, color: t.primary,
-                    )),
                   ),
                 ],
               ),
             ),
 
             // ── Day selector chips ──
-            Container(
+            SizedBox(
               height: 44,
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: workoutDays.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 6),
                 itemBuilder: (context, i) {
                   final d = workoutDays[i];
                   final sel = i == _dayIndex;
-                  return GestureDetector(
-                    onTap: () => setState(() => _dayIndex = i),
+                  return PressScale(
+                    onTap: () {
+                      if (_dayIndex != i) {
+                        HapticFeedback.selectionClick();
+                        setState(() => _dayIndex = i);
+                      }
+                    },
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
+                      duration: const Duration(milliseconds: 250),
                       curve: Curves.easeOutCubic,
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
@@ -567,8 +878,11 @@ class _WorkoutPageState extends State<WorkoutPage> {
                         borderRadius: BorderRadius.circular(22),
                         border: Border.all(
                           color: sel ? t.primary : t.border,
-                          width: 1,
+                          width: sel ? 1.5 : 1,
                         ),
+                        boxShadow: sel ? [
+                          BoxShadow(color: t.primary.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 2)),
+                        ] : null,
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -591,9 +905,29 @@ class _WorkoutPageState extends State<WorkoutPage> {
 
             const SizedBox(height: 8),
 
-            // ── Content area ──
+            // ── Content area with animated switch ──
             Expanded(
-              child: _buildDayContent(day, t),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 280),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0.03, 0),
+                        end: Offset.zero,
+                      ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+                      child: child,
+                    ),
+                  );
+                },
+                child: KeyedSubtree(
+                  key: ValueKey('day_$_dayIndex'),
+                  child: _buildDayContent(day, t),
+                ),
+              ),
             ),
           ],
         ),
@@ -604,23 +938,25 @@ class _WorkoutPageState extends State<WorkoutPage> {
   Widget _buildDayContent(WorkoutDay day, WorkoutTheme t) {
     if (day.isRest) {
       return Center(
-        child: Card(
-          margin: const EdgeInsets.symmetric(horizontal: 32),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.bedtime, size: 56, color: t.primary.withOpacity(0.6)),
-                const SizedBox(height: 16),
-                Text('休息日', style: GoogleFonts.inter(
-                  fontSize: 22, fontWeight: FontWeight.w800, color: t.text1,
-                )),
-                const SizedBox(height: 8),
-                Text('肌肉在休息时生长\n保证 7-9 小时睡眠', style: GoogleFonts.inter(
-                  fontSize: 13, color: t.text3, height: 1.8,
-                ), textAlign: TextAlign.center),
-              ],
+        child: FadeScaleEntry(
+          child: Card(
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.bedtime, size: 56, color: t.primary.withOpacity(0.6)),
+                  const SizedBox(height: 16),
+                  Text('休息日', style: GoogleFonts.inter(
+                    fontSize: 22, fontWeight: FontWeight.w800, color: t.text1,
+                  )),
+                  const SizedBox(height: 8),
+                  Text('肌肉在休息时生长\n保证 7-9 小时睡眠', style: GoogleFonts.inter(
+                    fontSize: 13, color: t.text3, height: 1.8,
+                  ), textAlign: TextAlign.center),
+                ],
+              ),
             ),
           ),
         ),
@@ -634,23 +970,29 @@ class _WorkoutPageState extends State<WorkoutPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _dayHeader(day, t),
+            FadeScaleEntry(child: _dayHeader(day, t), index: 0),
             const SizedBox(height: 12),
-            Text(day.optionalDesc!, style: GoogleFonts.inter(fontSize: 12, color: t.text3, height: 1.6)),
+            FadeScaleEntry(
+              index: 1,
+              child: Text(day.optionalDesc!, style: GoogleFonts.inter(fontSize: 12, color: t.text3, height: 1.6)),
+            ),
             const SizedBox(height: 12),
-            ...day.recoveryOptions!.map((opt) => Card(
-              margin: const EdgeInsets.only(bottom: 6),
-              child: ListTile(
-                leading: Container(
-                  width: 8, height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: t.primary,
-                    boxShadow: [BoxShadow(color: t.primary.withOpacity(0.4), blurRadius: 6)],
+            ...day.recoveryOptions!.asMap().entries.map((e) => FadeScaleEntry(
+              index: e.key + 2,
+              child: Card(
+                margin: const EdgeInsets.only(bottom: 6),
+                child: ListTile(
+                  leading: Container(
+                    width: 8, height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: t.primary,
+                      boxShadow: [BoxShadow(color: t.primary.withOpacity(0.4), blurRadius: 6)],
+                    ),
                   ),
+                  title: Text(e.value, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500, color: t.text2)),
+                  dense: true,
                 ),
-                title: Text(opt, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500, color: t.text2)),
-                dense: true,
               ),
             )),
           ],
@@ -668,53 +1010,77 @@ class _WorkoutPageState extends State<WorkoutPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _dayHeader(day, t),
+          // Day header
+          FadeScaleEntry(child: _dayHeader(day, t), index: 0),
           const SizedBox(height: 12),
 
           // Progress bar
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('训练进度', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: t.text3)),
-              Text('$done/$total', style: GoogleFonts.inter(
-                fontSize: 12, fontWeight: FontWeight.w700, color: t.primary,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              )),
-            ],
-          ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: total > 0 ? done / total : 0,
-              minHeight: 6,
-              backgroundColor: t.border,
-              valueColor: AlwaysStoppedAnimation(full ? t.success : t.primary),
+          FadeScaleEntry(
+            index: 1,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('训练进度', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: t.text3)),
+                    Text('$done/$total', style: GoogleFonts.inter(
+                      fontSize: 12, fontWeight: FontWeight.w700, color: t.primary,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    )),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween<double>(end: total > 0 ? done / total : 0),
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, value, _) => LinearProgressIndicator(
+                      value: value,
+                      minHeight: 6,
+                      backgroundColor: t.border,
+                      valueColor: AlwaysStoppedAnimation(full ? t.success : t.primary),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 14),
 
-          // Exercise list
+          // Exercise list with staggered animation
           ...day.exercises.asMap().entries.map((entry) {
             final i = entry.key;
             final ex = entry.value;
             final isDone = _doneMap.containsKey('$_dayIndex\_$i');
-            return _exerciseCard(ex, i + 1, isDone, t, () => _toggle(_dayIndex, i));
+            return FadeScaleEntry(
+              index: i + 2,
+              child: _exerciseCard(ex, i + 1, isDone, t, () => _toggle(_dayIndex, i)),
+            );
           }),
 
+          // Circuit note
           if (day.circuitNote != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Card(
-                color: t.primary.withOpacity(0.04),
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Text(day.circuitNote!, style: GoogleFonts.inter(
-                    fontSize: 11, color: t.text3, height: 1.6, fontWeight: FontWeight.w500,
-                  )),
+            FadeScaleEntry(
+              index: day.exercises.length + 2,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Card(
+                  color: t.primary.withOpacity(0.04),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Text(day.circuitNote!, style: GoogleFonts.inter(
+                      fontSize: 11, color: t.text3, height: 1.6, fontWeight: FontWeight.w500,
+                    )),
+                  ),
                 ),
               ),
             ),
+
+          // Bottom padding for nav bar
+          const SizedBox(height: 8),
         ],
       ),
     );
@@ -758,7 +1124,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
   Widget _exerciseCard(Exercise ex, int num, bool isDone, WorkoutTheme t, VoidCallback onTap) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: GestureDetector(
+      child: PressScale(
         onTap: onTap,
         child: Card(
           color: ex.isStar && !isDone ? t.primary.withOpacity(0.02) : null,
@@ -773,8 +1139,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Number + Checkbox
-                GestureDetector(
+                // Number + Checkbox with animation
+                PressScale(
                   onTap: onTap,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 250),
@@ -789,13 +1155,16 @@ class _WorkoutPageState extends State<WorkoutPage> {
                       ),
                       boxShadow: isDone ? [BoxShadow(color: t.success.withOpacity(0.3), blurRadius: 6)] : null,
                     ),
-                    child: isDone
-                        ? const Icon(Icons.check, color: Colors.white, size: 14)
-                        : Center(
-                            child: Text('$num', style: GoogleFonts.inter(
-                              fontSize: 11, fontWeight: FontWeight.w700, color: t.text4,
-                            )),
-                          ),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: isDone
+                          ? const Icon(Icons.check, color: Colors.white, size: 14, key: ValueKey('done'))
+                          : Center(
+                              child: Text('$num', style: GoogleFonts.inter(
+                                fontSize: 11, fontWeight: FontWeight.w700, color: t.text4,
+                              ), key: ValueKey('num$num')),
+                            ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -874,69 +1243,101 @@ class NutritionPage extends StatelessWidget {
     final t = ThemeInherited.of(context).theme;
 
     return Scaffold(
-      appBar: AppBar(title: Text('饮食营养', style: GoogleFonts.inter(
-        fontSize: 18, fontWeight: FontWeight.w800, color: t.text1,
-      ))),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Calorie summary
-            Card(
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: [
+            // Title
+            SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _statItem('每日热量', '2200', 'kcal', t),
-                    _statItem('蛋白质', '130-160', 'g', t),
-                    _statItem('碳水', '200-270', 'g', t),
-                    _statItem('脂肪', '58-73', 'g', t),
-                  ],
-                ),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                child: Text('饮食营养', style: GoogleFonts.inter(
+                  fontSize: 22, fontWeight: FontWeight.w900, color: t.text1, letterSpacing: -0.3,
+                )),
               ),
             ),
-            const SizedBox(height: 16),
 
-            // Macro detail cards
-            _macroCard('蛋白质', '130-160g', '1.8-2.2g/kg \u00B7 25%',
-                '鸡胸 \u00B7 牛肉 \u00B7 鸡蛋 \u00B7 鱼虾 \u00B7 豆腐 \u00B7 蛋白粉', t.primary, t),
-            const SizedBox(height: 8),
-            _macroCard('碳水', '200-270g', '2-3g/kg \u00B7 40%',
-                '糙米 \u00B7 红薯 \u00B7 燕麦 \u00B7 全麦 \u00B7 玉米 \u00B7 水果', t.warning, t),
-            const SizedBox(height: 8),
-            _macroCard('脂肪', '58-73g', '0.8-1g/kg \u00B7 30%',
-                '橄榄油 \u00B7 坚果 \u00B7 牛油果 \u00B7 深海鱼 \u00B7 蛋黄', t.success, t),
-
-            const SizedBox(height: 24),
-            Text('饮食建议', style: GoogleFonts.inter(
-              fontSize: 16, fontWeight: FontWeight.w800, color: t.text1,
-            )),
-            const SizedBox(height: 10),
-            ...nutritionTips.asMap().entries.map((e) => Card(
-              margin: const EdgeInsets.only(bottom: 6),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 3, height: 14,
-                      margin: const EdgeInsets.only(right: 10, top: 2),
-                      decoration: BoxDecoration(
-                        color: t.primary, borderRadius: BorderRadius.circular(2),
+            // Content
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  // Calorie summary
+                  FadeScaleEntry(
+                    index: 0,
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _statItem('每日热量', '2200', 'kcal', t),
+                            _statItem('蛋白质', '130-160', 'g', t),
+                            _statItem('碳水', '200-270', 'g', t),
+                            _statItem('脂肪', '58-73', 'g', t),
+                          ],
+                        ),
                       ),
                     ),
-                    Expanded(
-                      child: Text(nutritionTips[e.key], style: GoogleFonts.inter(
-                        fontSize: 12, color: t.text2, height: 1.6,
-                      )),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Macro detail cards
+                  FadeScaleEntry(
+                    index: 1,
+                    child: _macroCard('蛋白质', '130-160g', '1.8-2.2g/kg \u00B7 25%',
+                        '鸡胸 \u00B7 牛肉 \u00B7 鸡蛋 \u00B7 鱼虾 \u00B7 豆腐 \u00B7 蛋白粉', t.primary, t),
+                  ),
+                  const SizedBox(height: 8),
+                  FadeScaleEntry(
+                    index: 2,
+                    child: _macroCard('碳水', '200-270g', '2-3g/kg \u00B7 40%',
+                        '糙米 \u00B7 红薯 \u00B7 燕麦 \u00B7 全麦 \u00B7 玉米 \u00B7 水果', t.warning, t),
+                  ),
+                  const SizedBox(height: 8),
+                  FadeScaleEntry(
+                    index: 3,
+                    child: _macroCard('脂肪', '58-73g', '0.8-1g/kg \u00B7 30%',
+                        '橄榄油 \u00B7 坚果 \u00B7 牛油果 \u00B7 深海鱼 \u00B7 蛋黄', t.success, t),
+                  ),
+
+                  const SizedBox(height: 24),
+                  FadeScaleEntry(
+                    index: 4,
+                    child: Text('饮食建议', style: GoogleFonts.inter(
+                      fontSize: 16, fontWeight: FontWeight.w800, color: t.text1,
+                    )),
+                  ),
+                  const SizedBox(height: 10),
+                  ...nutritionTips.asMap().entries.map((e) => FadeScaleEntry(
+                    index: e.key + 5,
+                    child: Card(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 3, height: 14,
+                              margin: const EdgeInsets.only(right: 10, top: 2),
+                              decoration: BoxDecoration(
+                                color: t.primary, borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(nutritionTips[e.key], style: GoogleFonts.inter(
+                                fontSize: 12, color: t.text2, height: 1.6,
+                              )),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ],
-                ),
+                  )),
+                  const SizedBox(height: 8),
+                ]),
               ),
-            )),
+            ),
           ],
         ),
       ),
@@ -993,111 +1394,137 @@ class ProgressionPage extends StatelessWidget {
     final t = ThemeInherited.of(context).theme;
 
     return Scaffold(
-      appBar: AppBar(title: Text('渐进超负荷', style: GoogleFonts.inter(
-        fontSize: 18, fontWeight: FontWeight.w800, color: t.text1,
-      ))),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Overview
-            Card(
-              color: t.primary.withOpacity(0.04),
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: [
+            // Title
+            SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  '渐进超负荷是增肌的核心原则：逐步增加训练负荷，迫使身体适应并变得更强。每 1-2 周尝试加重或增加次数，保持训练日志记录进步。',
-                  style: GoogleFonts.inter(fontSize: 12, color: t.text2, height: 1.7),
-                ),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                child: Text('渐进超负荷', style: GoogleFonts.inter(
+                  fontSize: 22, fontWeight: FontWeight.w900, color: t.text1, letterSpacing: -0.3,
+                )),
               ),
             ),
-            const SizedBox(height: 16),
 
-            Text('四阶段计划', style: GoogleFonts.inter(
-              fontSize: 16, fontWeight: FontWeight.w800, color: t.text1,
-            )),
-            const SizedBox(height: 10),
-
-            // Phase cards
-            ...progressionPhases.asMap().entries.map((e) {
-              final (week, title, desc) = progressionPhases[e.key];
-              final phaseNum = e.key + 1;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Phase number circle
-                        Container(
-                          width: 36, height: 36,
-                          decoration: BoxDecoration(
-                            color: t.primary.withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text('$phaseNum', style: GoogleFonts.inter(
-                              fontSize: 16, fontWeight: FontWeight.w800, color: t.primary,
-                            )),
-                          ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  // Overview
+                  FadeScaleEntry(
+                    index: 0,
+                    child: Card(
+                      color: t.primary.withOpacity(0.04),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          '渐进超负荷是增肌的核心原则：逐步增加训练负荷，迫使身体适应并变得更强。每 1-2 周尝试加重或增加次数，保持训练日志记录进步。',
+                          style: GoogleFonts.inter(fontSize: 12, color: t.text2, height: 1.7),
                         ),
-                        const SizedBox(width: 14),
-                        // Info
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(title, style: GoogleFonts.inter(
-                                    fontSize: 15, fontWeight: FontWeight.w800, color: t.text1,
-                                  )),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: t.primary.withOpacity(0.08),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(week, style: GoogleFonts.inter(
-                                      fontSize: 9, fontWeight: FontWeight.w700, color: t.primary,
-                                    )),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(desc, style: GoogleFonts.inter(fontSize: 12, color: t.text3, height: 1.6)),
-                            ],
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              );
-            }),
+                  const SizedBox(height: 16),
 
-            const SizedBox(height: 20),
-            Text('加重策略', style: GoogleFonts.inter(
-              fontSize: 16, fontWeight: FontWeight.w800, color: t.text1,
-            )),
-            const SizedBox(height: 10),
-            ...[
-              ('上肢复合动作', '卧推 / 划船 / 推肩：每次 +1.25-2.5kg'),
-              ('下肢复合动作', '倒蹬 / 硬拉 / 臀推：每次 +2.5-5kg'),
-              ('孤立动作', '侧平举 / 弯举 / 下压：每次 +0.5-1kg 或 +1-2次'),
-              ('遇到瓶颈', '减重 10% 重新开始，或更换动作变式刺激新角度'),
-            ].map((item) => Card(
-              margin: const EdgeInsets.only(bottom: 6),
-              child: ListTile(
-                dense: true,
-                title: Text(item.$1, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: t.text1)),
-                subtitle: Text(item.$2, style: GoogleFonts.inter(fontSize: 11, color: t.text3, height: 1.5)),
+                  FadeScaleEntry(
+                    index: 1,
+                    child: Text('四阶段计划', style: GoogleFonts.inter(
+                      fontSize: 16, fontWeight: FontWeight.w800, color: t.text1,
+                    )),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Phase cards
+                  ...progressionPhases.asMap().entries.map((e) {
+                    final (week, title, desc) = progressionPhases[e.key];
+                    final phaseNum = e.key + 1;
+                    return FadeScaleEntry(
+                      index: e.key + 2,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 36, height: 36,
+                                  decoration: BoxDecoration(
+                                    color: t.primary.withOpacity(0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Text('$phaseNum', style: GoogleFonts.inter(
+                                      fontSize: 16, fontWeight: FontWeight.w800, color: t.primary,
+                                    )),
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(title, style: GoogleFonts.inter(
+                                            fontSize: 15, fontWeight: FontWeight.w800, color: t.text1,
+                                          )),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: t.primary.withOpacity(0.08),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(week, style: GoogleFonts.inter(
+                                              fontSize: 9, fontWeight: FontWeight.w700, color: t.primary,
+                                            )),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(desc, style: GoogleFonts.inter(fontSize: 12, color: t.text3, height: 1.6)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+
+                  const SizedBox(height: 20),
+                  FadeScaleEntry(
+                    index: 7,
+                    child: Text('加重策略', style: GoogleFonts.inter(
+                      fontSize: 16, fontWeight: FontWeight.w800, color: t.text1,
+                    )),
+                  ),
+                  const SizedBox(height: 10),
+                  ...[
+                    ('上肢复合动作', '卧推 / 划船 / 推肩：每次 +1.25-2.5kg'),
+                    ('下肢复合动作', '倒蹬 / 硬拉 / 臀推：每次 +2.5-5kg'),
+                    ('孤立动作', '侧平举 / 弯举 / 下压：每次 +0.5-1kg 或 +1-2次'),
+                    ('遇到瓶颈', '减重 10% 重新开始，或更换动作变式刺激新角度'),
+                  ].asMap().entries.map((item) => FadeScaleEntry(
+                    index: item.key + 8,
+                    child: Card(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      child: ListTile(
+                        dense: true,
+                        title: Text(item.value.$1, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: t.text1)),
+                        subtitle: Text(item.value.$2, style: GoogleFonts.inter(fontSize: 11, color: t.text3, height: 1.5)),
+                      ),
+                    ),
+                  )),
+                  const SizedBox(height: 8),
+                ]),
               ),
-            )),
+            ),
           ],
         ),
       ),
@@ -1106,7 +1533,7 @@ class ProgressionPage extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// THEME PAGE — Simple tappable list, NO GestureDetector nesting issues
+// THEME PAGE — Animated theme selection with press feedback
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class ThemePage extends StatelessWidget {
@@ -1119,61 +1546,113 @@ class ThemePage extends StatelessWidget {
     final current = inherited.current;
 
     return Scaffold(
-      appBar: AppBar(title: Text('主题选择', style: GoogleFonts.inter(
-        fontSize: 18, fontWeight: FontWeight.w800, color: t.text1,
-      ))),
-      body: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        itemCount: AppTheme.values.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (context, i) {
-          final mode = AppTheme.values[i];
-          final mt = themes[mode]!;
-          final sel = mode == current;
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                child: Text('主题选择', style: GoogleFonts.inter(
+                  fontSize: 22, fontWeight: FontWeight.w900, color: t.text1, letterSpacing: -0.3,
+                )),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, i) {
+                    final mode = AppTheme.values[i];
+                    final mt = themes[mode]!;
+                    final sel = mode == current;
 
-          return Card(
-            color: sel ? mt.primary.withOpacity(0.06) : null,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: BorderSide(
-                color: sel ? mt.primary : t.border,
-                width: sel ? 2 : 1,
-              ),
-            ),
-            child: ListTile(
-              onTap: () => inherited.setTheme(mode),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              leading: Container(
-                width: 40, height: 40,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [mt.primary, mt.accent]),
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: sel ? [BoxShadow(color: mt.primary.withOpacity(0.3), blurRadius: 8)] : null,
-                ),
-                child: sel ? const Icon(Icons.check, color: Colors.white, size: 20) : null,
-              ),
-              title: Text(mt.name, style: GoogleFonts.inter(
-                fontSize: 15, fontWeight: FontWeight.w700,
-                color: sel ? mt.primary : t.text1,
-              )),
-              subtitle: Text(sel ? '当前使用中' : '点击切换', style: GoogleFonts.inter(
-                fontSize: 11, color: sel ? mt.primary.withOpacity(0.7) : t.text4,
-              )),
-              trailing: sel
-                  ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: mt.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
+                    return FadeScaleEntry(
+                      index: i,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: PressScale(
+                          onTap: () => inherited.setTheme(mode),
+                          child: Card(
+                            color: sel ? mt.primary.withOpacity(0.06) : null,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              side: BorderSide(
+                                color: sel ? mt.primary : t.border,
+                                width: sel ? 2 : 1,
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              child: Row(
+                                children: [
+                                  // Color swatch
+                                  Container(
+                                    width: 44, height: 44,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(colors: [mt.primary, mt.accent]),
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: sel ? [BoxShadow(color: mt.primary.withOpacity(0.3), blurRadius: 10)] : null,
+                                    ),
+                                    child: AnimatedSwitcher(
+                                      duration: const Duration(milliseconds: 200),
+                                      child: sel
+                                          ? const Icon(Icons.check, color: Colors.white, size: 22, key: ValueKey('selected'))
+                                          : null,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  // Theme info
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(mt.name, style: GoogleFonts.inter(
+                                          fontSize: 15, fontWeight: FontWeight.w700,
+                                          color: sel ? mt.primary : t.text1,
+                                        )),
+                                        Text(sel ? '当前使用中' : '点击切换', style: GoogleFonts.inter(
+                                          fontSize: 11, color: sel ? mt.primary.withOpacity(0.7) : t.text4,
+                                        )),
+                                      ],
+                                    ),
+                                  ),
+                                  // Selected badge
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 250),
+                                    curve: Curves.easeOutBack,
+                                    padding: sel
+                                        ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4)
+                                        : EdgeInsets.zero,
+                                    decoration: sel
+                                        ? BoxDecoration(
+                                            color: mt.primary.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(12),
+                                          )
+                                        : null,
+                                    child: AnimatedDefaultTextStyle(
+                                      duration: const Duration(milliseconds: 250),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: sel ? mt.primary : Colors.transparent,
+                                      ),
+                                      child: const Text('已选择'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                      child: Text('已选择', style: GoogleFonts.inter(
-                        fontSize: 10, fontWeight: FontWeight.w700, color: mt.primary,
-                      )),
-                    )
-                  : null,
+                    );
+                  },
+                  childCount: AppTheme.values.length,
+                ),
+              ),
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }

@@ -14,18 +14,18 @@ if (localPropertiesFile.exists()) {
 
 def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
 if (flutterVersionCode == null) {
-    flutterVersionCode = '600'
+    flutterVersionCode = '4'
 }
 
 def flutterVersionName = localProperties.getProperty('flutter.versionName')
 if (flutterVersionName == null) {
-    flutterVersionName = '6.0.0'
+    flutterVersionName = '4.0.0'
 }
 
 android {
-    namespace "com.amber.amber_md_viewer"
+    namespace "com.body.recomp"
     compileSdk 35
-    ndkVersion "27.0.12077973"
+    ndkVersion flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
@@ -38,7 +38,7 @@ android {
 
     defaultConfig {
         applicationId "com.body.recomp"
-        minSdkVersion flutter.minSdkVersion
+        minSdk 21
         targetSdk 35
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
@@ -56,3 +56,9 @@ flutter {
 }
 
 dependencies {}
+
+// Workaround for missing jlink
+tasks.withType(JavaCompile).configureEach {
+    options.fork = true
+    options.forkOptions.jvmArgs += ['-Xmx2g']
+}
