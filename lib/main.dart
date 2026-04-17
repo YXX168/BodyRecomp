@@ -48,9 +48,10 @@ class WorkoutTheme {
   });
 }
 
+// Fix 4: Theme names changed to 三字·四字 format
 const themes = {
   AppTheme.blue: WorkoutTheme(
-    name: '极光·霜冻蓝', emoji: '',
+    name: '极光·冰霜蓝', emoji: '',
     bg: Color(0xFFF0F4FF),
     card: Color(0xFFFFFFFF),
     primary: Color(0xFF2563EB),
@@ -84,7 +85,7 @@ const themes = {
     navbarBg: Color(0xFFFFFFFF),
   ),
   AppTheme.pink: WorkoutTheme(
-    name: '玫瑰·樱花粉', emoji: '',
+    name: '樱花·飞舞粉', emoji: '',
     bg: Color(0xFFFDF2F8),
     card: Color(0xFFFFFFFF),
     primary: Color(0xFFDB2777),
@@ -101,7 +102,7 @@ const themes = {
     navbarBg: Color(0xFFFFFFFF),
   ),
   AppTheme.purple: WorkoutTheme(
-    name: '星云·宇宙紫', emoji: '',
+    name: '星云·紫光紫', emoji: '',
     bg: Color(0xFFFAF5FF),
     card: Color(0xFFFFFFFF),
     primary: Color(0xFF7C3AED),
@@ -118,7 +119,7 @@ const themes = {
     navbarBg: Color(0xFFFFFFFF),
   ),
   AppTheme.orange: WorkoutTheme(
-    name: '日落·炽焰橙', emoji: '',
+    name: '落日·余晖橙', emoji: '',
     bg: Color(0xFFFFF7ED),
     card: Color(0xFFFFFFFF),
     primary: Color(0xFFEA580C),
@@ -349,6 +350,7 @@ class _FadeScaleEntryState extends State<FadeScaleEntry>
 }
 
 /// Press scale animation (0.95) for interactive cards
+/// Fix 1: Added HitTestBehavior.opaque for full tap area coverage
 class PressScale extends StatefulWidget {
   final Widget child;
   final VoidCallback? onTap;
@@ -386,6 +388,7 @@ class _PressScaleState extends State<PressScale>
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque, // Fix 1: transparent areas now tappable
       onTapDown: (_) => _controller.forward(),
       onTapUp: (_) {
         _controller.reverse();
@@ -397,14 +400,18 @@ class _PressScaleState extends State<PressScale>
   }
 }
 
-/// Shimmer sweep animation for title text
-class ShimmerTitle extends StatefulWidget {
+// ═══════════════════════════════════════════════════════════════════════════════
+// Fix 2 & Fix 3: Replaced ShimmerTitle with static GradientTitle
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Static gradient title — no animation, no replay on page switch
+class GradientTitle extends StatelessWidget {
   final String text;
   final Color primary;
   final Color accent;
   final double fontSize;
 
-  const ShimmerTitle({
+  const GradientTitle({
     super.key,
     required this.text,
     required this.primary,
@@ -413,53 +420,20 @@ class ShimmerTitle extends StatefulWidget {
   });
 
   @override
-  State<ShimmerTitle> createState() => _ShimmerTitleState();
-}
-
-class _ShimmerTitleState extends State<ShimmerTitle>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _sweepCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _sweepCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2200),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _sweepCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _sweepCtrl,
-      builder: (context, child) {
-        return ShaderMask(
-          shaderCallback: (bounds) {
-            return LinearGradient(
-              colors: [widget.primary, widget.accent, widget.primary],
-              stops: [
-                0.0,
-                _sweepCtrl.value * 0.6 + 0.2,
-                1.0,
-              ],
-              tileMode: TileMode.mirror,
-            ).createShader(bounds);
-          },
-          blendMode: BlendMode.srcIn,
-          child: child,
-        );
+    return ShaderMask(
+      shaderCallback: (bounds) {
+        return LinearGradient(
+          colors: [primary, accent],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ).createShader(bounds);
       },
+      blendMode: BlendMode.srcIn,
       child: Text(
-        widget.text,
+        text,
         style: GoogleFonts.inter(
-          fontSize: widget.fontSize,
+          fontSize: fontSize,
           fontWeight: FontWeight.w900,
           letterSpacing: -0.5,
         ),
@@ -624,6 +598,7 @@ class RecompApp extends StatelessWidget {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN PAGE — Bottom navigation with animated tab switching
+// Fix 2: Title moved here (above AnimatedSwitcher) so it stays persistent
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class MainPage extends StatefulWidget {
@@ -648,26 +623,74 @@ class _MainPageState extends State<MainPage> {
     final t = inherited.theme;
 
     return Scaffold(
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (child, animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.02, 0),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
-              child: child,
+      body: Column(
+        children: [
+          // ── Fix 2: Persistent gradient title — stays above AnimatedSwitcher ──
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        GradientTitle(
+                          text: 'Body Recomp',
+                          primary: t.primary,
+                          accent: t.primaryLight,
+                          fontSize: 26,
+                        ),
+                        Text('27M \u00B7 173cm \u00B7 72.5kg \u00B7 BMI 24.2', style: GoogleFonts.inter(
+                          fontSize: 11, color: t.text3, fontWeight: FontWeight.w500,
+                        )),
+                      ],
+                    ),
+                  ),
+                  PressScale(
+                    onTap: () => HapticFeedback.lightImpact(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: t.primary.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text('目标 68-70kg', style: GoogleFonts.inter(
+                        fontSize: 11, fontWeight: FontWeight.w700, color: t.primary,
+                      )),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          );
-        },
-        child: KeyedSubtree(
-          key: ValueKey(_tabIndex),
-          child: _pages[_tabIndex],
-        ),
+          ),
+
+          // ── Page content with animated switch (title NOT inside here) ──
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0.02, 0),
+                      end: Offset.zero,
+                    ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+                    child: child,
+                  ),
+                );
+              },
+              child: KeyedSubtree(
+                key: ValueKey(_tabIndex),
+                child: _pages[_tabIndex],
+              ),
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -698,48 +721,58 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
+  // Fix 1: Bottom nav with proper tap area (56dp min height, Material for ripple)
   Widget _buildNavItem(IconData icon, String label, int index, WorkoutTheme t) {
     final sel = index == _tabIndex;
     return Expanded(
-      child: PressScale(
-        onTap: () {
-          if (_tabIndex != index) {
-            HapticFeedback.selectionClick();
-            setState(() => _tabIndex = index);
-          }
-        },
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedNavIcon(
-              icon: icon,
-              selected: sel,
-              activeColor: t.primary,
-              inactiveColor: t.text4,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              if (_tabIndex != index) {
+                HapticFeedback.selectionClick();
+                setState(() => _tabIndex = index);
+              }
+            },
+            splashColor: t.primary.withOpacity(0.08),
+            highlightColor: t.primary.withOpacity(0.04),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedNavIcon(
+                  icon: icon,
+                  selected: sel,
+                  activeColor: t.primary,
+                  inactiveColor: t.text4,
+                ),
+                const SizedBox(height: 2),
+                AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 250),
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                    color: sel ? t.primary : t.text4,
+                  ),
+                  child: Text(label),
+                ),
+                // Active indicator dot
+                const SizedBox(height: 3),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutBack,
+                  width: sel ? 16 : 0,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: t.primary,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 2),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 250),
-              style: GoogleFonts.inter(
-                fontSize: 10,
-                fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                color: sel ? t.primary : t.text4,
-              ),
-              child: Text(label),
-            ),
-            // Active indicator dot
-            const SizedBox(height: 3),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOutBack,
-              width: sel ? 16 : 0,
-              height: 3,
-              decoration: BoxDecoration(
-                color: t.primary,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -748,6 +781,7 @@ class _MainPageState extends State<MainPage> {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // WORKOUT PAGE — Day selector + exercise list with animations
+// Fix 2: Title removed from here (moved to MainPage)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class WorkoutPage extends StatefulWidget {
@@ -809,129 +843,87 @@ class _WorkoutPageState extends State<WorkoutPage> {
     final t = ThemeInherited.of(context).theme;
     final day = workoutDays[_dayIndex];
 
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            // ── App Bar with shimmer title ──
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ShimmerTitle(
-                          text: 'Body Recomp',
-                          primary: t.primary,
-                          accent: t.primaryLight,
-                          fontSize: 26,
-                        ),
-                        Text('27M \u00B7 173cm \u00B7 72.5kg \u00B7 BMI 24.2', style: GoogleFonts.inter(
-                          fontSize: 11, color: t.text3, fontWeight: FontWeight.w500,
-                        )),
-                      ],
+    return Column(
+      children: [
+        // ── Day selector chips ──
+        SizedBox(
+          height: 44,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: workoutDays.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 6),
+            itemBuilder: (context, i) {
+              final d = workoutDays[i];
+              final sel = i == _dayIndex;
+              return PressScale(
+                onTap: () {
+                  if (_dayIndex != i) {
+                    HapticFeedback.selectionClick();
+                    setState(() => _dayIndex = i);
+                  }
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: sel ? t.primary : Colors.transparent,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: sel ? t.primary : t.border,
+                      width: sel ? 1.5 : 1,
                     ),
+                    boxShadow: sel ? [
+                      BoxShadow(color: t.primary.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 2)),
+                    ] : null,
                   ),
-                  PressScale(
-                    onTap: () => HapticFeedback.lightImpact(),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: t.primary.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text('目标 68-70kg', style: GoogleFonts.inter(
-                        fontSize: 11, fontWeight: FontWeight.w700, color: t.primary,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(d.dayName, style: GoogleFonts.inter(
+                        fontSize: 12, fontWeight: FontWeight.w700,
+                        color: sel ? Colors.white : t.text2,
                       )),
-                    ),
+                      Text(d.subtitle, style: GoogleFonts.inter(
+                        fontSize: 8, fontWeight: FontWeight.w500,
+                        color: sel ? Colors.white.withOpacity(0.8) : t.text4,
+                      )),
+                    ],
                   ),
-                ],
-              ),
-            ),
-
-            // ── Day selector chips ──
-            SizedBox(
-              height: 44,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: workoutDays.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 6),
-                itemBuilder: (context, i) {
-                  final d = workoutDays[i];
-                  final sel = i == _dayIndex;
-                  return PressScale(
-                    onTap: () {
-                      if (_dayIndex != i) {
-                        HapticFeedback.selectionClick();
-                        setState(() => _dayIndex = i);
-                      }
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      curve: Curves.easeOutCubic,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: sel ? t.primary : Colors.transparent,
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(
-                          color: sel ? t.primary : t.border,
-                          width: sel ? 1.5 : 1,
-                        ),
-                        boxShadow: sel ? [
-                          BoxShadow(color: t.primary.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 2)),
-                        ] : null,
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(d.dayName, style: GoogleFonts.inter(
-                            fontSize: 12, fontWeight: FontWeight.w700,
-                            color: sel ? Colors.white : t.text2,
-                          )),
-                          Text(d.subtitle, style: GoogleFonts.inter(
-                            fontSize: 8, fontWeight: FontWeight.w500,
-                            color: sel ? Colors.white.withOpacity(0.8) : t.text4,
-                          )),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            // ── Content area with animated switch ──
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 280),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
-                transitionBuilder: (child, animation) {
-                  return FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0.03, 0),
-                        end: Offset.zero,
-                      ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
-                      child: child,
-                    ),
-                  );
-                },
-                child: KeyedSubtree(
-                  key: ValueKey('day_$_dayIndex'),
-                  child: _buildDayContent(day, t),
                 ),
-              ),
-            ),
-          ],
+              );
+            },
+          ),
         ),
-      ),
+
+        const SizedBox(height: 8),
+
+        // ── Content area with animated switch ──
+        Expanded(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 280),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.03, 0),
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+                  child: child,
+                ),
+              );
+            },
+            child: KeyedSubtree(
+              key: ValueKey('day_$_dayIndex'),
+              child: _buildDayContent(day, t),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1121,6 +1113,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
     );
   }
 
+  // Fix 5: Enhanced AnimatedSwitcher with FadeTransition + ScaleTransition + easeOutBack
   Widget _exerciseCard(Exercise ex, int num, bool isDone, WorkoutTheme t, VoidCallback onTap) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -1139,7 +1132,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Number + Checkbox with animation
+                // Number + Checkbox with enhanced animation (Fix 5)
                 PressScale(
                   onTap: onTap,
                   child: AnimatedContainer(
@@ -1157,6 +1150,17 @@ class _WorkoutPageState extends State<WorkoutPage> {
                     ),
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 200),
+                      transitionBuilder: (child, animation) {
+                        return FadeTransition(
+                          opacity: animation,
+                          child: ScaleTransition(
+                            scale: Tween<double>(begin: 0.8, end: 1.0).animate(
+                              CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+                            ),
+                            child: child,
+                          ),
+                        );
+                      },
                       child: isDone
                           ? const Icon(Icons.check, color: Colors.white, size: 14, key: ValueKey('done'))
                           : Center(
@@ -1232,7 +1236,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// NUTRITION PAGE
+// NUTRITION PAGE — Fix 3: Gradient title applied
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class NutritionPage extends StatelessWidget {
@@ -1242,105 +1246,104 @@ class NutritionPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = ThemeInherited.of(context).theme;
 
-    return Scaffold(
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            // Title
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                child: Text('饮食营养', style: GoogleFonts.inter(
-                  fontSize: 22, fontWeight: FontWeight.w900, color: t.text1, letterSpacing: -0.3,
+    return CustomScrollView(
+      slivers: [
+        // Fix 3: GradientTitle instead of plain Text
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+            child: GradientTitle(
+              text: '饮食营养',
+              primary: t.primary,
+              accent: t.primaryLight,
+              fontSize: 22,
+            ),
+          ),
+        ),
+
+        // Content
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              // Calorie summary
+              FadeScaleEntry(
+                index: 0,
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _statItem('每日热量', '2200', 'kcal', t),
+                        _statItem('蛋白质', '130-160', 'g', t),
+                        _statItem('碳水', '200-270', 'g', t),
+                        _statItem('脂肪', '58-73', 'g', t),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Macro detail cards
+              FadeScaleEntry(
+                index: 1,
+                child: _macroCard('蛋白质', '130-160g', '1.8-2.2g/kg \u00B7 25%',
+                    '鸡胸 \u00B7 牛肉 \u00B7 鸡蛋 \u00B7 鱼虾 \u00B7 豆腐 \u00B7 蛋白粉', t.primary, t),
+              ),
+              const SizedBox(height: 8),
+              FadeScaleEntry(
+                index: 2,
+                child: _macroCard('碳水', '200-270g', '2-3g/kg \u00B7 40%',
+                    '糙米 \u00B7 红薯 \u00B7 燕麦 \u00B7 全麦 \u00B7 玉米 \u00B7 水果', t.warning, t),
+              ),
+              const SizedBox(height: 8),
+              FadeScaleEntry(
+                index: 3,
+                child: _macroCard('脂肪', '58-73g', '0.8-1g/kg \u00B7 30%',
+                    '橄榄油 \u00B7 坚果 \u00B7 牛油果 \u00B7 深海鱼 \u00B7 蛋黄', t.success, t),
+              ),
+
+              const SizedBox(height: 24),
+              FadeScaleEntry(
+                index: 4,
+                child: Text('饮食建议', style: GoogleFonts.inter(
+                  fontSize: 16, fontWeight: FontWeight.w800, color: t.text1,
                 )),
               ),
-            ),
-
-            // Content
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  // Calorie summary
-                  FadeScaleEntry(
-                    index: 0,
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            _statItem('每日热量', '2200', 'kcal', t),
-                            _statItem('蛋白质', '130-160', 'g', t),
-                            _statItem('碳水', '200-270', 'g', t),
-                            _statItem('脂肪', '58-73', 'g', t),
-                          ],
+              const SizedBox(height: 10),
+              ...nutritionTips.asMap().entries.map((e) => FadeScaleEntry(
+                index: e.key + 5,
+                child: Card(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 3, height: 14,
+                          margin: const EdgeInsets.only(right: 10, top: 2),
+                          decoration: BoxDecoration(
+                            color: t.primary, borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
-                      ),
+                        Expanded(
+                          child: Text(nutritionTips[e.key], style: GoogleFonts.inter(
+                            fontSize: 12, color: t.text2, height: 1.6,
+                          )),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-
-                  // Macro detail cards
-                  FadeScaleEntry(
-                    index: 1,
-                    child: _macroCard('蛋白质', '130-160g', '1.8-2.2g/kg \u00B7 25%',
-                        '鸡胸 \u00B7 牛肉 \u00B7 鸡蛋 \u00B7 鱼虾 \u00B7 豆腐 \u00B7 蛋白粉', t.primary, t),
-                  ),
-                  const SizedBox(height: 8),
-                  FadeScaleEntry(
-                    index: 2,
-                    child: _macroCard('碳水', '200-270g', '2-3g/kg \u00B7 40%',
-                        '糙米 \u00B7 红薯 \u00B7 燕麦 \u00B7 全麦 \u00B7 玉米 \u00B7 水果', t.warning, t),
-                  ),
-                  const SizedBox(height: 8),
-                  FadeScaleEntry(
-                    index: 3,
-                    child: _macroCard('脂肪', '58-73g', '0.8-1g/kg \u00B7 30%',
-                        '橄榄油 \u00B7 坚果 \u00B7 牛油果 \u00B7 深海鱼 \u00B7 蛋黄', t.success, t),
-                  ),
-
-                  const SizedBox(height: 24),
-                  FadeScaleEntry(
-                    index: 4,
-                    child: Text('饮食建议', style: GoogleFonts.inter(
-                      fontSize: 16, fontWeight: FontWeight.w800, color: t.text1,
-                    )),
-                  ),
-                  const SizedBox(height: 10),
-                  ...nutritionTips.asMap().entries.map((e) => FadeScaleEntry(
-                    index: e.key + 5,
-                    child: Card(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 3, height: 14,
-                              margin: const EdgeInsets.only(right: 10, top: 2),
-                              decoration: BoxDecoration(
-                                color: t.primary, borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(nutritionTips[e.key], style: GoogleFonts.inter(
-                                fontSize: 12, color: t.text2, height: 1.6,
-                              )),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  )),
-                  const SizedBox(height: 8),
-                ]),
-              ),
-            ),
-          ],
+                ),
+              )),
+              const SizedBox(height: 8),
+            ]),
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -1383,7 +1386,7 @@ class NutritionPage extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PROGRESSION PAGE
+// PROGRESSION PAGE — Fix 3: Gradient title applied
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class ProgressionPage extends StatelessWidget {
@@ -1393,147 +1396,146 @@ class ProgressionPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = ThemeInherited.of(context).theme;
 
-    return Scaffold(
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            // Title
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                child: Text('渐进超负荷', style: GoogleFonts.inter(
-                  fontSize: 22, fontWeight: FontWeight.w900, color: t.text1, letterSpacing: -0.3,
+    return CustomScrollView(
+      slivers: [
+        // Fix 3: GradientTitle instead of plain Text
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+            child: GradientTitle(
+              text: '渐进超负荷',
+              primary: t.primary,
+              accent: t.primaryLight,
+              fontSize: 22,
+            ),
+          ),
+        ),
+
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              // Overview
+              FadeScaleEntry(
+                index: 0,
+                child: Card(
+                  color: t.primary.withOpacity(0.04),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      '渐进超负荷是增肌的核心原则：逐步增加训练负荷，迫使身体适应并变得更强。每 1-2 周尝试加重或增加次数，保持训练日志记录进步。',
+                      style: GoogleFonts.inter(fontSize: 12, color: t.text2, height: 1.7),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              FadeScaleEntry(
+                index: 1,
+                child: Text('四阶段计划', style: GoogleFonts.inter(
+                  fontSize: 16, fontWeight: FontWeight.w800, color: t.text1,
                 )),
               ),
-            ),
+              const SizedBox(height: 10),
 
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  // Overview
-                  FadeScaleEntry(
-                    index: 0,
+              // Phase cards
+              ...progressionPhases.asMap().entries.map((e) {
+                final (week, title, desc) = progressionPhases[e.key];
+                final phaseNum = e.key + 1;
+                return FadeScaleEntry(
+                  index: e.key + 2,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
                     child: Card(
-                      color: t.primary.withOpacity(0.04),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
-                        child: Text(
-                          '渐进超负荷是增肌的核心原则：逐步增加训练负荷，迫使身体适应并变得更强。每 1-2 周尝试加重或增加次数，保持训练日志记录进步。',
-                          style: GoogleFonts.inter(fontSize: 12, color: t.text2, height: 1.7),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  FadeScaleEntry(
-                    index: 1,
-                    child: Text('四阶段计划', style: GoogleFonts.inter(
-                      fontSize: 16, fontWeight: FontWeight.w800, color: t.text1,
-                    )),
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Phase cards
-                  ...progressionPhases.asMap().entries.map((e) {
-                    final (week, title, desc) = progressionPhases[e.key];
-                    final phaseNum = e.key + 1;
-                    return FadeScaleEntry(
-                      index: e.key + 2,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  width: 36, height: 36,
-                                  decoration: BoxDecoration(
-                                    color: t.primary.withOpacity(0.1),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: Text('$phaseNum', style: GoogleFonts.inter(
-                                      fontSize: 16, fontWeight: FontWeight.w800, color: t.primary,
-                                    )),
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 36, height: 36,
+                              decoration: BoxDecoration(
+                                color: t.primary.withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text('$phaseNum', style: GoogleFonts.inter(
+                                  fontSize: 16, fontWeight: FontWeight.w800, color: t.primary,
+                                )),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
                                     children: [
-                                      Row(
-                                        children: [
-                                          Text(title, style: GoogleFonts.inter(
-                                            fontSize: 15, fontWeight: FontWeight.w800, color: t.text1,
-                                          )),
-                                          const SizedBox(width: 8),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: t.primary.withOpacity(0.08),
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: Text(week, style: GoogleFonts.inter(
-                                              fontSize: 9, fontWeight: FontWeight.w700, color: t.primary,
-                                            )),
-                                          ),
-                                        ],
+                                      Text(title, style: GoogleFonts.inter(
+                                        fontSize: 15, fontWeight: FontWeight.w800, color: t.text1,
+                                      )),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: t.primary.withOpacity(0.08),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(week, style: GoogleFonts.inter(
+                                          fontSize: 9, fontWeight: FontWeight.w700, color: t.primary,
+                                        )),
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(desc, style: GoogleFonts.inter(fontSize: 12, color: t.text3, height: 1.6)),
                                     ],
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 4),
+                                  Text(desc, style: GoogleFonts.inter(fontSize: 12, color: t.text3, height: 1.6)),
+                                ],
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ),
-                    );
-                  }),
-
-                  const SizedBox(height: 20),
-                  FadeScaleEntry(
-                    index: 7,
-                    child: Text('加重策略', style: GoogleFonts.inter(
-                      fontSize: 16, fontWeight: FontWeight.w800, color: t.text1,
-                    )),
-                  ),
-                  const SizedBox(height: 10),
-                  ...[
-                    ('上肢复合动作', '卧推 / 划船 / 推肩：每次 +1.25-2.5kg'),
-                    ('下肢复合动作', '倒蹬 / 硬拉 / 臀推：每次 +2.5-5kg'),
-                    ('孤立动作', '侧平举 / 弯举 / 下压：每次 +0.5-1kg 或 +1-2次'),
-                    ('遇到瓶颈', '减重 10% 重新开始，或更换动作变式刺激新角度'),
-                  ].asMap().entries.map((item) => FadeScaleEntry(
-                    index: item.key + 8,
-                    child: Card(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      child: ListTile(
-                        dense: true,
-                        title: Text(item.value.$1, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: t.text1)),
-                        subtitle: Text(item.value.$2, style: GoogleFonts.inter(fontSize: 11, color: t.text3, height: 1.5)),
-                      ),
                     ),
-                  )),
-                  const SizedBox(height: 8),
-                ]),
+                  ),
+                );
+              }),
+
+              const SizedBox(height: 20),
+              FadeScaleEntry(
+                index: 7,
+                child: Text('加重策略', style: GoogleFonts.inter(
+                  fontSize: 16, fontWeight: FontWeight.w800, color: t.text1,
+                )),
               ),
-            ),
-          ],
+              const SizedBox(height: 10),
+              ...[
+                ('上肢复合动作', '卧推 / 划船 / 推肩：每次 +1.25-2.5kg'),
+                ('下肢复合动作', '倒蹬 / 硬拉 / 臀推：每次 +2.5-5kg'),
+                ('孤立动作', '侧平举 / 弯举 / 下压：每次 +0.5-1kg 或 +1-2次'),
+                ('遇到瓶颈', '减重 10% 重新开始，或更换动作变式刺激新角度'),
+              ].asMap().entries.map((item) => FadeScaleEntry(
+                index: item.key + 8,
+                child: Card(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  child: ListTile(
+                    dense: true,
+                    title: Text(item.value.$1, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: t.text1)),
+                    subtitle: Text(item.value.$2, style: GoogleFonts.inter(fontSize: 11, color: t.text3, height: 1.5)),
+                  ),
+                ),
+              )),
+              const SizedBox(height: 8),
+            ]),
+          ),
         ),
-      ),
+      ],
     );
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// THEME PAGE — Animated theme selection with press feedback
+// THEME PAGE — Fix 3: Gradient title applied
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class ThemePage extends StatelessWidget {
@@ -1545,115 +1547,115 @@ class ThemePage extends StatelessWidget {
     final t = inherited.theme;
     final current = inherited.current;
 
-    return Scaffold(
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                child: Text('主题选择', style: GoogleFonts.inter(
-                  fontSize: 22, fontWeight: FontWeight.w900, color: t.text1, letterSpacing: -0.3,
-                )),
-              ),
+    return CustomScrollView(
+      slivers: [
+        // Fix 3: GradientTitle instead of plain Text
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+            child: GradientTitle(
+              text: '主题选择',
+              primary: t.primary,
+              accent: t.primaryLight,
+              fontSize: 22,
             ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, i) {
-                    final mode = AppTheme.values[i];
-                    final mt = themes[mode]!;
-                    final sel = mode == current;
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, i) {
+                final mode = AppTheme.values[i];
+                final mt = themes[mode]!;
+                final sel = mode == current;
 
-                    return FadeScaleEntry(
-                      index: i,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: PressScale(
-                          onTap: () => inherited.setTheme(mode),
-                          child: Card(
-                            color: sel ? mt.primary.withOpacity(0.06) : null,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              side: BorderSide(
-                                color: sel ? mt.primary : t.border,
-                                width: sel ? 2 : 1,
+                return FadeScaleEntry(
+                  index: i,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: PressScale(
+                      onTap: () => inherited.setTheme(mode),
+                      child: Card(
+                        color: sel ? mt.primary.withOpacity(0.06) : null,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          side: BorderSide(
+                            color: sel ? mt.primary : t.border,
+                            width: sel ? 2 : 1,
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          child: Row(
+                            children: [
+                              // Color swatch
+                              Container(
+                                width: 44, height: 44,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(colors: [mt.primary, mt.accent]),
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: sel ? [BoxShadow(color: mt.primary.withOpacity(0.3), blurRadius: 10)] : null,
+                                ),
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 200),
+                                  child: sel
+                                      ? const Icon(Icons.check, color: Colors.white, size: 22, key: ValueKey('selected'))
+                                      : null,
+                                ),
                               ),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              child: Row(
-                                children: [
-                                  // Color swatch
-                                  Container(
-                                    width: 44, height: 44,
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(colors: [mt.primary, mt.accent]),
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: sel ? [BoxShadow(color: mt.primary.withOpacity(0.3), blurRadius: 10)] : null,
-                                    ),
-                                    child: AnimatedSwitcher(
-                                      duration: const Duration(milliseconds: 200),
-                                      child: sel
-                                          ? const Icon(Icons.check, color: Colors.white, size: 22, key: ValueKey('selected'))
-                                          : null,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  // Theme info
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(mt.name, style: GoogleFonts.inter(
-                                          fontSize: 15, fontWeight: FontWeight.w700,
-                                          color: sel ? mt.primary : t.text1,
-                                        )),
-                                        Text(sel ? '当前使用中' : '点击切换', style: GoogleFonts.inter(
-                                          fontSize: 11, color: sel ? mt.primary.withOpacity(0.7) : t.text4,
-                                        )),
-                                      ],
-                                    ),
-                                  ),
-                                  // Selected badge
-                                  AnimatedContainer(
-                                    duration: const Duration(milliseconds: 250),
-                                    curve: Curves.easeOutBack,
-                                    padding: sel
-                                        ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4)
-                                        : EdgeInsets.zero,
-                                    decoration: sel
-                                        ? BoxDecoration(
-                                            color: mt.primary.withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(12),
-                                          )
-                                        : null,
-                                    child: AnimatedDefaultTextStyle(
-                                      duration: const Duration(milliseconds: 250),
-                                      style: GoogleFonts.inter(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w700,
-                                        color: sel ? mt.primary : Colors.transparent,
-                                      ),
-                                      child: const Text('已选择'),
-                                    ),
-                                  ),
-                                ],
+                              const SizedBox(width: 14),
+                              // Theme info
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(mt.name, style: GoogleFonts.inter(
+                                      fontSize: 15, fontWeight: FontWeight.w700,
+                                      color: sel ? mt.primary : t.text1,
+                                    )),
+                                    Text(sel ? '当前使用中' : '点击切换', style: GoogleFonts.inter(
+                                      fontSize: 11, color: sel ? mt.primary.withOpacity(0.7) : t.text4,
+                                    )),
+                                  ],
+                                ),
                               ),
-                            ),
+                              // Selected badge
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeOutBack,
+                                padding: sel
+                                    ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4)
+                                    : EdgeInsets.zero,
+                                decoration: sel
+                                    ? BoxDecoration(
+                                        color: mt.primary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                      )
+                                    : null,
+                                child: AnimatedDefaultTextStyle(
+                                  duration: const Duration(milliseconds: 250),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: sel ? mt.primary : Colors.transparent,
+                                  ),
+                                  child: const Text('已选择'),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    );
-                  },
-                  childCount: AppTheme.values.length,
-                ),
-              ),
+                    ),
+                  ),
+                );
+              },
+              childCount: AppTheme.values.length,
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
