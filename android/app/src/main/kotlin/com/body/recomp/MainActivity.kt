@@ -1,4 +1,4 @@
-package com.bodyrecomp.app
+package com.body.recomp
 
 import io.flutter.embedding.android.FlutterActivity
 

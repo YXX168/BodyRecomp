@@ -1,2325 +1,1179 @@
-import 'dart:async';
-import 'dart:math';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// ============================================================================
-// DATA MODELS
-// ============================================================================
+// ═══════════════════════════════════════════════════════════════════════════════
+// THEME SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════════
 
-class AppThemeColors {
+enum AppTheme { blue, green, pink, purple, orange }
+
+class WorkoutTheme {
+  final String name;
+  final String emoji;
   final Color bg;
-  final Color bg2;
-  final Color bg3;
-  final Color bg4;
-  final Color t1;
-  final Color t2;
-  final Color t3;
-  final Color t4;
-  final Color t5;
+  final Color card;
   final Color primary;
-  final Color primary2;
-  final Color primary3;
-  final Color primaryDim;
+  final Color primaryLight;
   final Color accent;
-  final Color accent2;
+  final Color text1;
+  final Color text2;
+  final Color text3;
+  final Color text4;
   final Color success;
-  final Color success2;
+  final Color successLight;
   final Color warning;
-  final Color warning2;
-  final Color rose;
-  final Color rose2;
-  final List<Color> gradientPrimary;
-  final List<Color> gradientHero;
-  final Color cardBorder;
-  final Color cardShadow;
-  final Color fabBg;
+  final Color border;
+  final Color navbarBg;
 
-  AppThemeColors({
+  const WorkoutTheme({
+    required this.name,
+    required this.emoji,
     required this.bg,
-    required this.bg2,
-    required this.bg3,
-    required this.bg4,
-    required this.t1,
-    required this.t2,
-    required this.t3,
-    required this.t4,
-    required this.t5,
+    required this.card,
     required this.primary,
-    required this.primary2,
-    required this.primary3,
-    required this.primaryDim,
+    required this.primaryLight,
     required this.accent,
-    required this.accent2,
+    required this.text1,
+    required this.text2,
+    required this.text3,
+    required this.text4,
     required this.success,
-    required this.success2,
+    required this.successLight,
     required this.warning,
-    required this.warning2,
-    required this.rose,
-    required this.rose2,
-    required this.gradientPrimary,
-    required this.gradientHero,
-    required this.cardBorder,
-    required this.cardShadow,
-    required this.fabBg,
+    required this.border,
+    required this.navbarBg,
   });
 }
 
-enum ThemeName { blue, green, pink, purple, orange }
+const themes = {
+  AppTheme.blue: WorkoutTheme(
+    name: '天空蓝', emoji: '',
+    bg: Color(0xFFF0F4FF),
+    card: Color(0xFFFFFFFF),
+    primary: Color(0xFF2563EB),
+    primaryLight: Color(0xFF60A5FA),
+    accent: Color(0xFF7C3AED),
+    text1: Color(0xFF1E293B),
+    text2: Color(0xFF334155),
+    text3: Color(0xFF64748B),
+    text4: Color(0xFF94A3B8),
+    success: Color(0xFF059669),
+    successLight: Color(0xFF34D399),
+    warning: Color(0xFFD97706),
+    border: Color(0xFFE2E8F0),
+    navbarBg: Color(0xFFFFFFFF),
+  ),
+  AppTheme.green: WorkoutTheme(
+    name: '薄荷绿', emoji: '',
+    bg: Color(0xFFF0FDF4),
+    card: Color(0xFFFFFFFF),
+    primary: Color(0xFF059669),
+    primaryLight: Color(0xFF34D399),
+    accent: Color(0xFF0891B2),
+    text1: Color(0xFF1E293B),
+    text2: Color(0xFF334155),
+    text3: Color(0xFF64748B),
+    text4: Color(0xFF94A3B8),
+    success: Color(0xFF65A30D),
+    successLight: Color(0xFFA3E635),
+    warning: Color(0xFFD97706),
+    border: Color(0xFFE2E8F0),
+    navbarBg: Color(0xFFFFFFFF),
+  ),
+  AppTheme.pink: WorkoutTheme(
+    name: '樱花粉', emoji: '',
+    bg: Color(0xFFFDF2F8),
+    card: Color(0xFFFFFFFF),
+    primary: Color(0xFFDB2777),
+    primaryLight: Color(0xFFF472B6),
+    accent: Color(0xFF7C3AED),
+    text1: Color(0xFF1E293B),
+    text2: Color(0xFF334155),
+    text3: Color(0xFF64748B),
+    text4: Color(0xFF94A3B8),
+    success: Color(0xFF0D9488),
+    successLight: Color(0xFF2DD4BF),
+    warning: Color(0xFFD97706),
+    border: Color(0xFFE2E8F0),
+    navbarBg: Color(0xFFFFFFFF),
+  ),
+  AppTheme.purple: WorkoutTheme(
+    name: '薰衣紫', emoji: '',
+    bg: Color(0xFFFAF5FF),
+    card: Color(0xFFFFFFFF),
+    primary: Color(0xFF7C3AED),
+    primaryLight: Color(0xFFA78BFA),
+    accent: Color(0xFFDB2777),
+    text1: Color(0xFF1E293B),
+    text2: Color(0xFF334155),
+    text3: Color(0xFF64748B),
+    text4: Color(0xFF94A3B8),
+    success: Color(0xFF0891B2),
+    successLight: Color(0xFF22D3EE),
+    warning: Color(0xFFD97706),
+    border: Color(0xFFE2E8F0),
+    navbarBg: Color(0xFFFFFFFF),
+  ),
+  AppTheme.orange: WorkoutTheme(
+    name: '日落橙', emoji: '',
+    bg: Color(0xFFFFF7ED),
+    card: Color(0xFFFFFFFF),
+    primary: Color(0xFFEA580C),
+    primaryLight: Color(0xFFFB923C),
+    accent: Color(0xFFCA8A04),
+    text1: Color(0xFF1E293B),
+    text2: Color(0xFF334155),
+    text3: Color(0xFF64748B),
+    text4: Color(0xFF94A3B8),
+    success: Color(0xFF0D9488),
+    successLight: Color(0xFF2DD4BF),
+    warning: Color(0xFFDC2626),
+    border: Color(0xFFE2E8F0),
+    navbarBg: Color(0xFFFFFFFF),
+  ),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DATA MODELS
+// ═══════════════════════════════════════════════════════════════════════════════
 
 class Exercise {
   final String name;
-  final String muscle;
-  final String sets;
+  final List<String> muscles;
+  final String muscleTarget;
+  final int sets;
+  final String reps;
   final String rest;
-  final String tips;
+  final String? note;
   final bool isStar;
-  bool isChecked;
-
-  Exercise({
+  const Exercise({
     required this.name,
-    required this.muscle,
+    required this.muscles,
+    required this.muscleTarget,
     required this.sets,
+    required this.reps,
     required this.rest,
-    required this.tips,
+    this.note,
     this.isStar = false,
-    this.isChecked = false,
   });
-
-  Exercise copyWith({bool? isChecked}) {
-    return Exercise(
-      name: name,
-      muscle: muscle,
-      sets: sets,
-      rest: rest,
-      tips: tips,
-      isStar: isStar,
-      isChecked: isChecked ?? this.isChecked,
-    );
-  }
 }
 
 class WorkoutDay {
-  final String dayLabel;
-  final String title;
+  final String dayName;
   final String subtitle;
-  final List<Exercise> exercises;
+  final String badge;
+  final String description;
   final bool isRest;
   final bool isOptional;
-  final String? restEmoji;
-  final String? restTitle;
-  final String? restDescription;
-  final List<String>? activities;
-  final String? circuitInfo;
+  final String? optionalDesc;
+  final List<Exercise> exercises;
+  final List<String>? recoveryOptions;
+  final String? circuitNote;
 
-  WorkoutDay({
-    required this.dayLabel,
-    required this.title,
+  const WorkoutDay({
+    required this.dayName,
     required this.subtitle,
-    required this.exercises,
+    required this.badge,
+    required this.description,
     this.isRest = false,
     this.isOptional = false,
-    this.restEmoji,
-    this.restTitle,
-    this.restDescription,
-    this.activities,
-    this.circuitInfo,
+    this.optionalDesc,
+    this.exercises = const [],
+    this.recoveryOptions,
+    this.circuitNote,
   });
 }
 
-// ============================================================================
-// THEME DEFINITIONS
-// ============================================================================
+// ═══════════════════════════════════════════════════════════════════════════════
+// WORKOUT DATA — 7 days, 41 exercises
+// ═══════════════════════════════════════════════════════════════════════════════
 
-class ThemeDefinitions {
-  static AppThemeColors getTheme(ThemeName name) {
-    switch (name) {
-      case ThemeName.blue:
-        return _blue();
-      case ThemeName.green:
-        return _green();
-      case ThemeName.pink:
-        return _pink();
-      case ThemeName.purple:
-        return _purple();
-      case ThemeName.orange:
-        return _orange();
-    }
-  }
+const workoutDays = [
+  WorkoutDay(
+    dayName: '周一', subtitle: '上肢 A', badge: '推力 + 后束',
+    description: '胸 / 肩（前束+中束+后束） / 肱三头',
+    exercises: [
+      Exercise(name: '上斜哑铃卧推 30\u00B0', muscles: ['胸大肌'], muscleTarget: '上部', sets: 4, reps: '10-12', rest: '90s', isStar: true, note: '核心动作 \u00B7 上胸优先 \u2014 穿衣显锁骨的关键，控制离心3秒下放'),
+      Exercise(name: '平板杠铃卧推', muscles: ['胸大肌'], muscleTarget: '整体厚度', sets: 4, reps: '8-10', rest: '90-120s', note: '肩胛骨后缩下沉，全握距比窄握更安全'),
+      Exercise(name: '坐姿器械推肩', muscles: ['三角肌'], muscleTarget: '前束 / 中束', sets: 3, reps: '12', rest: '90s', note: '器械比哑铃安全，固定轨道适合推大重量打造饱满肩头'),
+      Exercise(name: '哑铃侧平举', muscles: ['三角肌'], muscleTarget: '中束', sets: 4, reps: '15-20', rest: '60s', note: '灵魂动作 \u2014 小重量慢动作，3秒上2秒下，身体不摆动，肩膀越练越宽'),
+      Exercise(name: '面拉', muscles: ['三角肌后束'], muscleTarget: '上背', sets: 3, reps: '15-20', rest: '60s', note: '改善圆肩体态必练，绳索拉到脸前，外旋拇指朝后'),
+      Exercise(name: '蝴蝶机夹胸', muscles: ['胸大肌'], muscleTarget: '中缝', sets: 3, reps: '15-20', rest: '60s', note: '雕刻胸肌中缝线条，顶峰收缩2秒'),
+      Exercise(name: '绳索下压', muscles: ['肱三头'], muscleTarget: '外侧头', sets: 3, reps: '12-15', rest: '60s', note: '手臂后侧线条，拒绝拜拜肉，肘部固定不动'),
+      Exercise(name: '坐姿哑铃颈后臂屈伸', muscles: ['肱三头'], muscleTarget: '长头', sets: 3, reps: '10-12', rest: '60s', note: '双手持一个哑铃颈后，肘朝天花板，安全稳定'),
+    ],
+  ),
+  WorkoutDay(
+    dayName: '周二', subtitle: '下肢 A', badge: '股四头 / 臀',
+    description: '股四头 / 臀 / 腘绳 / 小腿 / 核心',
+    exercises: [
+      Exercise(name: '倒蹬机（脚位踩高）', muscles: ['股四头', '臀'], muscleTarget: '', sets: 4, reps: '15', rest: '90s', isStar: true, note: '核心动作 \u2014 脚踩高踩外侧重臀和后侧链，比深蹲安全，新手首选'),
+      Exercise(name: '哑铃罗马尼亚硬拉', muscles: ['腘绳肌', '臀'], muscleTarget: '', sets: 3, reps: '10-12', rest: '90s', note: '膝盖微屈，髋关节后推，感受大腿后侧拉伸，比传统硬拉更安全'),
+      Exercise(name: '坐姿腿屈伸', muscles: ['股四头'], muscleTarget: '孤立', sets: 3, reps: '12-15', rest: '60s', note: '顶峰收缩2秒，慢放3秒，感受股四头肌燃烧'),
+      Exercise(name: '俯卧腿弯举', muscles: ['腘绳肌'], muscleTarget: '', sets: 3, reps: '12-15', rest: '60s', note: '强化大腿后侧，让腿部侧面更有型'),
+      Exercise(name: '站姿提踵', muscles: ['小腿'], muscleTarget: '腓肠肌', sets: 4, reps: '20', rest: '45s', note: '小腿紧致，视觉拉长腿部比例，顶峰收缩2秒'),
+      Exercise(name: '平板支撑', muscles: ['核心'], muscleTarget: '', sets: 3, reps: '45-60s', rest: '45s', note: '身体一条直线，健身房地面就能做'),
+    ],
+  ),
+  WorkoutDay(
+    dayName: '周三', subtitle: '上肢 B', badge: '拉力 + 手臂',
+    description: '背 / 后束 / 肱二头',
+    exercises: [
+      Exercise(name: '助力引体向上机', muscles: ['背阔肌', '肱二头'], muscleTarget: '', sets: 4, reps: '8-12', rest: '90-120s', isStar: true, note: '核心动作 \u2014 调助力等级逐步减助力；没有就做反向划船'),
+      Exercise(name: '坐姿器械划船', muscles: ['背阔肌', '菱形肌'], muscleTarget: '', sets: 4, reps: '10-12', rest: '90s', note: '器械轨道稳定，胸部贴住靠垫，手肘拉过身体'),
+      Exercise(name: '高位下拉', muscles: ['背阔肌'], muscleTarget: '宽度', sets: 3, reps: '10-12', rest: '90s', note: '感受背阔肌像翅膀一样拉开，手肘往下拉不后仰'),
+      Exercise(name: '反向蝴蝶机夹胸', muscles: ['三角肌后束'], muscleTarget: '上背', sets: 3, reps: '15-20', rest: '60s', note: '后束第2次刺激（周一面拉 + 今天蝴蝶机 = 6组/周）'),
+      Exercise(name: '直臂下压', muscles: ['背阔肌'], muscleTarget: '下部', sets: 3, reps: '12-15', rest: '60s', note: '手臂保持微弯，从头顶压到大腿前侧，感受背阔拉伸'),
+      Exercise(name: '杠铃弯举', muscles: ['肱二头'], muscleTarget: '长头', sets: 4, reps: '12', rest: '60s', note: '手臂正面线条，控制离心不甩腰，全幅度动作'),
+      Exercise(name: '锤式弯举', muscles: ['肱肌', '肱桡肌'], muscleTarget: '', sets: 3, reps: '12', rest: '60s', note: '掌心相对，让手臂侧面看起来更厚实有力量'),
+    ],
+  ),
+  WorkoutDay(
+    dayName: '周四', subtitle: '下肢 B', badge: '后链 + 雕刻',
+    description: '臀 / 腘绳 / 核心 / 小腿',
+    exercises: [
+      Exercise(name: '杠铃臀推', muscles: ['臀大肌'], muscleTarget: '', sets: 4, reps: '10-12', rest: '90s', isStar: true, note: '核心动作 \u2014 顶峰收缩停顿2秒，臀部孤立发力，护腰'),
+      Exercise(name: '保加利亚分腿蹲', muscles: ['股四头', '臀'], muscleTarget: '', sets: 3, reps: '每侧10-12', rest: '60s', note: '手持哑铃，单腿训练，矫正左右不平衡'),
+      Exercise(name: '坐姿腿弯举', muscles: ['腘绳肌'], muscleTarget: '', sets: 3, reps: '12-15', rest: '60s', note: '和周二俯卧腿弯举互补，两个动作腘绳肌受力角度不同'),
+      Exercise(name: '器械内收 / 外展', muscles: ['大腿内收肌'], muscleTarget: '', sets: 3, reps: '15', rest: '60s', note: '收紧大腿内侧，改善腿型'),
+      Exercise(name: '反向卷腹', muscles: ['腹直肌'], muscleTarget: '下腹', sets: 4, reps: '15-20', rest: '60s', note: '仰卧抬腿卷骨盆，用腹肌把膝盖拉向胸口，下腹刺激强烈'),
+      Exercise(name: '死虫式', muscles: ['核心'], muscleTarget: '稳定性', sets: 3, reps: '每侧10', rest: '45s', note: '仰卧对侧手脚伸展，核心全程收紧贴地，安静不引人注目'),
+      Exercise(name: '坐姿提踵', muscles: ['小腿'], muscleTarget: '比目鱼肌', sets: 3, reps: '20', rest: '45s', note: '周二站姿练腓肠肌，今天坐姿练比目鱼肌，两个都练到'),
+    ],
+  ),
+  WorkoutDay(
+    dayName: '周五', subtitle: '可选', badge: '可选循环',
+    description: '有空就来，没空跳过',
+    isOptional: true,
+    exercises: [
+      Exercise(name: '哑铃高脚杯深蹲', muscles: ['股四头', '臀', '核心'], muscleTarget: '', sets: 3, reps: '12', rest: '循环', note: '做不到可跪姿'),
+      Exercise(name: '俯卧撑', muscles: ['胸', '肩', '肱三头'], muscleTarget: '', sets: 3, reps: '10-15', rest: '循环', note: '做不到可跪姿'),
+      Exercise(name: '哑铃罗马尼亚硬拉', muscles: ['腘绳', '臀'], muscleTarget: '', sets: 3, reps: '12', rest: '循环'),
+      Exercise(name: '哑铃俯身划船', muscles: ['背阔肌'], muscleTarget: '', sets: 3, reps: '每侧10', rest: '循环'),
+      Exercise(name: '哑铃侧平举', muscles: ['三角肌'], muscleTarget: '中束', sets: 3, reps: '15', rest: '循环', note: '肩部本周第2次，高频次是肩宽秘诀'),
+      Exercise(name: '登山者', muscles: ['核心', '心肺'], muscleTarget: '', sets: 3, reps: '每侧15', rest: '循环'),
+    ],
+    circuitNote: '6 个动作依次做完 = 1 轮 \u2192 休息 90-120s \u2192 共 3 轮',
+  ),
+  WorkoutDay(isRest: true, dayName: '周六', subtitle: '休息', badge: '休息', description: ''),
+  WorkoutDay(
+    dayName: '周日', subtitle: '可选', badge: '恢复日',
+    description: '目的是恢复，不是训练',
+    isOptional: true,
+    optionalDesc: '任选其一，30-40 分钟，心率 110-135：',
+    recoveryOptions: ['快走 / 慢跑', '游泳 \u2014 关节零冲击', '椭圆机 / 划船机', '瑜伽 / 普拉提', '骑车散步'],
+  ),
+];
 
-  static AppThemeColors _blue() {
-    const primary = Color(0xFF3b82f6);
-    const accent = Color(0xFF8b5cf6);
-    const success = Color(0xFF10b981);
-    const warning = Color(0xFFf59e0b);
-    const rose = Color(0xFFec4899);
-    return AppThemeColors(
-      bg: const Color(0xFFf8fafc),
-      bg2: const Color(0xFFFFFFFF),
-      bg3: const Color(0xFFf1f5f9),
-      bg4: const Color(0xFFe2e8f0),
-      t1: const Color(0xFF0f172a),
-      t2: const Color(0xFF334155),
-      t3: const Color(0xFF64748b),
-      t4: const Color(0xFF94a3b8),
-      t5: const Color(0xFFcbd5e1),
-      primary: primary,
-      primary2: const Color(0xFF60a5fa),
-      primary3: const Color(0xFF93c5fd),
-      primaryDim: primary.withOpacity(0.12),
-      accent: accent,
-      accent2: const Color(0xFFa78bfa),
-      success: success,
-      success2: const Color(0xFF34d399),
-      warning: warning,
-      warning2: const Color(0xFFfbbf24),
-      rose: rose,
-      rose2: const Color(0xFFf472b6),
-      gradientPrimary: [primary, accent],
-      gradientHero: [const Color(0xFF0f172a), primary, success],
-      cardBorder: const Color(0xFFe2e8f0),
-      cardShadow: Colors.black.withOpacity(0.06),
-      fabBg: const Color(0xFF3b82f6),
-    );
-  }
+const nutritionTips = [
+  '热量缺口 300-500 大卡，减脂靠饮食缺口，少吃半碗饭 > 跑 20 分钟',
+  '蛋白质分 4-5 餐，每餐 30-40g',
+  '练后 30min 内补 20-30g 蛋白质',
+  '训练日碳水 +30-50g，放练前 2h / 练后 1h',
+  '每天 2.5-3L 水',
+];
 
-  static AppThemeColors _green() {
-    const primary = Color(0xFF10b981);
-    const accent = Color(0xFF06b6d4);
-    const success = Color(0xFF84cc16);
-    return AppThemeColors(
-      bg: const Color(0xFFf0fdf4),
-      bg2: const Color(0xFFFFFFFF),
-      bg3: const Color(0xFFdcfce7),
-      bg4: const Color(0xFFbbf7d0),
-      t1: const Color(0xFF052e16),
-      t2: const Color(0xFF14532d),
-      t3: const Color(0xFF166534),
-      t4: const Color(0xFF22c55e),
-      t5: const Color(0xFF86efac),
-      primary: primary,
-      primary2: const Color(0xFF34d399),
-      primary3: const Color(0xFF6ee7b7),
-      primaryDim: primary.withOpacity(0.12),
-      accent: accent,
-      accent2: const Color(0xFF22d3ee),
-      success: success,
-      success2: const Color(0xFFa3e635),
-      warning: const Color(0xFFf59e0b),
-      warning2: const Color(0xFFfbbf24),
-      rose: const Color(0xFFec4899),
-      rose2: const Color(0xFFf472b6),
-      gradientPrimary: [primary, accent],
-      gradientHero: [const Color(0xFF052e16), primary, success],
-      cardBorder: const Color(0xFFbbf7d0),
-      cardShadow: Colors.black.withOpacity(0.06),
-      fabBg: const Color(0xFF10b981),
-    );
-  }
+const progressionPhases = [
+  ('1-2 周', '学习期', '60-70% 1RM，掌握动作模式，不急着加重'),
+  ('3-4 周', '适应期', '70-75% 1RM，轻松完成就加 1.25-2.5kg'),
+  ('5-8 周', '增长期', '75-85% 1RM，RPE 7-8，每 1-2 周加重'),
+  ('9-12 周', '突破期', '接近 85% 1RM，测 1RM，8-12 周后换动作'),
+];
 
-  static AppThemeColors _pink() {
-    const primary = Color(0xFFec4899);
-    const accent = Color(0xFF8b5cf6);
-    return AppThemeColors(
-      bg: const Color(0xFFfdf2f8),
-      bg2: const Color(0xFFFFFFFF),
-      bg3: const Color(0xFFfce7f3),
-      bg4: const Color(0xFFfbcfe8),
-      t1: const Color(0xFF831843),
-      t2: const Color(0xFF9d174d),
-      t3: const Color(0xFFbe185d),
-      t4: const Color(0xFFdb2777),
-      t5: const Color(0xFFf9a8d4),
-      primary: primary,
-      primary2: const Color(0xFFf472b6),
-      primary3: const Color(0xFFf9a8d4),
-      primaryDim: primary.withOpacity(0.12),
-      accent: accent,
-      accent2: const Color(0xFFa78bfa),
-      success: const Color(0xFF10b981),
-      success2: const Color(0xFF34d399),
-      warning: const Color(0xFFf59e0b),
-      warning2: const Color(0xFFfbbf24),
-      rose: primary,
-      rose2: const Color(0xFFf472b6),
-      gradientPrimary: [primary, accent],
-      gradientHero: [const Color(0xFF831843), primary, accent],
-      cardBorder: const Color(0xFFfbcfe8),
-      cardShadow: Colors.black.withOpacity(0.06),
-      fabBg: const Color(0xFFec4899),
-    );
-  }
+// ═══════════════════════════════════════════════════════════════════════════════
+// THEME NOTIFIER — InheritedWidget for efficient theme propagation
+// ═══════════════════════════════════════════════════════════════════════════════
 
-  static AppThemeColors _purple() {
-    const primary = Color(0xFF8b5cf6);
-    const accent = Color(0xFFec4899);
-    return AppThemeColors(
-      bg: const Color(0xFFfaf5ff),
-      bg2: const Color(0xFFFFFFFF),
-      bg3: const Color(0xFFf3e8ff),
-      bg4: const Color(0xFFe9d5ff),
-      t1: const Color(0xFF3b0764),
-      t2: const Color(0xFF581c87),
-      t3: const Color(0xFF7e22ce),
-      t4: const Color(0xFFa855f7),
-      t5: const Color(0xFFc4b5fd),
-      primary: primary,
-      primary2: const Color(0xFFa78bfa),
-      primary3: const Color(0xFFc4b5fd),
-      primaryDim: primary.withOpacity(0.12),
-      accent: accent,
-      accent2: const Color(0xFFf472b6),
-      success: const Color(0xFF10b981),
-      success2: const Color(0xFF34d399),
-      warning: const Color(0xFFf59e0b),
-      warning2: const Color(0xFFfbbf24),
-      rose: const Color(0xFFec4899),
-      rose2: const Color(0xFFf472b6),
-      gradientPrimary: [primary, accent],
-      gradientHero: [const Color(0xFF3b0764), primary, accent],
-      cardBorder: const Color(0xFFe9d5ff),
-      cardShadow: Colors.black.withOpacity(0.06),
-      fabBg: const Color(0xFF8b5cf6),
-    );
-  }
+class ThemeInherited extends InheritedWidget {
+  final AppTheme current;
+  final WorkoutTheme theme;
+  final Future<void> Function(AppTheme) setTheme;
 
-  static AppThemeColors _orange() {
-    const primary = Color(0xFFf97316);
-    const accent = Color(0xFFeab308);
-    return AppThemeColors(
-      bg: const Color(0xFFfff7ed),
-      bg2: const Color(0xFFFFFFFF),
-      bg3: const Color(0xFFffedd5),
-      bg4: const Color(0xFFfed7aa),
-      t1: const Color(0xFF431407),
-      t2: const Color(0xFF7c2d12),
-      t3: const Color(0xFF9a3412),
-      t4: const Color(0xFFea580c),
-      t5: const Color(0xFFfdba74),
-      primary: primary,
-      primary2: const Color(0xFFfb923c),
-      primary3: const Color(0xFFfdba74),
-      primaryDim: primary.withOpacity(0.12),
-      accent: accent,
-      accent2: const Color(0xFFfacc15),
-      success: const Color(0xFF10b981),
-      success2: const Color(0xFF34d399),
-      warning: const Color(0xFFf59e0b),
-      warning2: const Color(0xFFfbbf24),
-      rose: const Color(0xFFec4899),
-      rose2: const Color(0xFFf472b6),
-      gradientPrimary: [primary, accent],
-      gradientHero: [const Color(0xFF431407), primary, accent],
-      cardBorder: const Color(0xFFfed7aa),
-      cardShadow: Colors.black.withOpacity(0.06),
-      fabBg: const Color(0xFFf97316),
-    );
-  }
-}
-
-// ============================================================================
-// WORKOUT DATA (preserved exactly from v1)
-// ============================================================================
-
-List<WorkoutDay> createWorkoutDays() {
-  return [
-    // MON - 上肢A
-    WorkoutDay(
-      dayLabel: '周一',
-      title: '上肢A',
-      subtitle: '推力+后束',
-      exercises: [
-        Exercise(
-          name: '上斜哑铃卧推 30°',
-          muscle: '胸大肌上部',
-          sets: '4×10-12',
-          rest: '90s',
-          tips: '核心动作·上胸优先 — 穿衣显锁骨的关键，控制离心3秒下放',
-          isStar: true,
-        ),
-        Exercise(
-          name: '平板杠铃卧推',
-          muscle: '胸大肌整体厚度',
-          sets: '4×8-10',
-          rest: '90-120s',
-          tips: '肩胛骨后缩下沉，全握距比窄握更安全',
-        ),
-        Exercise(
-          name: '坐姿器械推肩',
-          muscle: '三角肌前束/中束',
-          sets: '3×12',
-          rest: '90s',
-          tips: '器械比哑铃安全，固定轨道适合推大重量打造饱满肩头',
-        ),
-        Exercise(
-          name: '哑铃侧平举',
-          muscle: '三角肌中束',
-          sets: '4×15-20',
-          rest: '60s',
-          tips: '灵魂动作 — 小重量慢动作，3秒上2秒下，身体不摆动，肩膀越练越宽',
-        ),
-        Exercise(
-          name: '面拉',
-          muscle: '三角肌后束/上背',
-          sets: '3×15-20',
-          rest: '60s',
-          tips: '改善圆肩体态必练，绳索拉到脸前，外旋拇指朝后',
-        ),
-        Exercise(
-          name: '蝴蝶机夹胸',
-          muscle: '胸大肌中缝',
-          sets: '3×15-20',
-          rest: '60s',
-          tips: '雕刻胸肌中缝线条，顶峰收缩2秒',
-        ),
-        Exercise(
-          name: '绳索下压',
-          muscle: '肱三头外侧头',
-          sets: '3×12-15',
-          rest: '60s',
-          tips: '手臂后侧线条，拒绝拜拜肉，肘部固定不动',
-        ),
-        Exercise(
-          name: '坐姿哑铃颈后臂屈伸',
-          muscle: '肱三头长头',
-          sets: '3×10-12',
-          rest: '60s',
-          tips: '双手持一个哑铃颈后，肘朝天花板，安全稳定',
-        ),
-      ],
-    ),
-    // TUE - 下肢A
-    WorkoutDay(
-      dayLabel: '周二',
-      title: '下肢A',
-      subtitle: '股四头/臀',
-      exercises: [
-        Exercise(
-          name: '倒蹬机（脚位踩高）',
-          muscle: '股四头/臀',
-          sets: '4×15',
-          rest: '90s',
-          tips: '核心动作 — 脚踩高踩外侧重臀和后侧链，比深蹲安全，新手首选',
-          isStar: true,
-        ),
-        Exercise(
-          name: '哑铃罗马尼亚硬拉',
-          muscle: '腘绳肌/臀',
-          sets: '3×10-12',
-          rest: '90s',
-          tips: '膝盖微屈，髋关节后推，感受大腿后侧拉伸，比传统硬拉更安全',
-        ),
-        Exercise(
-          name: '坐姿腿屈伸',
-          muscle: '股四头孤立',
-          sets: '3×12-15',
-          rest: '60s',
-          tips: '顶峰收缩2秒，慢放3秒，感受股四头肌燃烧',
-        ),
-        Exercise(
-          name: '俯卧腿弯举',
-          muscle: '腘绳肌',
-          sets: '3×12-15',
-          rest: '60s',
-          tips: '强化大腿后侧，让腿部侧面更有型',
-        ),
-        Exercise(
-          name: '站姿提踵',
-          muscle: '小腿腓肠肌',
-          sets: '4×20',
-          rest: '45s',
-          tips: '小腿紧致，视觉拉长腿部比例，顶峰收缩2秒',
-        ),
-        Exercise(
-          name: '平板支撑',
-          muscle: '核心',
-          sets: '3×45-60s',
-          rest: '45s',
-          tips: '身体一条直线，健身房地面就能做',
-        ),
-      ],
-    ),
-    // WED - 上肢B
-    WorkoutDay(
-      dayLabel: '周三',
-      title: '上肢B',
-      subtitle: '拉力+手臂',
-      exercises: [
-        Exercise(
-          name: '助力引体向上机',
-          muscle: '背阔肌/肱二头',
-          sets: '4×8-12',
-          rest: '90-120s',
-          tips: '核心动作 — 调助力等级逐步减助力；没有就做反向划船',
-          isStar: true,
-        ),
-        Exercise(
-          name: '坐姿器械划船',
-          muscle: '背阔肌/菱形肌',
-          sets: '4×10-12',
-          rest: '90s',
-          tips: '器械轨道稳定，胸部贴住靠垫，手肘拉过身体',
-        ),
-        Exercise(
-          name: '高位下拉',
-          muscle: '背阔肌宽度',
-          sets: '3×10-12',
-          rest: '90s',
-          tips: '感受背阔肌像翅膀一样拉开，手肘往下拉不后仰',
-        ),
-        Exercise(
-          name: '反向蝴蝶机夹胸',
-          muscle: '三角肌后束/上背',
-          sets: '3×15-20',
-          rest: '60s',
-          tips: '后束第2次刺激（周一面拉 + 今天蝴蝶机 = 6组/周）',
-        ),
-        Exercise(
-          name: '直臂下压',
-          muscle: '背阔肌下部',
-          sets: '3×12-15',
-          rest: '60s',
-          tips: '手臂保持微弯，从头顶压到大腿前侧，感受背阔拉伸',
-        ),
-        Exercise(
-          name: '杠铃弯举',
-          muscle: '肱二头长头',
-          sets: '4×12',
-          rest: '60s',
-          tips: '手臂正面线条，控制离心不甩腰，全幅度动作',
-        ),
-        Exercise(
-          name: '锤式弯举',
-          muscle: '肱肌/肱桡肌',
-          sets: '3×12',
-          rest: '60s',
-          tips: '掌心相对，让手臂侧面看起来更厚实有力量',
-        ),
-      ],
-    ),
-    // THU - 下肢B
-    WorkoutDay(
-      dayLabel: '周四',
-      title: '下肢B',
-      subtitle: '后链+雕刻',
-      exercises: [
-        Exercise(
-          name: '杠铃臀推',
-          muscle: '臀大肌',
-          sets: '4×10-12',
-          rest: '90s',
-          tips: '核心动作 — 顶峰收缩停顿2秒，臀部孤立发力，护腰',
-          isStar: true,
-        ),
-        Exercise(
-          name: '保加利亚分腿蹲',
-          muscle: '股四头/臀',
-          sets: '3×每侧10-12',
-          rest: '60s',
-          tips: '手持哑铃，单腿训练，矫正左右不平衡',
-        ),
-        Exercise(
-          name: '坐姿腿弯举',
-          muscle: '腘绳肌（比目鱼肌）',
-          sets: '3×12-15',
-          rest: '60s',
-          tips: '和周二俯卧腿弯举互补，两个动作腘绳肌受力角度不同',
-        ),
-        Exercise(
-          name: '器械内收/外展',
-          muscle: '大腿内收肌',
-          sets: '3×15',
-          rest: '60s',
-          tips: '收紧大腿内侧，改善腿型',
-        ),
-        Exercise(
-          name: '反向卷腹',
-          muscle: '腹直肌下腹',
-          sets: '4×15-20',
-          rest: '60s',
-          tips: '仰卧抬腿卷骨盆，用腹肌把膝盖拉向胸口，下腹刺激强烈',
-        ),
-        Exercise(
-          name: '死虫式',
-          muscle: '核心稳定性',
-          sets: '3×每侧10',
-          rest: '45s',
-          tips: '仰卧对侧手脚伸展，核心全程收紧贴地，安静不引人注目',
-        ),
-        Exercise(
-          name: '坐姿提踵',
-          muscle: '小腿比目鱼肌',
-          sets: '3×20',
-          rest: '45s',
-          tips: '周二站姿练腓肠肌，今天坐姿练比目鱼肌，两个都练到',
-        ),
-      ],
-    ),
-    // FRI - 全身循环
-    WorkoutDay(
-      dayLabel: '周五',
-      title: '全身循环',
-      subtitle: '可选',
-      isOptional: true,
-      circuitInfo: '6 个动作依次做完 = 1 轮 → 休息 90-120s → 共 3 轮',
-      exercises: [
-        Exercise(
-          name: '哑铃高脚杯深蹲',
-          muscle: '股四头/臀/核心',
-          sets: '3×12',
-          rest: '循环',
-          tips: '做不到可跪姿',
-        ),
-        Exercise(
-          name: '俯卧撑',
-          muscle: '胸/肩/肱三头',
-          sets: '3×10-15',
-          rest: '循环',
-          tips: '做不到可跪姿',
-        ),
-        Exercise(
-          name: '哑铃罗马尼亚硬拉',
-          muscle: '腘绳/臀',
-          sets: '3×12',
-          rest: '循环',
-          tips: '',
-        ),
-        Exercise(
-          name: '哑铃俯身划船',
-          muscle: '背阔肌',
-          sets: '3×每侧10',
-          rest: '循环',
-          tips: '',
-        ),
-        Exercise(
-          name: '哑铃侧平举',
-          muscle: '三角肌中束',
-          sets: '3×15',
-          rest: '循环',
-          tips: '肩部本周第2次，高频次是肩宽秘诀',
-        ),
-        Exercise(
-          name: '登山者',
-          muscle: '核心/心肺',
-          sets: '3×每侧15',
-          rest: '循环',
-          tips: '',
-        ),
-      ],
-    ),
-    // SAT - 休息
-    WorkoutDay(
-      dayLabel: '周六',
-      title: '休息',
-      subtitle: '',
-      isRest: true,
-      restEmoji: '💪',
-      restTitle: '休息',
-      restDescription: '肌肉在休息时生长，保证 7-9 小时睡眠',
-      exercises: [],
-    ),
-    // SUN - 主动恢复
-    WorkoutDay(
-      dayLabel: '周日',
-      title: '主动恢复',
-      subtitle: '可选',
-      isOptional: true,
-      activities: [
-        '🚶 快走/慢跑',
-        '🏊 游泳 — 关节零冲击',
-        '🚣 椭圆机/划船机',
-        '🧘 瑜伽/普拉提',
-        '🚴 骑车散步',
-      ],
-      exercises: [],
-    ),
-  ];
-}
-
-// ============================================================================
-// PERSISTENCE HELPER
-// ============================================================================
-
-class WorkoutStorage {
-  static const String _themeKey = 'app_theme_name';
-  static const String _prefix = 'workout_day_';
-
-  static Future<ThemeName> loadTheme() async {
-    final prefs = await SharedPreferences.getInstance();
-    final index = prefs.getInt(_themeKey) ?? 0;
-    return ThemeName.values[index];
-  }
-
-  static Future<void> saveTheme(ThemeName theme) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_themeKey, theme.index);
-  }
-
-  static String _weekKey(DateTime date) {
-    final monday = date.subtract(Duration(days: date.weekday - 1));
-    return '${monday.year}_${monday.month}_${monday.day}';
-  }
-
-  static Future<Set<int>> loadChecked(int dayIndex) async {
-    final prefs = await SharedPreferences.getInstance();
-    final weekKey = _weekKey(DateTime.now());
-    final key = '${_prefix}$dayIndex\_$weekKey';
-    final list = prefs.getStringList(key);
-    if (list == null) return {};
-    return list.map((s) => int.tryParse(s) ?? -1).where((i) => i >= 0).toSet();
-  }
-
-  static Future<void> saveChecked(int dayIndex, Set<int> checked) async {
-    final prefs = await SharedPreferences.getInstance();
-    final weekKey = _weekKey(DateTime.now());
-    final key = '${_prefix}$dayIndex\_$weekKey';
-    await prefs.setStringList(key, checked.map((i) => i.toString()).toList());
-  }
-
-  static Future<void> clearOldWeeks() async {
-    final prefs = await SharedPreferences.getInstance();
-    final currentWeek = _weekKey(DateTime.now());
-    final keysToRemove = <String>[];
-    for (final key in prefs.getKeys()) {
-      if (key.startsWith(_prefix) && !key.endsWith(currentWeek)) {
-        keysToRemove.add(key);
-      }
-    }
-    for (final key in keysToRemove) {
-      await prefs.remove(key);
-    }
-  }
-}
-
-// ============================================================================
-// GRADIENT TEXT WIDGET
-// ============================================================================
-
-class GradientText extends StatelessWidget {
-  final String text;
-  final List<Color> colors;
-  final TextStyle style;
-
-  const GradientText({
+  const ThemeInherited({
     super.key,
-    required this.text,
-    required this.colors,
-    required this.style,
+    required this.current,
+    required this.theme,
+    required this.setTheme,
+    required super.child,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    return ShaderMask(
-      shaderCallback: (bounds) {
-        return LinearGradient(
-          colors: colors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ).createShader(bounds);
-      },
-      child: Text(
-        text,
-        style: style.copyWith(color: Colors.white),
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// COMPACT HEADER (v2: palette icon inline, no tag badge)
-// ============================================================================
-
-class CompactHeader extends StatelessWidget {
-  final AppThemeColors colors;
-  final VoidCallback onThemeTap;
-
-  const CompactHeader({
-    super.key,
-    required this.colors,
-    required this.onThemeTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              // Palette icon button (inline, not floating)
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: onThemeTap,
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: colors.primaryDim,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: colors.primary.withOpacity(0.2),
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.palette_outlined,
-                      size: 18,
-                      color: colors.primary,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              // Title
-              GradientText(
-                text: 'BODY RECOMP',
-                colors: colors.gradientHero,
-                style: GoogleFonts.spaceGrotesk(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 2,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          // User info in one line
-          Text(
-            '27M · 173cm · 72.5kg · BMI 24.2 · 减脂增肌',
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              color: colors.t3,
-              fontWeight: FontWeight.w400,
-              letterSpacing: 0.3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// DAY TAB BAR (v2: primary navigation with filled selected state)
-// ============================================================================
-
-class DayTabBar extends StatelessWidget {
-  final AppThemeColors colors;
-  final int selectedIndex;
-  final ValueChanged<int> onTabSelected;
-  final List<WorkoutDay> workoutDays;
-
-  const DayTabBar({
-    super.key,
-    required this.colors,
-    required this.selectedIndex,
-    required this.onTabSelected,
-    required this.workoutDays,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 44,
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: colors.cardBorder, width: 1),
-        ),
-      ),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: workoutDays.length,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-        itemBuilder: (context, index) {
-          final day = workoutDays[index];
-          final isSelected = index == selectedIndex;
-          return _buildTab(day, index, isSelected);
-        },
-      ),
-    );
-  }
-
-  Widget _buildTab(WorkoutDay day, int index, bool isSelected) {
-    return GestureDetector(
-      onTap: () => onTabSelected(index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
-        margin: const EdgeInsets.symmetric(horizontal: 3),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? colors.primary.withOpacity(0.15)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected
-                ? colors.primary.withOpacity(0.5)
-                : Colors.transparent,
-            width: 1.2,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              day.dayLabel,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: day.isRest
-                    ? colors.t4
-                    : isSelected
-                        ? colors.primary
-                        : colors.t3,
-              ),
-            ),
-            if (!day.isRest && day.title.isNotEmpty) ...[
-              const SizedBox(width: 5),
-              Text(
-                day.title,
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
-                  color: day.isRest
-                      ? colors.t5
-                      : isSelected
-                          ? colors.primary
-                          : colors.t4,
-                ),
-              ),
-            ],
-            if (day.isOptional && !day.isRest) ...[
-              const SizedBox(width: 4),
-              Container(
-                width: 4,
-                height: 4,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: colors.warning,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// COMPACT STATS ROW (v2: inline in day content, no box/border)
-// ============================================================================
-
-class CompactStats extends StatelessWidget {
-  final AppThemeColors colors;
-
-  const CompactStats({super.key, required this.colors});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Row(
-        children: [
-          _buildStatItem('🎯', '68-70kg', '目标体重', colors),
-          Container(width: 1, height: 28, color: colors.bg4),
-          _buildStatItem('🔥', '2200kcal', '每日热量', colors),
-          Container(width: 1, height: 28, color: colors.bg4),
-          _buildStatItem('🥩', '130-160g', '蛋白质', colors),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatItem(
-    String icon,
-    String value,
-    String label,
-    AppThemeColors colors,
-  ) {
-    return Expanded(
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(icon, style: const TextStyle(fontSize: 13)),
-          const SizedBox(width: 4),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                value,
-                style: GoogleFonts.jetBrainsMono(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: colors.t1,
-                ),
-              ),
-              Text(
-                label,
-                style: GoogleFonts.inter(
-                  fontSize: 10,
-                  color: colors.t4,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// PROGRESS BAR (simplified for v2)
-// ============================================================================
-
-class DayProgressBar extends StatelessWidget {
-  final int completed;
-  final int total;
-  final AppThemeColors colors;
-
-  const DayProgressBar({
-    super.key,
-    required this.completed,
-    required this.total,
-    required this.colors,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = total == 0 ? 0.0 : completed / total;
-    final isComplete = completed == total && total > 0;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                isComplete ? '🎉 今日训练完成！' : '训练进度',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: isComplete ? colors.success : colors.t2,
-                ),
-              ),
-              Text(
-                '$completed / $total',
-                style: GoogleFonts.jetBrainsMono(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: isComplete ? colors.success : colors.t3,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(3),
-            child: SizedBox(
-              height: 5,
-              child: Stack(
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: colors.bg3,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                  FractionallySizedBox(
-                    widthFactor: progress,
-                    alignment: Alignment.centerLeft,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: isComplete
-                              ? [colors.success, colors.success2]
-                              : colors.gradientPrimary,
-                        ),
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// EXERCISE CARD (cleaned up for v2)
-// ============================================================================
-
-class ExerciseCard extends StatefulWidget {
-  final Exercise exercise;
-  final int index;
-  final AppThemeColors colors;
-  final ValueChanged<int> onCheckChanged;
-
-  const ExerciseCard({
-    super.key,
-    required this.exercise,
-    required this.index,
-    required this.colors,
-    required this.onCheckChanged,
-  });
-
-  @override
-  State<ExerciseCard> createState() => _ExerciseCardState();
-}
-
-class _ExerciseCardState extends State<ExerciseCard> {
-  bool _showTips = false;
-
-  void _toggleCheck() {
-    HapticFeedback.mediumImpact();
-    widget.onCheckChanged(widget.index);
+  static ThemeInherited of(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<ThemeInherited>()!;
   }
 
   @override
-  Widget build(BuildContext context) {
-    final isChecked = widget.exercise.isChecked;
-    final colors = widget.colors;
-    final exercise = widget.exercise;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOutCubic,
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isChecked ? colors.bg3.withOpacity(0.5) : colors.bg2,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: exercise.isStar && !isChecked
-              ? colors.primary.withOpacity(0.3)
-              : isChecked
-                  ? colors.success.withOpacity(0.25)
-                  : colors.cardBorder,
-          width: exercise.isStar && !isChecked ? 1.2 : 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: exercise.isStar && !isChecked
-                ? colors.primary.withOpacity(0.08)
-                : colors.cardShadow,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Row 1: checkbox + name + star
-          GestureDetector(
-            onTap: _toggleCheck,
-            behavior: HitTestBehavior.opaque,
-            child: Row(
-              children: [
-                // Checkbox
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isChecked ? colors.success : Colors.transparent,
-                    border: Border.all(
-                      color: isChecked
-                          ? colors.success
-                          : exercise.isStar
-                              ? colors.primary
-                              : colors.t4,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: isChecked
-                      ? const Icon(Icons.check, size: 14, color: Colors.white)
-                      : null,
-                ),
-                const SizedBox(width: 10),
-                // Star tag + name
-                Expanded(
-                  child: Row(
-                    children: [
-                      if (exercise.isStar) ...[
-                        Text('⭐', style: const TextStyle(fontSize: 12)),
-                        const SizedBox(width: 4),
-                      ],
-                      Flexible(
-                        child: Text(
-                          exercise.name,
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: isChecked ? colors.t4 : colors.t1,
-                            decoration:
-                                isChecked ? TextDecoration.lineThrough : null,
-                            decorationColor: colors.t4,
-                            decorationThickness: 1.5,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Row 2: muscle tag + sets + rest
-          Padding(
-            padding: const EdgeInsets.only(left: 34, top: 4),
-            child: Row(
-              children: [
-                Text(
-                  exercise.muscle,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: isChecked ? colors.t5 : colors.t3,
-                  ),
-                ),
-                const Spacer(),
-                _buildMiniBadge('${exercise.sets}', colors, isChecked),
-                const SizedBox(width: 6),
-                _buildMiniBadge('⏱ ${exercise.rest}', colors, isChecked),
-              ],
-            ),
-          ),
-          // Tips (expandable)
-          if (exercise.tips.isNotEmpty) ...[
-            const SizedBox(height: 2),
-            GestureDetector(
-              onTap: () => setState(() => _showTips = !_showTips),
-              child: Padding(
-                padding: const EdgeInsets.only(left: 34),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _showTips
-                          ? Icons.keyboard_arrow_up
-                          : Icons.keyboard_arrow_down,
-                      size: 16,
-                      color: colors.t4,
-                    ),
-                    const SizedBox(width: 2),
-                    Text(
-                      '提示',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        color: colors.t4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            AnimatedSize(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutCubic,
-              alignment: Alignment.topCenter,
-              child: _showTips
-                  ? Padding(
-                      padding: const EdgeInsets.only(left: 34, top: 4),
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: isChecked
-                              ? colors.bg3.withOpacity(0.3)
-                              : colors.bg3,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '💡 ${exercise.tips}',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: isChecked ? colors.t5 : colors.t3,
-                            height: 1.5,
-                          ),
-                        ),
-                      ),
-                    )
-                  : const SizedBox.shrink(),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMiniBadge(String text, AppThemeColors colors, bool isChecked) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: isChecked ? colors.bg3.withOpacity(0.3) : colors.primaryDim,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        text,
-        style: GoogleFonts.inter(
-          fontSize: 10,
-          fontWeight: FontWeight.w500,
-          color: isChecked ? colors.t5 : colors.t2,
-        ),
-      ),
-    );
-  }
+  bool updateShouldNotify(covariant ThemeInherited old) => current != old.current;
 }
 
-// ============================================================================
-// REST DAY CARD
-// ============================================================================
-
-class RestDayCard extends StatelessWidget {
-  final WorkoutDay day;
-  final AppThemeColors colors;
-
-  const RestDayCard({super.key, required this.day, required this.colors});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-      child: Center(
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
-          decoration: BoxDecoration(
-            color: colors.bg2,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: colors.cardBorder),
-            boxShadow: [
-              BoxShadow(
-                color: colors.cardShadow,
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Text(
-                day.restEmoji ?? '💪',
-                style: const TextStyle(fontSize: 48),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                day.restTitle ?? '休息',
-                style: GoogleFonts.inter(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: colors.t1,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                day.restDescription ?? '',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  color: colors.t3,
-                  height: 1.5,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// ACTIVE RECOVERY CARD
-// ============================================================================
-
-class ActiveRecoveryCard extends StatelessWidget {
-  final WorkoutDay day;
-  final AppThemeColors colors;
-
-  const ActiveRecoveryCard({
-    super.key,
-    required this.day,
-    required this.colors,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final activities = day.activities ?? [];
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Text(
-              '推荐活动',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: colors.t2,
-              ),
-            ),
-          ),
-          ...activities.map((activity) {
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: colors.bg2,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: colors.cardBorder),
-                boxShadow: [
-                  BoxShadow(
-                    color: colors.cardShadow,
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      activity,
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: colors.t1,
-                      ),
-                    ),
-                  ),
-                  Icon(
-                    Icons.chevron_right,
-                    color: colors.t4,
-                    size: 20,
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// CIRCUIT INFO BANNER
-// ============================================================================
-
-class CircuitInfoBanner extends StatelessWidget {
-  final String info;
-  final AppThemeColors colors;
-
-  const CircuitInfoBanner({
-    super.key,
-    required this.info,
-    required this.colors,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              colors.accent.withOpacity(0.08),
-              colors.accent2.withOpacity(0.04),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: colors.accent.withOpacity(0.2)),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.loop, color: colors.accent, size: 16),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                info,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: colors.t2,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// EXPANDABLE SECTION (NEW v2 widget)
-// ============================================================================
-
-class ExpandableSection extends StatefulWidget {
-  final String title;
-  final String icon;
-  final Widget content;
-  final AppThemeColors colors;
-
-  const ExpandableSection({
-    super.key,
-    required this.title,
-    required this.icon,
-    required this.content,
-    required this.colors,
-  });
-
-  @override
-  State<ExpandableSection> createState() => _ExpandableSectionState();
-}
-
-class _ExpandableSectionState extends State<ExpandableSection> {
-  bool _isExpanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      child: Column(
-        children: [
-          GestureDetector(
-            onTap: () => setState(() => _isExpanded = !_isExpanded),
-            behavior: HitTestBehavior.opaque,
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Row(
-                children: [
-                  Text(widget.icon, style: const TextStyle(fontSize: 14)),
-                  const SizedBox(width: 6),
-                  Text(
-                    widget.title,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: widget.colors.t2,
-                    ),
-                  ),
-                  const Spacer(),
-                  AnimatedRotation(
-                    turns: _isExpanded ? 0.5 : 0,
-                    duration: const Duration(milliseconds: 200),
-                    child: Icon(
-                      Icons.chevron_right,
-                      size: 18,
-                      color: widget.colors.t4,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
-            child: _isExpanded ? widget.content : const SizedBox.shrink(),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// NUTRITION TIPS (simplified from v1 NutritionSection, used in ExpandableSection)
-// ============================================================================
-
-class NutritionTips extends StatelessWidget {
-  final AppThemeColors colors;
-
-  const NutritionTips({super.key, required this.colors});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildMacroRow('🥩', '蛋白质', '130-160g', '鸡胸肉、鱼虾、鸡蛋、蛋白粉', colors.rose),
-        const SizedBox(height: 6),
-        _buildMacroRow('🍚', '碳水', '200-270g', '燕麦、糙米、红薯、全麦面包', colors.warning),
-        const SizedBox(height: 6),
-        _buildMacroRow('🥑', '脂肪', '58-73g', '牛油果、坚果、橄榄油、蛋黄', colors.success),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: colors.bg3.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '💡 小贴士',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: colors.t2,
-                ),
-              ),
-              const SizedBox(height: 6),
-              _tipLine('💧 每天至少喝 2.5L 水，训练前后各 500ml'),
-              _tipLine('⏰ 训练前 1.5h 吃碳水为主的一餐，训练后 30min 内补充蛋白质'),
-              _tipLine('🥗 多吃深色蔬菜，补充维生素和膳食纤维'),
-              _tipLine('🚫 减少加工食品、含糖饮料和油炸食品'),
-              _tipLine('🌙 睡前 3h 不进食大餐，可补充少量酪蛋白'),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMacroRow(
-    String icon,
-    String label,
-    String value,
-    String desc,
-    Color accentColor,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: colors.bg2,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: colors.cardBorder),
-      ),
-      child: Row(
-        children: [
-          Text(icon, style: const TextStyle(fontSize: 16)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      label,
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: colors.t1,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      value,
-                      style: GoogleFonts.jetBrainsMono(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: accentColor,
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  desc,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: colors.t3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _tipLine(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Text(
-        text,
-        style: GoogleFonts.inter(
-          fontSize: 11,
-          color: colors.t3,
-          height: 1.4,
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// PROGRESSION INFO (simplified from v1 ProgressionSection, used in ExpandableSection)
-// ============================================================================
-
-class ProgressionInfo extends StatelessWidget {
-  final AppThemeColors colors;
-
-  const ProgressionInfo({super.key, required this.colors});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _phaseCard('📖', '1-2 周', '学习期', '学习正确动作模式，感受目标肌肉发力。使用轻重量，重点是动作质量和关节安全。', colors.primary),
-        const SizedBox(height: 6),
-        _phaseCard('💪', '3-4 周', '适应期', '身体逐渐适应训练负荷，可以小幅增加重量（每次 2.5-5%）。注意记录训练日志。', colors.accent),
-        const SizedBox(height: 6),
-        _phaseCard('🚀', '5-8 周', '增长期', '这是肌肉增长最快的阶段。挑战更大重量，保持渐进超负荷。确保睡眠充足、营养到位。', colors.success),
-        const SizedBox(height: 6),
-        _phaseCard('⚡', '9-12 周', '突破期', '尝试突破 PR。引入高级技巧：递减组、超级组、暂停休息等。12 周后安排 1 周减载。', colors.rose),
-      ],
-    );
-  }
-
-  Widget _phaseCard(
-    String icon,
-    String week,
-    String title,
-    String desc,
-    Color accent,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: colors.bg2,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: colors.cardBorder),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: accent.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Text(icon, style: const TextStyle(fontSize: 14)),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: accent,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: accent.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        week,
-                        style: GoogleFonts.jetBrainsMono(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: accent,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  desc,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: colors.t3,
-                    height: 1.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// THEME SHEET (bottom sheet for theme selection)
-// ============================================================================
-
-class ThemeSheet extends StatelessWidget {
-  final AppThemeColors colors;
-  final ThemeName currentTheme;
-  final ValueChanged<ThemeName> onThemeChanged;
-
-  const ThemeSheet({
-    super.key,
-    required this.colors,
-    required this.currentTheme,
-    required this.onThemeChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final themes = [
-      (ThemeName.blue, '蓝', Color(0xFF3b82f6)),
-      (ThemeName.green, '绿', Color(0xFF10b981)),
-      (ThemeName.pink, '粉', Color(0xFFec4899)),
-      (ThemeName.purple, '紫', Color(0xFF8b5cf6)),
-      (ThemeName.orange, '橙', Color(0xFFf97316)),
-    ];
-
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: colors.bg2,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: colors.bg4,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            '选择主题',
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: colors.t1,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: themes.map((theme) {
-              final isActive = theme.$1 == currentTheme;
-              return GestureDetector(
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  onThemeChanged(theme.$1);
-                  Navigator.pop(context);
-                },
-                child: Column(
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      curve: Curves.easeOutCubic,
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: theme.$3,
-                        border: isActive
-                            ? Border.all(color: colors.t1, width: 3)
-                            : null,
-                        boxShadow: isActive
-                            ? [
-                                BoxShadow(
-                                  color: theme.$3.withOpacity(0.4),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: isActive
-                          ? const Icon(Icons.check, color: Colors.white, size: 24)
-                          : null,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      theme.$2,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight:
-                            isActive ? FontWeight.w600 : FontWeight.w400,
-                        color: isActive ? colors.t1 : colors.t3,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// SUBTLE BACKGROUND (v2: static gradient, replaces AmbientBackground)
-// ============================================================================
-
-class SubtleBackground extends StatelessWidget {
-  final AppThemeColors colors;
-
-  const SubtleBackground({super.key, required this.colors});
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              colors.primary.withOpacity(0.03),
-              colors.accent.withOpacity(0.02),
-              colors.bg,
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// DAY CONTENT ANIMATOR (simplified for v2)
-// ============================================================================
-
-class DayContentAnimator extends StatefulWidget {
-  final int dayIndex;
+class ThemeState extends StatefulWidget {
   final Widget child;
-
-  const DayContentAnimator({
-    super.key,
-    required this.dayIndex,
-    required this.child,
-  });
+  const ThemeState({super.key, required this.child});
 
   @override
-  State<DayContentAnimator> createState() => _DayContentAnimatorState();
+  State<ThemeState> createState() => _ThemeStateState();
 }
 
-class _DayContentAnimatorState extends State<DayContentAnimator>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
+class _ThemeStateState extends State<ThemeState> {
+  AppTheme _mode = AppTheme.blue;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 250),
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
-    _controller.forward();
+    SharedPreferences.getInstance().then((prefs) {
+      final idx = prefs.getInt('recomp_theme_v3') ?? 0;
+      if (mounted) setState(() => _mode = AppTheme.values[idx.clamp(0, AppTheme.values.length - 1)]);
+    });
   }
 
-  @override
-  void didUpdateWidget(DayContentAnimator oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.dayIndex != widget.dayIndex) {
-      _controller.reset();
-      _controller.forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  Future<void> setTheme(AppTheme mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('recomp_theme_v3', mode.index);
+    setState(() => _mode = mode);
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return FadeTransition(
-          opacity: _fadeAnimation,
-          child: child,
-        );
-      },
+    return ThemeInherited(
+      current: _mode,
+      theme: themes[_mode]!,
+      setTheme: setTheme,
       child: widget.child,
     );
   }
 }
 
-// ============================================================================
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN APP
-// ============================================================================
+// ═══════════════════════════════════════════════════════════════════════════════
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const BodyRecompApp());
+  runApp(const ThemeState(child: RecompApp()));
 }
 
-class BodyRecompApp extends StatefulWidget {
-  const BodyRecompApp({super.key});
+class RecompApp extends StatelessWidget {
+  const RecompApp({super.key});
 
   @override
-  State<BodyRecompApp> createState() => _BodyRecompAppState();
+  Widget build(BuildContext context) {
+    return Builder(builder: (context) {
+      final inherited = ThemeInherited.of(context);
+      final t = inherited.theme;
+
+      return MaterialApp(
+        title: 'Body Recomp',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          brightness: Brightness.light,
+          scaffoldBackgroundColor: t.bg,
+          colorScheme: ColorScheme.light(
+            primary: t.primary,
+            secondary: t.accent,
+            surface: t.card,
+            onSurface: t.text1,
+          ),
+          appBarTheme: AppBarTheme(
+            backgroundColor: t.bg,
+            foregroundColor: t.text1,
+            elevation: 0,
+            scrolledUnderElevation: 0.5,
+          ),
+          bottomNavigationBarTheme: BottomNavigationBarThemeData(
+            backgroundColor: t.navbarBg,
+            selectedItemColor: t.primary,
+            unselectedItemColor: t.text4,
+            type: BottomNavigationBarType.fixed,
+            selectedLabelStyle: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700),
+            unselectedLabelStyle: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500),
+          ),
+          cardTheme: CardThemeData(
+            color: t.card,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(color: t.border, width: 1),
+            ),
+          ),
+          useMaterial3: true,
+          textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme),
+        ),
+        home: const MainPage(),
+      );
+    });
+  }
 }
 
-class _BodyRecompAppState extends State<BodyRecompApp> {
-  ThemeName _currentTheme = ThemeName.blue;
-  AppThemeColors _colors = ThemeDefinitions.getTheme(ThemeName.blue);
-  bool _isLoaded = false;
-  List<WorkoutDay> _workoutDays = [];
-  int _selectedDay = 0;
-  Map<int, Set<int>> _checkedExercises = {};
-  Timer? _weekResetTimer;
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN PAGE — Bottom navigation with 4 tabs
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class MainPage extends StatefulWidget {
+  const MainPage({super.key});
+  @override
+  State<MainPage> createState() => _MainPageState();
+}
+
+class _MainPageState extends State<MainPage> {
+  int _tabIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final inherited = ThemeInherited.of(context);
+    final t = inherited.theme;
+
+    return Scaffold(
+      body: IndexedStack(
+        index: _tabIndex,
+        children: const [
+          WorkoutPage(),
+          NutritionPage(),
+          ProgressionPage(),
+          ThemePage(),
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _tabIndex,
+        onTap: (i) => setState(() => _tabIndex = i),
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.fitness_center), label: '训练'),
+          BottomNavigationBarItem(icon: Icon(Icons.restaurant), label: '饮食'),
+          BottomNavigationBarItem(icon: Icon(Icons.trending_up), label: '超负荷'),
+          BottomNavigationBarItem(icon: Icon(Icons.palette), label: '主题'),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// WORKOUT PAGE — Day selector + exercise list
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class WorkoutPage extends StatefulWidget {
+  const WorkoutPage({super.key});
+  @override
+  State<WorkoutPage> createState() => _WorkoutPageState();
+}
+
+class _WorkoutPageState extends State<WorkoutPage> {
+  int _dayIndex = 0;
+  Map<String, dynamic> _doneMap = {};
 
   @override
   void initState() {
     super.initState();
-    _workoutDays = createWorkoutDays();
-    _loadData();
-    _startWeekResetTimer();
+    // Auto-select today
+    final today = DateTime.now().weekday; // 1=Mon, 7=Sun
+    if (today >= 1 && today <= 7) setState(() => _dayIndex = today - 1);
+    _loadProgress();
   }
 
-  @override
-  void dispose() {
-    _weekResetTimer?.cancel();
-    super.dispose();
-  }
-
-  void _startWeekResetTimer() {
-    _weekResetTimer = Timer.periodic(const Duration(hours: 1), (_) {
-      _checkWeekReset();
-    });
-  }
-
-  void _checkWeekReset() {
-    final now = DateTime.now();
-    if (now.weekday == DateTime.monday && now.hour >= 0 && now.hour < 1) {
-      final currentWeek = WorkoutStorage._weekKey(now);
-      final lastWeek =
-          WorkoutStorage._weekKey(now.subtract(const Duration(days: 1)));
-      if (currentWeek != lastWeek) {
-        WorkoutStorage.clearOldWeeks();
-        setState(() {
-          _checkedExercises.clear();
-        });
-      }
+  Future<void> _loadProgress() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('recomp_done_v3');
+    if (raw != null) {
+      try { setState(() => _doneMap = jsonDecode(raw) as Map<String, dynamic>); } catch (_) {}
     }
   }
 
-  Future<void> _loadData() async {
-    final theme = await WorkoutStorage.loadTheme();
-    final workoutDays = createWorkoutDays();
-    final now = DateTime.now();
-    final todayIndex = now.weekday - 1;
-
-    final Map<int, Set<int>> checked = {};
-    for (int i = 0; i < workoutDays.length; i++) {
-      if (workoutDays[i].exercises.isNotEmpty) {
-        checked[i] = await WorkoutStorage.loadChecked(i);
-      }
-    }
-
-    if (!mounted) return;
+  Future<void> _toggle(int dayIdx, int exIdx) async {
+    final key = '$dayIdx\_$exIdx';
     setState(() {
-      _currentTheme = theme;
-      _colors = ThemeDefinitions.getTheme(theme);
-      _workoutDays = workoutDays;
-      _selectedDay = todayIndex.clamp(0, workoutDays.length - 1);
-      _checkedExercises = checked;
-      _isLoaded = true;
-    });
-  }
-
-  Future<void> _changeTheme(ThemeName theme) async {
-    await WorkoutStorage.saveTheme(theme);
-    setState(() {
-      _currentTheme = theme;
-      _colors = ThemeDefinitions.getTheme(theme);
-    });
-  }
-
-  Future<void> _toggleExercise(int dayIndex, int exerciseIndex) async {
-    setState(() {
-      final checked = _checkedExercises[dayIndex] ?? {};
-      if (checked.contains(exerciseIndex)) {
-        checked.remove(exerciseIndex);
+      if (_doneMap.containsKey(key)) {
+        _doneMap.remove(key);
       } else {
-        checked.add(exerciseIndex);
+        _doneMap[key] = true;
+        HapticFeedback.lightImpact();
       }
-      _checkedExercises[dayIndex] = checked;
-      _workoutDays[dayIndex].exercises[exerciseIndex].isChecked =
-          checked.contains(exerciseIndex);
     });
-    await WorkoutStorage.saveChecked(dayIndex, _checkedExercises[dayIndex] ?? {});
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('recomp_done_v3', jsonEncode(_doneMap));
   }
 
-  int _getCompletedCount(int dayIndex) {
-    return _checkedExercises[dayIndex]?.length ?? 0;
-  }
-
-  void _showThemeSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => ThemeSheet(
-        colors: _colors,
-        currentTheme: _currentTheme,
-        onThemeChanged: _changeTheme,
-      ),
-    );
+  int _doneCount(int day) {
+    int c = 0;
+    for (int i = 0; i < workoutDays[day].exercises.length; i++) {
+      if (_doneMap.containsKey('$day\_$i')) c++;
+    }
+    return c;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_isLoaded) {
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: Scaffold(
-          backgroundColor: _colors.bg,
-          body: Center(
-            child: CircularProgressIndicator(
-              color: _colors.primary,
-              strokeWidth: 2,
+    final t = ThemeInherited.of(context).theme;
+    final day = workoutDays[_dayIndex];
+
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ── App Bar ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+              child: Row(
+                children: [
+                  // Title with PRIMARY color (NOT ShaderMask!)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Body Recomp', style: GoogleFonts.inter(
+                          fontSize: 26, fontWeight: FontWeight.w900,
+                          color: t.primary, letterSpacing: -0.5,
+                        )),
+                        Text('27M \u00B7 173cm \u00B7 72.5kg \u00B7 BMI 24.2', style: GoogleFonts.inter(
+                          fontSize: 11, color: t.text3, fontWeight: FontWeight.w500,
+                        )),
+                      ],
+                    ),
+                  ),
+                  // Stats pill
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: t.primary.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text('目标 68-70kg', style: GoogleFonts.inter(
+                      fontSize: 11, fontWeight: FontWeight.w700, color: t.primary,
+                    )),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Day selector chips ──
+            Container(
+              height: 44,
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: workoutDays.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                itemBuilder: (context, i) {
+                  final d = workoutDays[i];
+                  final sel = i == _dayIndex;
+                  return GestureDetector(
+                    onTap: () => setState(() => _dayIndex = i),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOutCubic,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: sel ? t.primary : Colors.transparent,
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                          color: sel ? t.primary : t.border,
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(d.dayName, style: GoogleFonts.inter(
+                            fontSize: 12, fontWeight: FontWeight.w700,
+                            color: sel ? Colors.white : t.text2,
+                          )),
+                          Text(d.subtitle, style: GoogleFonts.inter(
+                            fontSize: 8, fontWeight: FontWeight.w500,
+                            color: sel ? Colors.white.withOpacity(0.8) : t.text4,
+                          )),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // ── Content area ──
+            Expanded(
+              child: _buildDayContent(day, t),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDayContent(WorkoutDay day, WorkoutTheme t) {
+    if (day.isRest) {
+      return Center(
+        child: Card(
+          margin: const EdgeInsets.symmetric(horizontal: 32),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.bedtime, size: 56, color: t.primary.withOpacity(0.6)),
+                const SizedBox(height: 16),
+                Text('休息日', style: GoogleFonts.inter(
+                  fontSize: 22, fontWeight: FontWeight.w800, color: t.text1,
+                )),
+                const SizedBox(height: 8),
+                Text('肌肉在休息时生长\n保证 7-9 小时睡眠', style: GoogleFonts.inter(
+                  fontSize: 13, color: t.text3, height: 1.8,
+                ), textAlign: TextAlign.center),
+              ],
             ),
           ),
         ),
       );
     }
 
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'BODY RECOMP',
-      theme: ThemeData(
-        scaffoldBackgroundColor: _colors.bg,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: _colors.primary,
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-      ),
-      home: Scaffold(
-        backgroundColor: _colors.bg,
-        body: SafeArea(
-          child: Stack(
-            children: [
-              // Subtle static background
-              SubtleBackground(colors: _colors),
-              // Main scrollable content
-              RefreshIndicator(
-                color: _colors.primary,
-                onRefresh: _loadData,
-                child: CustomScrollView(
-                  slivers: [
-                    // Compact header with palette icon
-                    SliverToBoxAdapter(
-                      child: CompactHeader(
-                        colors: _colors,
-                        onThemeTap: _showThemeSheet,
-                      ),
-                    ),
-                    // Day tab bar (primary navigation)
-                    SliverToBoxAdapter(
-                      child: DayTabBar(
-                        colors: _colors,
-                        selectedIndex: _selectedDay,
-                        onTabSelected: (index) {
-                          setState(() => _selectedDay = index);
-                        },
-                        workoutDays: _workoutDays,
-                      ),
-                    ),
-                    // Selected day content
-                    SliverToBoxAdapter(
-                      child: _buildDayContent(),
-                    ),
-                    // Bottom spacing
-                    const SliverToBoxAdapter(
-                      child: SizedBox(height: 32),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDayContent() {
-    final day = _workoutDays[_selectedDay];
-
-    // Rest day
-    if (day.isRest) {
-      return DayContentAnimator(
-        key: ValueKey(_selectedDay),
-        dayIndex: _selectedDay,
-        child: RestDayCard(day: day, colors: _colors),
-      );
-    }
-
-    // Active recovery day
-    if (day.activities != null && day.activities!.isNotEmpty) {
-      return DayContentAnimator(
-        key: ValueKey(_selectedDay),
-        dayIndex: _selectedDay,
+    // Recovery day
+    if (day.recoveryOptions != null) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildDayTitle(day),
-            const SizedBox(height: 8),
-            ActiveRecoveryCard(day: day, colors: _colors),
+            _dayHeader(day, t),
+            const SizedBox(height: 12),
+            Text(day.optionalDesc!, style: GoogleFonts.inter(fontSize: 12, color: t.text3, height: 1.6)),
+            const SizedBox(height: 12),
+            ...day.recoveryOptions!.map((opt) => Card(
+              margin: const EdgeInsets.only(bottom: 6),
+              child: ListTile(
+                leading: Container(
+                  width: 8, height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: t.primary,
+                    boxShadow: [BoxShadow(color: t.primary.withOpacity(0.4), blurRadius: 6)],
+                  ),
+                ),
+                title: Text(opt, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500, color: t.text2)),
+                dense: true,
+              ),
+            )),
           ],
         ),
       );
     }
 
-    // Training day
-    final completed = _getCompletedCount(_selectedDay);
+    // Normal workout day
+    final done = _doneCount(_dayIndex);
     final total = day.exercises.length;
+    final full = done == total && total > 0;
 
-    return DayContentAnimator(
-      key: ValueKey(_selectedDay),
-      dayIndex: _selectedDay,
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildDayTitle(day),
-          // Compact stats
-          CompactStats(colors: _colors),
-          // Inline tip
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-            child: Row(
+          _dayHeader(day, t),
+          const SizedBox(height: 12),
+
+          // Progress bar
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('训练进度', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: t.text3)),
+              Text('$done/$total', style: GoogleFonts.inter(
+                fontSize: 12, fontWeight: FontWeight.w700, color: t.primary,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              )),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: total > 0 ? done / total : 0,
+              minHeight: 6,
+              backgroundColor: t.border,
+              valueColor: AlwaysStoppedAnimation(full ? t.success : t.primary),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Exercise list
+          ...day.exercises.asMap().entries.map((entry) {
+            final i = entry.key;
+            final ex = entry.value;
+            final isDone = _doneMap.containsKey('$_dayIndex\_$i');
+            return _exerciseCard(ex, i + 1, isDone, t, () => _toggle(_dayIndex, i));
+          }),
+
+          if (day.circuitNote != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Card(
+                color: t.primary.withOpacity(0.04),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Text(day.circuitNote!, style: GoogleFonts.inter(
+                    fontSize: 11, color: t.text3, height: 1.6, fontWeight: FontWeight.w500,
+                  )),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dayHeader(WorkoutDay day, WorkoutTheme t) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Icon(Icons.lightbulb_outline, size: 13, color: _colors.warning),
-                const SizedBox(width: 4),
-                Text(
-                  '训练日早上可做空腹有氧 20-30 分钟（可选）',
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: _colors.t3,
+                Text('${day.dayName} ${day.subtitle}', style: GoogleFonts.inter(
+                  fontSize: 18, fontWeight: FontWeight.w800, color: t.text1, letterSpacing: -0.3,
+                )),
+                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: t.primary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(6),
                   ),
+                  child: Text(day.badge, style: GoogleFonts.inter(
+                    fontSize: 10, fontWeight: FontWeight.w700, color: t.primary,
+                  )),
+                ),
+              ],
+            ),
+            if (day.description.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(day.description, style: GoogleFonts.inter(fontSize: 12, color: t.text3)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _exerciseCard(Exercise ex, int num, bool isDone, WorkoutTheme t, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Card(
+          color: ex.isStar && !isDone ? t.primary.withOpacity(0.02) : null,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: ex.isStar && !isDone
+                ? BorderSide(color: t.primary.withOpacity(0.3), width: 1.5)
+                : BorderSide(color: t.border, width: 1),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Number + Checkbox
+                GestureDetector(
+                  onTap: onTap,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOutBack,
+                    width: 26, height: 26,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isDone ? t.success : Colors.transparent,
+                      border: Border.all(
+                        color: isDone ? t.success : t.text4,
+                        width: 1.5,
+                      ),
+                      boxShadow: isDone ? [BoxShadow(color: t.success.withOpacity(0.3), blurRadius: 6)] : null,
+                    ),
+                    child: isDone
+                        ? const Icon(Icons.check, color: Colors.white, size: 14)
+                        : Center(
+                            child: Text('$num', style: GoogleFonts.inter(
+                              fontSize: 11, fontWeight: FontWeight.w700, color: t.text4,
+                            )),
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Exercise info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(ex.name, style: GoogleFonts.inter(
+                        fontSize: 14, fontWeight: FontWeight.w700,
+                        color: isDone ? t.text4 : t.text1,
+                        decoration: isDone ? TextDecoration.lineThrough : null,
+                        decorationColor: t.text4,
+                      )),
+                      const SizedBox(height: 3),
+                      Wrap(
+                        spacing: 4, runSpacing: 2,
+                        children: [
+                          ...ex.muscles.map((m) => Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: t.primary.withOpacity(0.06),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(m, style: GoogleFonts.inter(
+                              fontSize: 9, fontWeight: FontWeight.w600, color: t.text3,
+                            )),
+                          )),
+                          if (ex.muscleTarget.isNotEmpty)
+                            Text(ex.muscleTarget, style: GoogleFonts.inter(fontSize: 9, color: t.text3)),
+                        ],
+                      ),
+                      if (ex.note != null && !isDone) ...[
+                        const SizedBox(height: 6),
+                        Text(ex.note!, style: GoogleFonts.inter(fontSize: 10.5, color: t.text3, height: 1.5)),
+                      ],
+                    ],
+                  ),
+                ),
+
+                // Sets x Reps x Rest
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('${ex.sets}\u00D7', style: GoogleFonts.inter(
+                      fontSize: 16, fontWeight: FontWeight.w800, color: t.primary,
+                    )),
+                    Text(ex.reps, style: GoogleFonts.inter(
+                      fontSize: 10, fontWeight: FontWeight.w600, color: t.text2,
+                    )),
+                    const SizedBox(height: 2),
+                    Text(ex.rest, style: GoogleFonts.inter(
+                      fontSize: 9, fontWeight: FontWeight.w500, color: t.text4,
+                    )),
+                  ],
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 4),
-          // Progress bar
-          DayProgressBar(
-            completed: completed,
-            total: total,
-            colors: _colors,
-          ),
-          // Circuit info
-          if (day.circuitInfo != null)
-            CircuitInfoBanner(info: day.circuitInfo!, colors: _colors),
-          // Exercise cards
-          ...day.exercises.asMap().entries.map((entry) {
-            return ExerciseCard(
-              key: ValueKey('ex_${_selectedDay}_${entry.key}'),
-              exercise: entry.value.copyWith(
-                isChecked: _checkedExercises[_selectedDay]?.contains(entry.key) ??
-                    false,
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NUTRITION PAGE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class NutritionPage extends StatelessWidget {
+  const NutritionPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = ThemeInherited.of(context).theme;
+
+    return Scaffold(
+      appBar: AppBar(title: Text('饮食营养', style: GoogleFonts.inter(
+        fontSize: 18, fontWeight: FontWeight.w800, color: t.text1,
+      ))),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Calorie summary
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _statItem('每日热量', '2200', 'kcal', t),
+                    _statItem('蛋白质', '130-160', 'g', t),
+                    _statItem('碳水', '200-270', 'g', t),
+                    _statItem('脂肪', '58-73', 'g', t),
+                  ],
+                ),
               ),
-              index: entry.key,
-              colors: _colors,
-              onCheckChanged: (exIndex) {
-                _toggleExercise(_selectedDay, exIndex);
-              },
-            );
-          }),
-          const SizedBox(height: 8),
-          // Expandable: Nutrition
-          ExpandableSection(
-            title: '营养建议',
-            icon: '🍽️',
-            colors: _colors,
-            content: Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: NutritionTips(colors: _colors),
             ),
-          ),
-          // Expandable: Progression
-          ExpandableSection(
-            title: '进阶计划',
-            icon: '📈',
-            colors: _colors,
-            content: Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: ProgressionInfo(colors: _colors),
-            ),
-          ),
-        ],
+            const SizedBox(height: 16),
+
+            // Macro detail cards
+            _macroCard('蛋白质', '130-160g', '1.8-2.2g/kg \u00B7 25%',
+                '鸡胸 \u00B7 牛肉 \u00B7 鸡蛋 \u00B7 鱼虾 \u00B7 豆腐 \u00B7 蛋白粉', t.primary, t),
+            const SizedBox(height: 8),
+            _macroCard('碳水', '200-270g', '2-3g/kg \u00B7 40%',
+                '糙米 \u00B7 红薯 \u00B7 燕麦 \u00B7 全麦 \u00B7 玉米 \u00B7 水果', t.warning, t),
+            const SizedBox(height: 8),
+            _macroCard('脂肪', '58-73g', '0.8-1g/kg \u00B7 30%',
+                '橄榄油 \u00B7 坚果 \u00B7 牛油果 \u00B7 深海鱼 \u00B7 蛋黄', t.success, t),
+
+            const SizedBox(height: 24),
+            Text('饮食建议', style: GoogleFonts.inter(
+              fontSize: 16, fontWeight: FontWeight.w800, color: t.text1,
+            )),
+            const SizedBox(height: 10),
+            ...nutritionTips.asMap().entries.map((e) => Card(
+              margin: const EdgeInsets.only(bottom: 6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 3, height: 14,
+                      margin: const EdgeInsets.only(right: 10, top: 2),
+                      decoration: BoxDecoration(
+                        color: t.primary, borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(nutritionTips[e.key], style: GoogleFonts.inter(
+                        fontSize: 12, color: t.text2, height: 1.6,
+                      )),
+                    ),
+                  ],
+                ),
+              ),
+            )),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildDayTitle(WorkoutDay day) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-      child: Row(
-        children: [
-          Text(
-            '${day.dayLabel}',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: _colors.primary,
+  Widget _statItem(String label, String value, String unit, WorkoutTheme t) {
+    return Column(
+      children: [
+        Text(label, style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: t.text4, letterSpacing: 0.5)),
+        const SizedBox(height: 4),
+        Text(value, style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: t.primary)),
+        Text(unit, style: GoogleFonts.inter(fontSize: 9, color: t.text4)),
+      ],
+    );
+  }
+
+  Widget _macroCard(String label, String value, String pct, String foods, Color color, WorkoutTheme t) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(width: 28, height: 3, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+                const SizedBox(width: 8),
+                Text(label, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: t.text4, letterSpacing: 1.5)),
+                const Spacer(),
+                Text(pct, style: GoogleFonts.inter(fontSize: 10, color: t.text3)),
+              ],
             ),
-          ),
-          if (day.title.isNotEmpty) ...[
-            Text(
-              ' · ${day.title}',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: _colors.t1,
+            const SizedBox(height: 10),
+            Text(value, style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w900, color: color)),
+            const SizedBox(height: 4),
+            Text(foods, style: GoogleFonts.inter(fontSize: 11, color: t.text3, height: 1.5)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROGRESSION PAGE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class ProgressionPage extends StatelessWidget {
+  const ProgressionPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = ThemeInherited.of(context).theme;
+
+    return Scaffold(
+      appBar: AppBar(title: Text('渐进超负荷', style: GoogleFonts.inter(
+        fontSize: 18, fontWeight: FontWeight.w800, color: t.text1,
+      ))),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Overview
+            Card(
+              color: t.primary.withOpacity(0.04),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  '渐进超负荷是增肌的核心原则：逐步增加训练负荷，迫使身体适应并变得更强。每 1-2 周尝试加重或增加次数，保持训练日志记录进步。',
+                  style: GoogleFonts.inter(fontSize: 12, color: t.text2, height: 1.7),
+                ),
               ),
             ),
+            const SizedBox(height: 16),
+
+            Text('四阶段计划', style: GoogleFonts.inter(
+              fontSize: 16, fontWeight: FontWeight.w800, color: t.text1,
+            )),
+            const SizedBox(height: 10),
+
+            // Phase cards
+            ...progressionPhases.asMap().entries.map((e) {
+              final (week, title, desc) = progressionPhases[e.key];
+              final phaseNum = e.key + 1;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Phase number circle
+                        Container(
+                          width: 36, height: 36,
+                          decoration: BoxDecoration(
+                            color: t.primary.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text('$phaseNum', style: GoogleFonts.inter(
+                              fontSize: 16, fontWeight: FontWeight.w800, color: t.primary,
+                            )),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        // Info
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(title, style: GoogleFonts.inter(
+                                    fontSize: 15, fontWeight: FontWeight.w800, color: t.text1,
+                                  )),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: t.primary.withOpacity(0.08),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(week, style: GoogleFonts.inter(
+                                      fontSize: 9, fontWeight: FontWeight.w700, color: t.primary,
+                                    )),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(desc, style: GoogleFonts.inter(fontSize: 12, color: t.text3, height: 1.6)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+
+            const SizedBox(height: 20),
+            Text('加重策略', style: GoogleFonts.inter(
+              fontSize: 16, fontWeight: FontWeight.w800, color: t.text1,
+            )),
+            const SizedBox(height: 10),
+            ...[
+              ('上肢复合动作', '卧推 / 划船 / 推肩：每次 +1.25-2.5kg'),
+              ('下肢复合动作', '倒蹬 / 硬拉 / 臀推：每次 +2.5-5kg'),
+              ('孤立动作', '侧平举 / 弯举 / 下压：每次 +0.5-1kg 或 +1-2次'),
+              ('遇到瓶颈', '减重 10% 重新开始，或更换动作变式刺激新角度'),
+            ].map((item) => Card(
+              margin: const EdgeInsets.only(bottom: 6),
+              child: ListTile(
+                dense: true,
+                title: Text(item.$1, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: t.text1)),
+                subtitle: Text(item.$2, style: GoogleFonts.inter(fontSize: 11, color: t.text3, height: 1.5)),
+              ),
+            )),
           ],
-          if (day.subtitle.isNotEmpty) ...[
-            Text(
-              ' · ${day.subtitle}',
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: _colors.t4,
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// THEME PAGE — Simple tappable list, NO GestureDetector nesting issues
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class ThemePage extends StatelessWidget {
+  const ThemePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final inherited = ThemeInherited.of(context);
+    final t = inherited.theme;
+    final current = inherited.current;
+
+    return Scaffold(
+      appBar: AppBar(title: Text('主题选择', style: GoogleFonts.inter(
+        fontSize: 18, fontWeight: FontWeight.w800, color: t.text1,
+      ))),
+      body: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        itemCount: AppTheme.values.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        itemBuilder: (context, i) {
+          final mode = AppTheme.values[i];
+          final mt = themes[mode]!;
+          final sel = mode == current;
+
+          return Card(
+            color: sel ? mt.primary.withOpacity(0.06) : null,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(
+                color: sel ? mt.primary : t.border,
+                width: sel ? 2 : 1,
               ),
             ),
-          ],
-        ],
+            child: ListTile(
+              onTap: () => inherited.setTheme(mode),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              leading: Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [mt.primary, mt.accent]),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: sel ? [BoxShadow(color: mt.primary.withOpacity(0.3), blurRadius: 8)] : null,
+                ),
+                child: sel ? const Icon(Icons.check, color: Colors.white, size: 20) : null,
+              ),
+              title: Text(mt.name, style: GoogleFonts.inter(
+                fontSize: 15, fontWeight: FontWeight.w700,
+                color: sel ? mt.primary : t.text1,
+              )),
+              subtitle: Text(sel ? '当前使用中' : '点击切换', style: GoogleFonts.inter(
+                fontSize: 11, color: sel ? mt.primary.withOpacity(0.7) : t.text4,
+              )),
+              trailing: sel
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: mt.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text('已选择', style: GoogleFonts.inter(
+                        fontSize: 10, fontWeight: FontWeight.w700, color: mt.primary,
+                      )),
+                    )
+                  : null,
+            ),
+          );
+        },
       ),
     );
   }
