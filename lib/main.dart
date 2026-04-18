@@ -520,7 +520,15 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final t = ThemeInherited.of(context).theme;
-    return Scaffold(
+    final dark = t.isDark;
+    // 设置状态栏样式：亮色主题用深色文字，暗色主题用浅色文字
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+      ),
+      child: Scaffold(
       body: Column(
         children: [
           SafeArea(
@@ -587,6 +595,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
           ),
         ),
       ),
+    ),
     );
   }
 
