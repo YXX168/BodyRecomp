@@ -40,8 +40,8 @@ android {
         applicationId "com.body.recomp"
         minSdk 21
         targetSdk 35
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
+        versionCode 62
+        versionName "6.2.0"
     }
 
     buildTypes {
