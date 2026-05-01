@@ -710,7 +710,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
   }
 
   /// 将当天完成数量写入月度历史 key: recomp_history_YYYY_MM
-  static Future<void> _saveToHistory(SharedPreferences p) async {
+  Future<void> _saveToHistory(SharedPreferences p) async {
     final now = DateTime.now();
     final monthKey = 'recomp_history_${now.year}_${now.month.toString().padLeft(2, '0')}';
     // 从当前 _done 中统计各天的完成数量
@@ -1187,7 +1187,7 @@ class _RecordPageState extends State<RecordPage> {
               Text('多', style: GoogleFonts.inter(fontSize: 9, color: t.text4)),
             ]),
           ]),
-        )))),
+        ))))),
         // 年度统计
         SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), child: FadeScaleEntry(index: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('$_viewYear 年度统计', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: t.text1)),
@@ -1198,7 +1198,7 @@ class _RecordPageState extends State<RecordPage> {
               _statBlock('训练天数', '$_yearTrainDays', '天', t),
             ]),
           ])),
-        ])))),
+        ]))))),
         // 12个月小月历
         SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), child: Column(
           crossAxisAlignment: CrossAxisAlignment.start, children: [
