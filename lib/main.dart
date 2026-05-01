@@ -1187,7 +1187,7 @@ class _RecordPageState extends State<RecordPage> {
               Text('多', style: GoogleFonts.inter(fontSize: 9, color: t.text4)),
             ]),
           ]),
-        ))))),
+        )))),
         // 年度统计
         SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), child: FadeScaleEntry(index: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('$_viewYear 年度统计', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: t.text1)),
@@ -1436,6 +1436,6 @@ class ThemePage extends StatelessWidget {
           )));
         }, childCount: AppTheme.values.length),
       )),
-    ]);
+    ]));
   }
 }
