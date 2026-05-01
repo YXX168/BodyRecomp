@@ -1198,7 +1198,7 @@ class _RecordPageState extends State<RecordPage> {
               _statBlock('训练天数', '$_yearTrainDays', '天', t),
             ]),
           ])),
-        ]))))),
+        ])))),
         // 12个月小月历
         SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), child: Column(
           crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1208,7 +1208,7 @@ class _RecordPageState extends State<RecordPage> {
           ],
         ))),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
-      ]);
+      ]));
   }
 
   Widget _statBlock(String label, String value, String unit, WorkoutTheme t) => Column(children: [
