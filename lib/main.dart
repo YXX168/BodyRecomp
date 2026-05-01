@@ -576,7 +576,7 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   int _tab = 0;
-  final _pages = const [WorkoutPage(), RecordPage(), NutritionPage(), ProgressionPage(), ThemePage()];
+  final _pages = const [WorkoutPage(), NutritionPage(), ProgressionPage(), RecordPage()];
 
   @override
   Widget build(BuildContext context) {
@@ -599,9 +599,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                   children: [
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       GradientTitle(text: 'Body Recomp', primary: t.primary, accent: t.primaryLight, fontSize: 26),
-                      Text('27M · 173cm · 72.5kg · BMI 24.2 · v6.4.0', style: GoogleFonts.inter(fontSize: 11, color: t.text3, fontWeight: FontWeight.w500)),
+                      Text('27M · 173cm · 72.5kg · BMI 24.2', style: GoogleFonts.inter(fontSize: 11, color: t.text3, fontWeight: FontWeight.w500)),
                     ])),
-                    PressScale(onTap: () => HapticFeedback.lightImpact(), child: Container(
+                    PressScale(onTap: _showThemeSheet, child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(color: t.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(20)),
                       child: Text('目标 68-70kg', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: t.primary)),
@@ -626,7 +626,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(6, 6, 6, 4),
               child: LayoutBuilder(builder: (context, box) {
-                final w = box.maxWidth / 5;
+                final w = box.maxWidth / 4;
                 return Stack(children: [
                   AnimatedPositioned(
                     duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic,
@@ -643,10 +643,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                   ),
                   Row(children: [
                     _navItem(Icons.fitness_center, '训练', 0, t, w),
-                    _navItem(Icons.bar_chart_rounded, '记录', 1, t, w),
-                    _navItem(Icons.restaurant, '饮食', 2, t, w),
-                    _navItem(Icons.trending_up, '超负荷', 3, t, w),
-                    _navItem(Icons.palette, '主题', 4, t, w),
+                    _navItem(Icons.restaurant, '饮食', 1, t, w),
+                    _navItem(Icons.trending_up, '超负荷', 2, t, w),
+                    _navItem(Icons.bar_chart_rounded, '记录', 3, t, w),
                   ]),
                 ]);
               }),
@@ -680,6 +679,98 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
           ]),
         ),
       ),
+    );
+  }
+
+  void _showThemeSheet() {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        final inh = ThemeInherited.of(ctx);
+        final t = inh.theme;
+        final cur = inh.current;
+        return Container(
+          decoration: BoxDecoration(
+            color: t.navbarBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 16, 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('主题选择', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: t.text1)),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(ctx),
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(color: t.border.withOpacity(0.5), shape: BoxShape.circle),
+                          child: Icon(Icons.close, size: 18, color: t.text3),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: AppTheme.values.map((m) {
+                        final mt = themes[m]!;
+                        final sel = m == cur;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: PressScale(
+                            onTap: () { inh.setTheme(m); Navigator.pop(ctx); },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: sel ? mt.primary.withOpacity(0.06) : null,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: sel ? mt.primary : t.border, width: sel ? 2 : 1),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                child: Row(children: [
+                                  Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(colors: [mt.primary, mt.accent]),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: sel ? const Icon(Icons.check, color: Colors.white, size: 20) : null,
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(mt.name, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: sel ? mt.primary : t.text1)),
+                                      Text(sel ? '当前使用中' : '点击切换', style: GoogleFonts.inter(fontSize: 10, color: sel ? mt.primary.withOpacity(0.7) : t.text4)),
+                                    ],
+                                  )),
+                                ]),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -1203,30 +1294,32 @@ class _RecordPageState extends State<RecordPage> {
       final cells = <Widget>[];
       for (int col = 0; col < 7; col++) {
         if (row == 0 && col < firstWeekday) {
-          cells.add(const SizedBox(height: 32));
+          cells.add(const Expanded(child: SizedBox(height: 32)));
         } else if (day > daysInMonth) {
-          cells.add(const SizedBox(height: 32));
+          cells.add(const Expanded(child: SizedBox(height: 32)));
         } else {
           final isToday = isCurrentMonth && day == now.day;
           final count = _monthData[day] ?? 0;
           final intensity = count > 0 ? (count / 8).clamp(0.0, 1.0) : 0.0;
-          cells.add(SizedBox(
-            height: 32,
-            child: Center(child: Container(
-              width: 26, height: 26,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: count == 0 ? Colors.transparent : Color.lerp(t.card, t.success, intensity),
-                border: isToday ? Border.all(color: t.primary, width: 2) : null,
-                boxShadow: isToday ? [BoxShadow(color: t.primary.withOpacity(0.2), blurRadius: 4)] : null,
-              ),
-              child: Center(child: Text('$day',
-                style: GoogleFonts.inter(
-                  fontSize: 10,
-                  fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
-                  color: count == 0 ? (isToday ? t.primary : t.text4) : (intensity > 0.5 ? Colors.white : t.text1),
-                ))),
-            )),
+          cells.add(Expanded(
+            child: SizedBox(
+              height: 32,
+              child: Center(child: Container(
+                width: 26, height: 26,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: count == 0 ? Colors.transparent : Color.lerp(t.card, t.success, intensity),
+                  border: isToday ? Border.all(color: t.primary, width: 2) : null,
+                  boxShadow: isToday ? [BoxShadow(color: t.primary.withOpacity(0.2), blurRadius: 4)] : null,
+                ),
+                child: Center(child: Text('$day',
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+                    color: count == 0 ? (isToday ? t.primary : t.text4) : (intensity > 0.5 ? Colors.white : t.text1),
+                  ))),
+              )),
+            ),
           ));
           day++;
         }
@@ -1268,7 +1361,7 @@ class _RecordPageState extends State<RecordPage> {
     }
     final total = history.values.fold(0, (s, v) => s + (v as int));
     return Container(
-      width: (MediaQuery.of(context).size.width - 32 - 16) / 4,
+      width: (MediaQuery.of(context).size.width - 32 - 24) / 4,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
