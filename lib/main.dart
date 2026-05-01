@@ -512,7 +512,7 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   int _tab = 0;
-  final _pages = const [WorkoutPage(), NutritionPage(), ProgressionPage(), ThemePage()];
+  final _pages = const [WorkoutPage(), RecordPage(), NutritionPage(), ProgressionPage(), ThemePage()];
 
   @override
   Widget build(BuildContext context) {
@@ -564,7 +564,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(6, 6, 6, 4),
             child: LayoutBuilder(builder: (context, box) {
-              final w = box.maxWidth / 4;
+              final w = box.maxWidth / 5;
               return Stack(children: [
                 // Sliding pill
                 AnimatedPositioned(
@@ -583,9 +583,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                 // Nav items
                 Row(children: [
                   _navItem(Icons.fitness_center, '训练', 0, t, w),
-                  _navItem(Icons.restaurant, '饮食', 1, t, w),
-                  _navItem(Icons.trending_up, '超负荷', 2, t, w),
-                  _navItem(Icons.palette, '主题', 3, t, w),
+                  _navItem(Icons.bar_chart_rounded, '记录', 1, t, w),
+                  _navItem(Icons.restaurant, '饮食', 2, t, w),
+                  _navItem(Icons.trending_up, '超负荷', 3, t, w),
+                  _navItem(Icons.palette, '主题', 4, t, w),
                 ]),
               ]);
             }),
@@ -659,7 +660,31 @@ class _WorkoutPageState extends State<WorkoutPage> {
       final currentYear = DateTime.now().year;
 
       if (storedWeek == null || storedYear == null || storedYear != currentYear || storedWeek != currentWeek) {
-        // 新的一周，清空所有完成记录
+        // 新的一周：先将旧数据归档到历史，再清空
+        final r = p.getString('recomp_done_v6');
+        if (r != null && r != '{}') {
+          // 归档旧数据到历史
+          final monthKey = 'recomp_history_${DateTime.now().year}_${DateTime.now().month.toString().padLeft(2, '0')}';
+          final existing = p.getString(monthKey);
+          Map<String, dynamic> history = {};
+          if (existing != null) {
+            try { history = jsonDecode(existing) as Map<String, dynamic>; } catch (_) {}
+          }
+          final oldDone = jsonDecode(r) as Map<String, dynamic>;
+          final dayCounts = <int, int>{};
+          oldDone.forEach((key, _) {
+            final parts = key.split('_');
+            if (parts.length == 2) {
+              final day = int.tryParse(parts[0]);
+              if (day != null) dayCounts[day] = (dayCounts[day] ?? 0) + 1;
+            }
+          });
+          for (final entry in dayCounts.entries) {
+            history['D_${entry.key}'] = entry.value;
+          }
+          await p.setString(monthKey, jsonEncode(history));
+        }
+        // 清空完成记录
         await p.setString('recomp_done_v6', jsonEncode({}));
         await p.setInt('recomp_done_v6_week', currentWeek);
         await p.setInt('recomp_done_v6_year', currentYear);
@@ -680,6 +705,52 @@ class _WorkoutPageState extends State<WorkoutPage> {
     });
     final p = await SharedPreferences.getInstance();
     await p.setString('recomp_done_v6', jsonEncode(_done));
+    // 同步更新月度历史记录
+    await _saveToHistory(p);
+  }
+
+  /// 将当天完成数量写入月度历史 key: recomp_history_YYYY_MM
+  static Future<void> _saveToHistory(SharedPreferences p) async {
+    final now = DateTime.now();
+    final monthKey = 'recomp_history_${now.year}_${now.month.toString().padLeft(2, '0')}';
+    // 从当前 _done 中统计各天的完成数量
+    final dayCounts = <int, int>{};
+    _done.forEach((key, _) {
+      final parts = key.split('_');
+      if (parts.length == 2) {
+        final day = int.tryParse(parts[0]);
+        if (day != null) dayCounts[day] = (dayCounts[day] ?? 0) + 1;
+      }
+    });
+    // 读取已有历史并合并
+    final existing = p.getString(monthKey);
+    Map<String, dynamic> history = {};
+    if (existing != null) {
+      try { history = jsonDecode(existing) as Map<String, dynamic>; } catch (_) {}
+    }
+    // 写入各天完成数（key 格式 "D_3" = 周一完成了3个动作）
+    for (final entry in dayCounts.entries) {
+      history['D_${entry.key}'] = entry.value;
+    }
+    await p.setString(monthKey, jsonEncode(history));
+  }
+
+  /// 读取指定月份的历史数据
+  static Map<int, int> _loadMonthHistory(SharedPreferences p, int year, int month) {
+    final key = 'recomp_history_${year}_${month.toString().padLeft(2, '0')}';
+    final raw = p.getString(key);
+    if (raw == null) return {};
+    try {
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      final result = <int, int>{};
+      map.forEach((k, v) {
+        if (k.startsWith('D_')) {
+          final day = int.tryParse(k.substring(2));
+          if (day != null) result[day] = v as int;
+        }
+      });
+      return result;
+    } catch (_) { return {}; }
   }
 
   int _cnt(int d) { int c = 0; for (int i = 0; i < workoutDays[d].exercises.length; i++) if (_done.containsKey('${d}_$i')) c++; return c; }
@@ -945,6 +1016,316 @@ class NutritionPage extends StatelessWidget {
       const SizedBox(height: 4), Text(f, style: GoogleFonts.inter(fontSize: 11, color: t.text3, height: 1.5)),
     ],
   )));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RECORD PAGE — v6.3: 训练记录统计（本月日历热力图 + 本年汇总）
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class RecordPage extends StatefulWidget {
+  const RecordPage({super.key});
+  @override
+  State<RecordPage> createState() => _RecordPageState();
+}
+
+class _RecordPageState extends State<RecordPage> {
+  int _viewYear = DateTime.now().year;
+  int _viewMonth = DateTime.now().month;
+  Map<int, int> _monthData = {};
+  bool _loading = true;
+  int _yearTotal = 0;
+  int _yearTrainDays = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final p = await SharedPreferences.getInstance();
+    // 加载当前查看月份的数据
+    final data = _WorkoutPageState._loadMonthHistory(p, _viewYear, _viewMonth);
+    // 计算年度统计
+    int yearTotal = 0, yearTrainDays = 0;
+    for (int m = 1; m <= 12; m++) {
+      final mData = _WorkoutPageState._loadMonthHistory(p, _viewYear, m);
+      for (final v in mData.values) {
+        yearTotal += v;
+        yearTrainDays++;
+      }
+    }
+    // 叠加本周当前完成数（可能还没归档）
+    final curDone = p.getString('recomp_done_v6');
+    if (curDone != null) {
+      try {
+        final done = jsonDecode(curDone) as Map<String, dynamic>;
+        final now = DateTime.now();
+        if (now.year == _viewYear && now.month == _viewMonth) {
+          final dayCounts = <int, int>{};
+          done.forEach((key, _) {
+            final parts = key.split('_');
+            if (parts.length == 2) {
+              final day = int.tryParse(parts[0]);
+              if (day != null) dayCounts[day] = (dayCounts[day] ?? 0) + 1;
+            }
+          });
+          for (final entry in dayCounts.entries) {
+            data[entry.key] = (data[entry.key] ?? 0) + entry.value;
+          }
+        }
+        if (now.year == _viewYear) {
+          // 计算本周已完成的总数
+          int curWeekTotal = 0;
+          done.forEach((_, __) => curWeekTotal++);
+          yearTotal += curWeekTotal;
+        }
+      } catch (_) {}
+    }
+    if (mounted) setState(() { _monthData = data; _yearTotal = yearTotal; _yearTrainDays = yearTrainDays; _loading = false; });
+  }
+
+  void _prevMonth() {
+    if (_viewMonth == 1) { _viewMonth = 12; _viewYear--; }
+    else { _viewMonth--; }
+    setState(() => _loading = true);
+    _loadData();
+  }
+
+  void _nextMonth() {
+    final now = DateTime.now();
+    if (_viewYear == now.year && _viewMonth == now.month) return;
+    if (_viewMonth == 12) { _viewMonth = 1; _viewYear++; }
+    else { _viewMonth++; }
+    setState(() => _loading = true);
+    _loadData();
+  }
+
+  int _totalExercises() {
+    return _monthData.values.fold(0, (sum, v) => sum + v);
+  }
+
+  int _trainDays() {
+    return _monthData.length;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = ThemeInherited.of(context).theme;
+    final dark = t.isDark;
+    final daysInMonth = DateTime(_viewYear, _viewMonth + 1, 0).day;
+    // 该月1号是周几（0=周一，6=周日）
+    int firstWeekday = DateTime(_viewYear, _viewMonth, 1).weekday - 1;
+    final now = DateTime.now();
+    final isCurrentMonth = _viewYear == now.year && _viewMonth == now.month;
+    final monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+    final weekLabels = ['一', '二', '三', '四', '五', '六', '日'];
+
+    return _loading
+      ? const Center(child: CircularProgressIndicator())
+      : CustomScrollView(slivers: [
+        SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+          child: GradientTitle(text: '训练记录', primary: t.primary, accent: t.primaryLight, fontSize: 22))),
+        // 月份选择器
+        SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 0), child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            PressScale(onTap: _prevMonth, child: Container(
+              width: 36, height: 36,
+              decoration: BoxDecoration(color: t.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
+              child: Icon(Icons.chevron_left, size: 20, color: t.primary))),
+            PressScale(onTap: () { _viewYear = DateTime.now().year; _viewMonth = DateTime.now().month; setState(() => _loading = true); _loadData(); },
+              child: Column(children: [
+                Text('$_viewYear年 $monthNames[_viewMonth - 1]', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: t.text1)),
+                if (isCurrentMonth) Text('当前月', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: t.primary)),
+              ])),
+            PressScale(onTap: _nextMonth, child: Container(
+              width: 36, height: 36,
+              decoration: BoxDecoration(color: (_viewYear == DateTime.now().year && _viewMonth == DateTime.now().month) ? t.border.withOpacity(0.5) : t.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
+              child: Icon(Icons.chevron_right, size: 20, color: (_viewYear == DateTime.now().year && _viewMonth == DateTime.now().month) ? t.text4 : t.primary))),
+          ],
+        ))),
+        // 月度统计卡片
+        SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 0), child: FadeScaleEntry(child: Card(
+          child: Padding(padding: const EdgeInsets.all(16), child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _statBlock('完成动作', '${_totalExercises()}', '个', t),
+              Container(width: 1, height: 36, color: t.border),
+              _statBlock('训练天数', '${_trainDays()}', '天', t),
+              Container(width: 1, height: 36, color: t.border),
+              _statBlock('本月总计', '${_yearTotal}', '个(年)', t),
+            ],
+          )),
+        )))),
+        // 日历热力图
+        SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), child: FadeScaleEntry(index: 1, child: Card(
+          child: Padding(padding: const EdgeInsets.all(14), child: Column(children: [
+            // 星期头
+            Row(children: [
+              for (int i = 0; i < 7; i++) Expanded(
+                child: Center(child: Text(weekLabels[i], style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: i >= 5 ? t.text4 : t.text3))),
+              ),
+            ]),
+            const SizedBox(height: 6),
+            // 日历格子
+            ..._buildCalendarRows(daysInMonth, firstWeekday, now, isCurrentMonth, t),
+            const SizedBox(height: 10),
+            // 图例
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text('少', style: GoogleFonts.inter(fontSize: 9, color: t.text4)),
+              const SizedBox(width: 4),
+              _legendDot(t, 0),
+              const SizedBox(width: 3),
+              _legendDot(t, 0.25),
+              const SizedBox(width: 3),
+              _legendDot(t, 0.5),
+              const SizedBox(width: 3),
+              _legendDot(t, 0.75),
+              const SizedBox(width: 3),
+              _legendDot(t, 1.0),
+              const SizedBox(width: 4),
+              Text('多', style: GoogleFonts.inter(fontSize: 9, color: t.text4)),
+            ]),
+          ]),
+        )))),
+        // 年度统计
+        SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), child: FadeScaleEntry(index: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('$_viewYear 年度统计', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: t.text1)),
+          const SizedBox(height: 8),
+          Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
+            Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+              _statBlock('年度完成', '$_yearTotal', '个动作', t),
+              _statBlock('训练天数', '$_yearTrainDays', '天', t),
+            ]),
+          ])),
+        ])))),
+        // 12个月小月历
+        SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('全年概览', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: t.text1)),
+            const SizedBox(height: 8),
+            _buildYearGrid(t),
+          ],
+        ))),
+        const SliverToBoxAdapter(child: SizedBox(height: 24)),
+      ]);
+  }
+
+  Widget _statBlock(String label, String value, String unit, WorkoutTheme t) => Column(children: [
+    Text(label, style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: t.text4, letterSpacing: 0.5)),
+    const SizedBox(height: 2), Text(value, style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: t.primary)),
+    Text(unit, style: GoogleFonts.inter(fontSize: 9, color: t.text4)),
+  ]);
+
+  List<Widget> _buildCalendarRows(int daysInMonth, int firstWeekday, DateTime now, bool isCurrentMonth, WorkoutTheme t) {
+    final rows = <Widget>[];
+    int day = 1;
+    for (int row = 0; row < 6; row++) {
+      if (day > daysInMonth) break;
+      final cells = <Widget>[];
+      for (int col = 0; col < 7; col++) {
+        if (row == 0 && col < firstWeekday) {
+          cells.add(const SizedBox(height: 32));
+        } else if (day > daysInMonth) {
+          cells.add(const SizedBox(height: 32));
+        } else {
+          final isToday = isCurrentMonth && day == now.day;
+          final count = _monthData[day] ?? 0;
+          final intensity = count > 0 ? (count / 8).clamp(0.0, 1.0) : 0.0;
+          cells.add(SizedBox(
+            height: 32,
+            child: Center(child: Container(
+              width: 26, height: 26,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: count == 0 ? Colors.transparent
+                  : Color.lerp(t.card, t.success, intensity),
+                border: isToday ? Border.all(color: t.primary, width: 2) : null,
+                boxShadow: isToday ? [BoxShadow(color: t.primary.withOpacity(0.2), blurRadius: 4)] : null,
+              ),
+              child: Center(child: Text('$day',
+                style: GoogleFonts.inter(fontSize: 10, fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+                  color: count == 0 ? (isToday ? t.primary : t.text4) : (intensity > 0.5 ? Colors.white : t.text1)))),
+            )),
+          ));
+          day++;
+        }
+      }
+      rows.add(Padding(padding: const EdgeInsets.only(bottom: 2), child: Row(children: cells)));
+    }
+    return rows;
+  }
+
+  Widget _legendDot(WorkoutTheme t, double intensity) => Container(
+    width: 12, height: 12,
+    decoration: BoxDecoration(shape: BoxShape.circle,
+      color: intensity == 0 ? t.border : Color.lerp(t.card, t.success, intensity)),
+  );
+
+  Widget _buildYearGrid(WorkoutTheme t) {
+    final now = DateTime.now();
+    final monthNames = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+    final cells = <Widget>[];
+    // 需要异步加载数据，但为了性能用同步方式展示当前已有数据
+    // 用 FutureBuilder 加载各月数据
+    return FutureBuilder<SharedPreferences>(
+      future: SharedPreferences.getInstance(),
+      builder: (ctx, snap) {
+        if (!snap.hasData) return const SizedBox(height: 100);
+        final p = snap.data!;
+        return Wrap(spacing: 8, runSpacing: 8, children: [
+          for (int m = 1; m <= 12; m++) _buildMiniMonth(p, _viewYear, m, monthNames[m - 1], t, m == now.month),
+        ]);
+      },
+    );
+  }
+
+  Widget _buildMiniMonth(SharedPreferences p, int year, int month, String label, WorkoutTheme t, bool isCurrent) {
+    final data = _WorkoutPageState._loadMonthHistory(p, year, month);
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    final firstWeekday = DateTime(year, month, 1).weekday - 1;
+    final total = data.values.fold(0, (s, v) => s + v);
+    return Container(
+      width: (MediaQuery.of(context).size.width - 16 * 2 - 8 * 3) / 4,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: isCurrent ? t.primary : t.border, width: isCurrent ? 1.5 : 0.5),
+        color: isCurrent ? t.primary.withOpacity(0.04) : null,
+      ),
+      child: Column(children: [
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text('$label月', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: isCurrent ? t.primary : t.text3)),
+          if (total > 0) Text('$total', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: t.success)),
+        ]),
+        const SizedBox(height: 4),
+        // 迷你7x6网格
+        ..._buildMiniGrid(daysInMonth, firstWeekday, data, t),
+      ]),
+    );
+  }
+
+  List<Widget> _buildMiniGrid(int daysInMonth, int firstWeekday, Map<int, int> data, WorkoutTheme t) {
+    final rows = <Widget>[];
+    int day = 1;
+    for (int row = 0; row < 6; row++) {
+      if (day > daysInMonth) break;
+      final cells = <Widget>[];
+      for (int col = 0; col < 7; col++) {
+        if (row == 0 && col < firstWeekday || day > daysInMonth) {
+          cells.add(SizedBox(width: 4, height: 4));
+        } else {
+          final count = data[day] ?? 0;
+          cells.add(Container(width: 4, height: 4,
+            decoration: BoxDecoration(shape: BoxShape.circle,
+              color: count == 0 ? t.border.withOpacity(0.3) : Color.lerp(t.card, t.success, (count / 8).clamp(0.0, 1.0)))));
+          day++;
+        }
+      }
+      rows.add(Row(mainAxisAlignment: MainAxisAlignment.center, children: cells));
+    }
+    return rows;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
