@@ -92,7 +92,6 @@ const themes = {
     success: Color(0xFF65A30D), successLight: Color(0xFFA3E635), warning: Color(0xFFD97706),
     border: Color(0xFFE2E8F0), navbarBg: Color(0xFFFFFFFF),
   ),
-  // v6.0 NEW: Cyberpunk neon dark theme
   AppTheme.dark: WorkoutTheme(
     name: '永夜星域 · 极夜黑',
     bg: Color(0xFF0A0E1A), card: Color(0xFF141A2E),
@@ -234,6 +233,73 @@ const progressionPhases = [
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// v6.4: HISTORY HELPERS — 每周重置 + 月度历史记录
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// 计算 ISO 8601 周数
+int isoWeekNumber(DateTime date) {
+  final dayOfYear = date.difference(DateTime(date.year, 1, 1)).inDays;
+  final jan1Weekday = DateTime(date.year, 1, 1).weekday;
+  final offset = jan1Weekday <= 4 ? jan1Weekday - 1 : jan1Weekday - 8;
+  return ((dayOfYear + offset) ~/ 7) + 1;
+}
+
+/// 月份历史 key 格式: recomp_history_2026_05
+String historyKey(int year, int month) {
+  return 'recomp_history_${year}_${month.toString().padLeft(2, '0')}';
+}
+
+/// 从 _done map 统计每天完成数: {"0": 5, "2": 8} => dayIndex -> count
+Map<int, int> countByDay(Map<String, dynamic> done) {
+  final result = <int, int>{};
+  done.forEach((key, _) {
+    final parts = key.split('_');
+    if (parts.length == 2) {
+      final day = int.tryParse(parts[0]);
+      if (day != null) {
+        result[day] = (result[day] ?? 0) + 1;
+      }
+    }
+  });
+  return result;
+}
+
+/// 读取指定月份的历史: {dayIndex: 完成动作数}
+Future<Map<int, int>> loadMonthHistory(SharedPreferences p, int year, int month) async {
+  final raw = p.getString(historyKey(year, month));
+  if (raw == null) return {};
+  try {
+    final map = jsonDecode(raw) as Map<String, dynamic>;
+    final result = <int, int>{};
+    map.forEach((k, v) {
+      final day = int.tryParse(k);
+      if (day != null) result[day] = v as int;
+    });
+    return result;
+  } catch (_) {
+    return {};
+  }
+}
+
+/// 将完成数据写入月度历史（merge 方式，不覆盖其他天）
+Future<void> saveToMonthHistory(SharedPreferences p, int year, int month, Map<int, int> dayCounts) async {
+  final key = historyKey(year, month);
+  final existing = p.getString(key);
+  Map<String, dynamic> history = {};
+  if (existing != null) {
+    try {
+      history = jsonDecode(existing) as Map<String, dynamic>;
+    } catch (_) {
+      history = {};
+    }
+  }
+  for (final entry in dayCounts.entries) {
+    history[entry.key.toString()] = entry.value;
+  }
+  await p.setString(key, jsonEncode(history));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // ANIMATION HELPERS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -294,7 +360,6 @@ class _PressScaleState extends State<PressScale> with SingleTickerProviderStateM
   }
 }
 
-/// v6.0 FIX #3: Animated note — smooth fade + slide + height collapse
 class AnimatedNote extends StatefulWidget {
   final String note;
   final bool visible;
@@ -349,7 +414,6 @@ class _AnimatedNoteState extends State<AnimatedNote> with SingleTickerProviderSt
   }
 }
 
-/// v6.0: Pulsing icon with animated rings for rest day card
 class _PulseIcon extends StatefulWidget {
   final IconData icon;
   final double size;
@@ -501,7 +565,7 @@ class RecompApp extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MAIN PAGE — v6.0 FIX #1: Redesigned bottom nav with sliding pill indicator
+// MAIN PAGE — v6.4: 5-tab bottom nav
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class MainPage extends StatefulWidget {
@@ -512,13 +576,12 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   int _tab = 0;
-  final _pages = const [WorkoutPage(), NutritionPage(), ProgressionPage(), ThemePage()];
+  final _pages = const [WorkoutPage(), RecordPage(), NutritionPage(), ProgressionPage(), ThemePage()];
 
   @override
   Widget build(BuildContext context) {
     final t = ThemeInherited.of(context).theme;
     final dark = t.isDark;
-    // 设置状态栏样式：亮色主题用深色文字，暗色主题用浅色文字
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -526,73 +589,71 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
         statusBarBrightness: dark ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
-      body: Column(
-        children: [
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-              child: Row(
-                children: [
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    GradientTitle(text: 'Body Recomp', primary: t.primary, accent: t.primaryLight, fontSize: 26),
-                    Text('27M · 173cm · 72.5kg · BMI 24.2', style: GoogleFonts.inter(fontSize: 11, color: t.text3, fontWeight: FontWeight.w500)),
-                  ])),
-                  PressScale(onTap: () => HapticFeedback.lightImpact(), child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(color: t.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(20)),
-                    child: Text('目标 68-70kg', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: t.primary)),
-                  )),
-                ],
+        body: Column(
+          children: [
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                child: Row(
+                  children: [
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      GradientTitle(text: 'Body Recomp', primary: t.primary, accent: t.primaryLight, fontSize: 26),
+                      Text('27M · 173cm · 72.5kg · BMI 24.2 · v6.4.0', style: GoogleFonts.inter(fontSize: 11, color: t.text3, fontWeight: FontWeight.w500)),
+                    ])),
+                    PressScale(onTap: () => HapticFeedback.lightImpact(), child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(color: t.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(20)),
+                      child: Text('目标 68-70kg', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: t.primary)),
+                    )),
+                  ],
+                ),
               ),
             ),
-          ),
-          Expanded(child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            switchInCurve: Curves.easeOutCubic, switchOutCurve: Curves.easeInCubic,
-            transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: SlideTransition(
-              position: Tween<Offset>(begin: const Offset(0.02, 0), end: Offset.zero)
-                  .animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)), child: child)),
-            child: KeyedSubtree(key: ValueKey(_tab), child: _pages[_tab]),
-          )),
-        ],
-      ),
-      // v6.0: Sliding pill nav bar — no splash, no shadow, just smooth pill
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(color: t.navbarBg, border: Border(top: BorderSide(color: t.border, width: 0.5))),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(6, 6, 6, 4),
-            child: LayoutBuilder(builder: (context, box) {
-              final w = box.maxWidth / 4;
-              return Stack(children: [
-                // Sliding pill
-                AnimatedPositioned(
-                  duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic,
-                  left: w * _tab + 4, top: 0, bottom: 0, width: w - 8,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      color: t.primary.withOpacity(t.isDark ? 0.12 : 0.08),
-                      boxShadow: t.isDark
-                        ? [BoxShadow(color: t.primary.withOpacity(0.15), blurRadius: 16)]
-                        : [BoxShadow(color: t.primary.withOpacity(0.06), blurRadius: 8)],
+            Expanded(child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              switchInCurve: Curves.easeOutCubic, switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: SlideTransition(
+                position: Tween<Offset>(begin: const Offset(0.02, 0), end: Offset.zero)
+                    .animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)), child: child)),
+              child: KeyedSubtree(key: ValueKey(_tab), child: _pages[_tab]),
+            )),
+          ],
+        ),
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(color: t.navbarBg, border: Border(top: BorderSide(color: t.border, width: 0.5))),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(6, 6, 6, 4),
+              child: LayoutBuilder(builder: (context, box) {
+                final w = box.maxWidth / 5;
+                return Stack(children: [
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic,
+                    left: w * _tab + 4, top: 0, bottom: 0, width: w - 8,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        color: t.primary.withOpacity(t.isDark ? 0.12 : 0.08),
+                        boxShadow: t.isDark
+                          ? [BoxShadow(color: t.primary.withOpacity(0.15), blurRadius: 16)]
+                          : [BoxShadow(color: t.primary.withOpacity(0.06), blurRadius: 8)],
+                      ),
                     ),
                   ),
-                ),
-                // Nav items
-                Row(children: [
-                  _navItem(Icons.fitness_center, '训练', 0, t, w),
-                  _navItem(Icons.restaurant, '饮食', 1, t, w),
-                  _navItem(Icons.trending_up, '超负荷', 2, t, w),
-                  _navItem(Icons.palette, '主题', 3, t, w),
-                ]),
-              ]);
-            }),
+                  Row(children: [
+                    _navItem(Icons.fitness_center, '训练', 0, t, w),
+                    _navItem(Icons.bar_chart_rounded, '记录', 1, t, w),
+                    _navItem(Icons.restaurant, '饮食', 2, t, w),
+                    _navItem(Icons.trending_up, '超负荷', 3, t, w),
+                    _navItem(Icons.palette, '主题', 4, t, w),
+                  ]),
+                ]);
+              }),
+            ),
           ),
         ),
       ),
-    ),
     );
   }
 
@@ -624,7 +685,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// WORKOUT PAGE
+// WORKOUT PAGE — v6.4: 每周自动重置 + 历史记录同步
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class WorkoutPage extends StatefulWidget {
@@ -636,14 +697,41 @@ class WorkoutPage extends StatefulWidget {
 class _WorkoutPageState extends State<WorkoutPage> {
   int _day = 0;
   Map<String, dynamic> _done = {};
+
   @override
   void initState() {
     super.initState();
     final d = DateTime.now().weekday;
     if (d >= 1 && d <= 7) _day = d - 1;
-    SharedPreferences.getInstance().then((p) {
-      final r = p.getString('recomp_done_v6');
-      if (r != null) try { _done = jsonDecode(r) as Map<String, dynamic>; } catch (_) {}
+    SharedPreferences.getInstance().then((p) async {
+      final now = DateTime.now();
+      final currentWeek = isoWeekNumber(now);
+      final currentYear = now.year;
+      final storedWeek = p.getInt('recomp_done_v6_week');
+      final storedYear = p.getInt('recomp_done_v6_year');
+
+      if (storedWeek == null || storedYear == null || storedYear != currentYear || storedWeek != currentWeek) {
+        // 新的一周：先将旧数据归档到月度历史，再清空
+        final oldRaw = p.getString('recomp_done_v6');
+        if (oldRaw != null && oldRaw != '{}') {
+          try {
+            final oldDone = jsonDecode(oldRaw) as Map<String, dynamic>;
+            final dayCounts = countByDay(oldDone);
+            if (dayCounts.isNotEmpty) {
+              await saveToMonthHistory(p, now.year, now.month, dayCounts);
+            }
+          } catch (_) {}
+        }
+        await p.setString('recomp_done_v6', jsonEncode({}));
+        await p.setInt('recomp_done_v6_week', currentWeek);
+        await p.setInt('recomp_done_v6_year', currentYear);
+        _done = {};
+      } else {
+        final r = p.getString('recomp_done_v6');
+        if (r != null) {
+          try { _done = jsonDecode(r) as Map<String, dynamic>; } catch (_) {}
+        }
+      }
       if (mounted) setState(() {});
     });
   }
@@ -651,31 +739,49 @@ class _WorkoutPageState extends State<WorkoutPage> {
   Future<void> _toggle(int di, int ei) async {
     final k = '${di}_$ei';
     setState(() {
-      if (_done.containsKey(k)) { _done.remove(k); HapticFeedback.lightImpact(); }
-      else { _done[k] = true; HapticFeedback.mediumImpact(); }
+      if (_done.containsKey(k)) {
+        _done.remove(k);
+        HapticFeedback.lightImpact();
+      } else {
+        _done[k] = true;
+        HapticFeedback.mediumImpact();
+      }
     });
     final p = await SharedPreferences.getInstance();
     await p.setString('recomp_done_v6', jsonEncode(_done));
+    // 同步写入月度历史
+    final now = DateTime.now();
+    final dayCounts = countByDay(_done);
+    await saveToMonthHistory(p, now.year, now.month, dayCounts);
   }
 
-  int _cnt(int d) { int c = 0; for (int i = 0; i < workoutDays[d].exercises.length; i++) if (_done.containsKey('${d}_$i')) c++; return c; }
+  int _cnt(int d) {
+    int c = 0;
+    for (int i = 0; i < workoutDays[d].exercises.length; i++) {
+      if (_done.containsKey('${d}_$i')) c++;
+    }
+    return c;
+  }
 
   @override
   Widget build(BuildContext context) {
     final t = ThemeInherited.of(context).theme;
     final wd = workoutDays[_day];
     return Column(children: [
-      // Day chips
       SizedBox(height: 44, child: ListView.separated(
         scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: workoutDays.length, separatorBuilder: (_, __) => const SizedBox(width: 6),
         itemBuilder: (ctx, i) {
-          final d = workoutDays[i]; final s = i == _day;
-          return PressScale(onTap: () { if (_day != i) { HapticFeedback.selectionClick(); setState(() => _day = i); } },
-            child: AnimatedContainer(duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic,
+          final d = workoutDays[i];
+          final s = i == _day;
+          return PressScale(
+            onTap: () { if (_day != i) { HapticFeedback.selectionClick(); setState(() => _day = i); } },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: s ? t.primary : Colors.transparent, borderRadius: BorderRadius.circular(22),
+                color: s ? t.primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(22),
                 border: Border.all(color: s ? t.primary : t.border, width: s ? 1.5 : 1),
                 boxShadow: s ? [BoxShadow(color: t.primary.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 2))] : null,
               ),
@@ -688,20 +794,23 @@ class _WorkoutPageState extends State<WorkoutPage> {
         },
       )),
       const SizedBox(height: 8),
-      // Content
       Expanded(child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 280),
         switchInCurve: Curves.easeOutCubic, switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (child, a) => FadeTransition(opacity: a, child: SlideTransition(
-          position: Tween<Offset>(begin: const Offset(0.03, 0), end: Offset.zero)
-              .animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)), child: child)),
+        transitionBuilder: (child, a) => FadeTransition(
+          opacity: a,
+          child: SlideTransition(
+            position: Tween<Offset>(begin: const Offset(0.03, 0), end: Offset.zero)
+                .animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)),
+            child: child,
+          ),
+        ),
         child: KeyedSubtree(key: ValueKey('day_$_day'), child: _buildContent(wd, t)),
       )),
     ]);
   }
 
   Widget _buildContent(WorkoutDay day, WorkoutTheme t) {
-    // v6.0 FIX #4: Redesigned Saturday rest card
     if (day.isRest) {
       return Center(child: FadeScaleEntry(child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -736,7 +845,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
       )));
     }
 
-    // v6.0 FIX #5: Sunday recovery — removed blank space, better layout
     if (day.recoveryOptions != null) {
       return SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -767,8 +875,9 @@ class _WorkoutPageState extends State<WorkoutPage> {
       );
     }
 
-    // Normal workout day
-    final done = _cnt(_day), total = day.exercises.length, full = done == total && total > 0;
+    final done = _cnt(_day);
+    final total = day.exercises.length;
+    final full = done == total && total > 0;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -799,34 +908,36 @@ class _WorkoutPageState extends State<WorkoutPage> {
     );
   }
 
-  Widget _dayHdr(WorkoutDay d, WorkoutTheme t) => Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        Text('${d.dayName} ${d.subtitle}', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: t.text1, letterSpacing: -0.3)),
-        const SizedBox(width: 10),
-        Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(color: t.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(6)),
-          child: Text(d.badge, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: t.primary))),
-      ]),
-      if (d.description.isNotEmpty) ...[const SizedBox(height: 4), Text(d.description, style: GoogleFonts.inter(fontSize: 12, color: t.text3))],
-    ],
-  )));
+  Widget _dayHdr(WorkoutDay d, WorkoutTheme t) {
+    return Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Text('${d.dayName} ${d.subtitle}', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: t.text1, letterSpacing: -0.3)),
+          const SizedBox(width: 10),
+          Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(color: t.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(6)),
+            child: Text(d.badge, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: t.primary))),
+        ]),
+        if (d.description.isNotEmpty) ...[const SizedBox(height: 4), Text(d.description, style: GoogleFonts.inter(fontSize: 12, color: t.text3))],
+      ],
+    )));
+  }
 
-  Widget _restTip(IconData ic, String txt, Color c, WorkoutTheme t) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-    decoration: BoxDecoration(color: c.withOpacity(0.06), borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: c.withOpacity(0.12), width: 0.5)),
-    child: Row(children: [Icon(ic, size: 18, color: c), const SizedBox(width: 10),
-      Text(txt, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: t.text2))]));
+  Widget _restTip(IconData ic, String txt, Color c, WorkoutTheme t) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(color: c.withOpacity(0.06), borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: c.withOpacity(0.12), width: 0.5)),
+      child: Row(children: [Icon(ic, size: 18, color: c), const SizedBox(width: 10),
+        Text(txt, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: t.text2))]));
+  }
 
-  // v6.0 FIX #3: Exercise card with animated note
   Widget _exCard(Exercise ex, int num, bool done, WorkoutTheme t, VoidCallback tap) {
     return Padding(padding: const EdgeInsets.only(bottom: 6), child: PressScale(onTap: tap, child: Card(
       color: ex.isStar && !done ? t.primary.withOpacity(0.02) : null,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14),
         side: ex.isStar && !done ? BorderSide(color: t.primary.withOpacity(0.3), width: 1.5) : BorderSide(color: t.border, width: 1)),
       child: Padding(padding: const EdgeInsets.all(14), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Checkbox
         PressScale(onTap: tap, child: AnimatedContainer(duration: const Duration(milliseconds: 250), curve: Curves.easeOutBack,
           width: 26, height: 26,
           decoration: BoxDecoration(shape: BoxShape.circle, color: done ? t.success : Colors.transparent,
@@ -840,7 +951,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
           ),
         )),
         const SizedBox(width: 12),
-        // Info
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(ex.name, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: done ? t.text4 : t.text1,
             decoration: done ? TextDecoration.lineThrough : null, decorationColor: t.text4)),
@@ -851,10 +961,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
               child: Text(m, style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w600, color: t.text3)))),
             if (ex.muscleTarget.isNotEmpty) Text(ex.muscleTarget, style: GoogleFonts.inter(fontSize: 9, color: t.text3)),
           ]),
-          // v6.0: Animated note (fade + slide + collapse)
           if (ex.note != null) AnimatedNote(note: ex.note!, visible: !done, color: t.text3),
         ])),
-        // Sets
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text('${ex.sets}\u00D7', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: t.primary)),
           Text(ex.reps, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: t.text2)),
@@ -863,6 +971,348 @@ class _WorkoutPageState extends State<WorkoutPage> {
         ]),
       ])),
     )));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RECORD PAGE — v6.4: 训练记录（月度日历热力图 + 年度统计）
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class RecordPage extends StatefulWidget {
+  const RecordPage({super.key});
+  @override
+  State<RecordPage> createState() => _RecordPageState();
+}
+
+class _RecordPageState extends State<RecordPage> {
+  int _viewYear = DateTime.now().year;
+  int _viewMonth = DateTime.now().month;
+  Map<int, int> _monthData = {};
+  bool _loading = true;
+  int _yearTotal = 0;
+  int _yearTrainDays = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final p = await SharedPreferences.getInstance();
+    final data = await loadMonthHistory(p, _viewYear, _viewMonth);
+
+    // 计算年度统计
+    int yearTotal = 0;
+    int yearTrainDays = 0;
+    for (int m = 1; m <= 12; m++) {
+      final mData = await loadMonthHistory(p, _viewYear, m);
+      yearTotal += mData.values.fold(0, (s, v) => s + v);
+      yearTrainDays += mData.length;
+    }
+
+    // 叠加本周当前完成数（可能还没归档）
+    final now = DateTime.now();
+    final curDone = p.getString('recomp_done_v6');
+    if (curDone != null) {
+      try {
+        final done = jsonDecode(curDone) as Map<String, dynamic>;
+        if (now.year == _viewYear && now.month == _viewMonth) {
+          final dayCounts = countByDay(done);
+          for (final entry in dayCounts.entries) {
+            data[entry.key] = (data[entry.key] ?? 0) + entry.value;
+          }
+        }
+        if (now.year == _viewYear) {
+          yearTotal += done.length;
+        }
+      } catch (_) {}
+    }
+
+    if (mounted) {
+      setState(() {
+        _monthData = data;
+        _yearTotal = yearTotal;
+        _yearTrainDays = yearTrainDays;
+        _loading = false;
+      });
+    }
+  }
+
+  void _prevMonth() {
+    setState(() {
+      if (_viewMonth == 1) {
+        _viewMonth = 12;
+        _viewYear--;
+      } else {
+        _viewMonth--;
+      }
+    });
+    _loadData();
+  }
+
+  void _nextMonth() {
+    final now = DateTime.now();
+    if (_viewYear == now.year && _viewMonth == now.month) return;
+    setState(() {
+      if (_viewMonth == 12) {
+        _viewMonth = 1;
+        _viewYear++;
+      } else {
+        _viewMonth++;
+      }
+    });
+    _loadData();
+  }
+
+  void _goToday() {
+    final now = DateTime.now();
+    setState(() {
+      _viewYear = now.year;
+      _viewMonth = now.month;
+      _loading = true;
+    });
+    _loadData();
+  }
+
+  int _totalExercises() {
+    return _monthData.values.fold(0, (sum, v) => sum + v);
+  }
+
+  int _trainDays() {
+    return _monthData.length;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = ThemeInherited.of(context).theme;
+    final daysInMonth = DateTime(_viewYear, _viewMonth + 1, 0).day;
+    final firstWeekday = DateTime(_viewYear, _viewMonth, 1).weekday - 1;
+    final now = DateTime.now();
+    final isCurrentMonth = _viewYear == now.year && _viewMonth == now.month;
+    final monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+    final weekLabels = ['一', '二', '三', '四', '五', '六', '日'];
+
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return CustomScrollView(slivers: [
+      SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+        child: GradientTitle(text: '训练记录', primary: t.primary, accent: t.primaryLight, fontSize: 22))),
+      // 月份选择器
+      SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 0), child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          PressScale(onTap: _prevMonth, child: Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(color: t.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
+            child: Icon(Icons.chevron_left, size: 20, color: t.primary))),
+          PressScale(onTap: _goToday, child: Column(children: [
+            Text('$_viewYear年 ${monthNames[_viewMonth - 1]}', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: t.text1)),
+            if (isCurrentMonth) Text('当前月', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: t.primary)),
+          ])),
+          PressScale(onTap: _nextMonth, child: Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              color: isCurrentMonth ? t.border.withOpacity(0.5) : t.primary.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(10)),
+            child: Icon(Icons.chevron_right, size: 20, color: isCurrentMonth ? t.text4 : t.primary))),
+        ],
+      ))),
+      // 月度统计
+      SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 0), child: FadeScaleEntry(child: Card(
+        child: Padding(padding: const EdgeInsets.all(16), child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _statBlock('完成动作', '${_totalExercises()}', '个', t),
+            Container(width: 1, height: 36, color: t.border),
+            _statBlock('训练天数', '${_trainDays()}', '天', t),
+            Container(width: 1, height: 36, color: t.border),
+            _statBlock('年度累计', '$_yearTotal', '个', t),
+          ],
+        )),
+      )))),
+      // 日历热力图
+      SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), child: FadeScaleEntry(index: 1, child: Card(
+        child: Padding(padding: const EdgeInsets.all(14), child: Column(children: [
+          Row(children: [
+            for (int i = 0; i < 7; i++) Expanded(
+              child: Center(child: Text(weekLabels[i], style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: i >= 5 ? t.text4 : t.text3))),
+            ),
+          ]),
+          const SizedBox(height: 6),
+          ..._buildCalendarRows(daysInMonth, firstWeekday, now, isCurrentMonth, t),
+          const SizedBox(height: 10),
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Text('少', style: GoogleFonts.inter(fontSize: 9, color: t.text4)),
+            const SizedBox(width: 4),
+            _legendDot(t, 0),
+            const SizedBox(width: 3),
+            _legendDot(t, 0.25),
+            const SizedBox(width: 3),
+            _legendDot(t, 0.5),
+            const SizedBox(width: 3),
+            _legendDot(t, 0.75),
+            const SizedBox(width: 3),
+            _legendDot(t, 1.0),
+            const SizedBox(width: 4),
+            Text('多', style: GoogleFonts.inter(fontSize: 9, color: t.text4)),
+          ]),
+        ]),
+      ))))),
+      // 年度统计
+      SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), child: FadeScaleEntry(index: 2, child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('$_viewYear 年度统计', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: t.text1)),
+          const SizedBox(height: 8),
+          Card(child: Padding(padding: const EdgeInsets.all(16), child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _statBlock('年度完成', '$_yearTotal', '个动作', t),
+              _statBlock('训练天数', '$_yearTrainDays', '天', t),
+            ],
+          ))),
+        ],
+      )))),
+      // 12个月迷你月历
+      SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('全年概览', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: t.text1)),
+          const SizedBox(height: 8),
+          _buildYearGrid(t),
+        ],
+      ))),
+      const SliverToBoxAdapter(child: SizedBox(height: 24)),
+    ]);
+  }
+
+  Widget _statBlock(String label, String value, String unit, WorkoutTheme t) {
+    return Column(children: [
+      Text(label, style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: t.text4, letterSpacing: 0.5)),
+      const SizedBox(height: 2),
+      Text(value, style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: t.primary)),
+      Text(unit, style: GoogleFonts.inter(fontSize: 9, color: t.text4)),
+    ]);
+  }
+
+  List<Widget> _buildCalendarRows(int daysInMonth, int firstWeekday, DateTime now, bool isCurrentMonth, WorkoutTheme t) {
+    final rows = <Widget>[];
+    int day = 1;
+    for (int row = 0; row < 6; row++) {
+      if (day > daysInMonth) break;
+      final cells = <Widget>[];
+      for (int col = 0; col < 7; col++) {
+        if (row == 0 && col < firstWeekday) {
+          cells.add(const SizedBox(height: 32));
+        } else if (day > daysInMonth) {
+          cells.add(const SizedBox(height: 32));
+        } else {
+          final isToday = isCurrentMonth && day == now.day;
+          final count = _monthData[day] ?? 0;
+          final intensity = count > 0 ? (count / 8).clamp(0.0, 1.0) : 0.0;
+          cells.add(SizedBox(
+            height: 32,
+            child: Center(child: Container(
+              width: 26, height: 26,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: count == 0 ? Colors.transparent : Color.lerp(t.card, t.success, intensity),
+                border: isToday ? Border.all(color: t.primary, width: 2) : null,
+                boxShadow: isToday ? [BoxShadow(color: t.primary.withOpacity(0.2), blurRadius: 4)] : null,
+              ),
+              child: Center(child: Text('$day',
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+                  color: count == 0 ? (isToday ? t.primary : t.text4) : (intensity > 0.5 ? Colors.white : t.text1),
+                ))),
+            )),
+          ));
+          day++;
+        }
+      }
+      rows.add(Padding(padding: const EdgeInsets.only(bottom: 2), child: Row(children: cells)));
+    }
+    return rows;
+  }
+
+  Widget _legendDot(WorkoutTheme t, double intensity) {
+    return Container(
+      width: 12, height: 12,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: intensity == 0 ? t.border : Color.lerp(t.card, t.success, intensity),
+      ),
+    );
+  }
+
+  Widget _buildYearGrid(WorkoutTheme t) {
+    final now = DateTime.now();
+    return FutureBuilder<SharedPreferences>(
+      future: SharedPreferences.getInstance(),
+      builder: (ctx, snap) {
+        if (!snap.hasData) return const SizedBox(height: 100);
+        final p = snap.data!;
+        return Wrap(spacing: 8, runSpacing: 8, children: [
+          for (int m = 1; m <= 12; m++) _buildMiniMonth(p, _viewYear, m, '$m', t, m == now.month),
+        ]);
+      },
+    );
+  }
+
+  Widget _buildMiniMonth(SharedPreferences p, int year, int month, String label, WorkoutTheme t, bool isCurrent) {
+    final data = p.getString(historyKey(year, month));
+    Map<String, dynamic> history = {};
+    if (data != null) {
+      try { history = jsonDecode(data) as Map<String, dynamic>; } catch (_) {}
+    }
+    final total = history.values.fold(0, (s, v) => s + (v as int));
+    return Container(
+      width: (MediaQuery.of(context).size.width - 32 - 16) / 4,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: isCurrent ? t.primary : t.border, width: isCurrent ? 1.5 : 0.5),
+        color: isCurrent ? t.primary.withOpacity(0.04) : null,
+      ),
+      child: Column(children: [
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text('$label月', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: isCurrent ? t.primary : t.text3)),
+          if (total > 0) Text('$total', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: t.success)),
+        ]),
+        const SizedBox(height: 4),
+        ..._buildMiniGrid(year, month, history, t),
+      ]),
+    );
+  }
+
+  List<Widget> _buildMiniGrid(int year, int month, Map<String, dynamic> history, WorkoutTheme t) {
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    final firstWeekday = DateTime(year, month, 1).weekday - 1;
+    final rows = <Widget>[];
+    int day = 1;
+    for (int row = 0; row < 6; row++) {
+      if (day > daysInMonth) break;
+      final cells = <Widget>[];
+      for (int col = 0; col < 7; col++) {
+        if (row == 0 && col < firstWeekday || day > daysInMonth) {
+          cells.add(SizedBox(width: 4, height: 4));
+        } else {
+          final count = history[day.toString()] ?? 0;
+          final intensity = count > 0 ? (count / 8).clamp(0.0, 1.0) : 0.0;
+          cells.add(Container(
+            width: 4, height: 4,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: count == 0 ? t.border.withOpacity(0.3) : Color.lerp(t.card, t.success, intensity),
+            ),
+          ));
+          day++;
+        }
+      }
+      rows.add(Row(mainAxisAlignment: MainAxisAlignment.center, children: cells));
+    }
+    return rows;
   }
 }
 
@@ -979,7 +1429,7 @@ class ProgressionPage extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// THEME PAGE — v6.0: 6 themes including cyberpunk dark
+// THEME PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class ThemePage extends StatelessWidget {
@@ -1008,7 +1458,6 @@ class ThemePage extends StatelessWidget {
                     : sel ? [BoxShadow(color: mt.primary.withOpacity(0.3), blurRadius: 10)] : null,
               ),
               child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), child: Row(children: [
-                // Swatch
                 AnimatedContainer(duration: const Duration(milliseconds: 300), width: 44, height: 44,
                   decoration: BoxDecoration(gradient: LinearGradient(colors: [mt.primary, mt.accent]), borderRadius: BorderRadius.circular(12),
                     boxShadow: sel && mt.isDark ? [BoxShadow(color: mt.primary.withOpacity(0.5), blurRadius: 12), BoxShadow(color: mt.accent.withOpacity(0.3), blurRadius: 16)]
