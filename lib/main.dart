@@ -162,15 +162,14 @@ const workoutDays = [
     ],
   ),
   WorkoutDay(
-    dayName: '周二', subtitle: '下肢 A', badge: '股四头 / 臀',
-    description: '股四头 / 臀 / 腘绳 / 小腿 / 核心',
+    dayName: '周二', subtitle: '下肢 A', badge: '股四头肌 / 前侧重点',
+    description: '股四头肌 / 大腿前侧 / 内收肌 / 有氧 / 核心',
     exercises: [
-      Exercise(name: '倒蹬机（脚位踩高）', muscles: ['股四头', '臀'], muscleTarget: '', sets: 4, reps: '15', rest: '90s', isStar: true, note: '核心动作 — 脚踩高踩外侧重臀和后侧链，比深蹲安全，新手首选'),
-      Exercise(name: '哑铃罗马尼亚硬拉', muscles: ['腘绳肌', '臀'], muscleTarget: '', sets: 3, reps: '10-12', rest: '90s', note: '膝盖微屈，髋关节后推，感受大腿后侧拉伸，比传统硬拉更安全'),
-      Exercise(name: '坐姿腿屈伸', muscles: ['股四头'], muscleTarget: '孤立', sets: 3, reps: '12-15', rest: '60s', note: '顶峰收缩2秒，慢放3秒，感受股四头肌燃烧'),
-      Exercise(name: '俯卧腿弯举', muscles: ['腘绳肌'], muscleTarget: '', sets: 3, reps: '12-15', rest: '60s', note: '强化大腿后侧，让腿部侧面更有型'),
-      Exercise(name: '站姿提踵', muscles: ['小腿'], muscleTarget: '腓肠肌', sets: 4, reps: '20', rest: '45s', note: '小腿紧致，视觉拉长腿部比例，顶峰收缩2秒'),
-      Exercise(name: '平板支撑', muscles: ['核心'], muscleTarget: '', sets: 3, reps: '45-60s', rest: '45s', note: '身体一条直线，健身房地面就能做'),
+      Exercise(name: '倒蹬机', muscles: ['股四头', '臀'], muscleTarget: '前侧重点', sets: 4, reps: '12-15', rest: '90s', isStar: true, note: '核心动作 — 专注大腿前侧发力，控制离心下放节奏'),
+      Exercise(name: '坐姿腿屈伸', muscles: ['股四头'], muscleTarget: '孤立', sets: 3, reps: '15', rest: '60s', note: '重点在于顶峰收缩，雕刻大腿前侧线条'),
+      Exercise(name: '内收机', muscles: ['大腿内收肌'], muscleTarget: '', sets: 3, reps: '15', rest: '60s', note: '收紧大腿内侧，改善腿型'),
+      Exercise(name: '坡度走', muscles: ['有氧'], muscleTarget: '心率125-130', sets: 1, reps: '40分钟', rest: '-', note: '心率尽量稳在 125-130 左右，保持匀速不冲刺'),
+      Exercise(name: '卷腹', muscles: ['腹直肌'], muscleTarget: '', sets: 5, reps: '20', rest: '30s', note: '放在有氧后，感受腹部的极致灼烧感'),
     ],
   ),
   WorkoutDay(
@@ -187,16 +186,14 @@ const workoutDays = [
     ],
   ),
   WorkoutDay(
-    dayName: '周四', subtitle: '下肢 B', badge: '后链 + 雕刻',
-    description: '臀 / 腘绳 / 核心 / 小腿',
+    dayName: '周四', subtitle: '下肢 B', badge: '臀腿后链 / 稳定重点',
+    description: '臀部后链 / 腘绳肌 / 臀中肌 / 有氧 / 核心',
     exercises: [
-      Exercise(name: '杠铃臀推', muscles: ['臀大肌'], muscleTarget: '', sets: 4, reps: '10-12', rest: '90s', isStar: true, note: '核心动作 — 顶峰收缩停顿2秒，臀部孤立发力，护腰'),
-      Exercise(name: '保加利亚分腿蹲', muscles: ['股四头', '臀'], muscleTarget: '', sets: 3, reps: '每侧10-12', rest: '60s', note: '手持哑铃，单腿训练，矫正左右不平衡'),
-      Exercise(name: '坐姿腿弯举', muscles: ['腘绳肌'], muscleTarget: '', sets: 3, reps: '12-15', rest: '60s', note: '和周二俯卧腿弯举互补，两个动作腘绳肌受力角度不同'),
-      Exercise(name: '器械内收 / 外展', muscles: ['大腿内收肌'], muscleTarget: '', sets: 3, reps: '15', rest: '60s', note: '收紧大腿内侧，改善腿型'),
-      Exercise(name: '反向卷腹', muscles: ['腹直肌'], muscleTarget: '下腹', sets: 4, reps: '15-20', rest: '60s', note: '仰卧抬腿卷骨盆，用腹肌把膝盖拉向胸口，下腹刺激强烈'),
-      Exercise(name: '死虫式', muscles: ['核心'], muscleTarget: '稳定性', sets: 3, reps: '每侧10', rest: '45s', note: '仰卧对侧手脚伸展，核心全程收紧贴地，安静不引人注目'),
-      Exercise(name: '坐姿提踵', muscles: ['小腿'], muscleTarget: '比目鱼肌', sets: 3, reps: '20', rest: '45s', note: '周二站姿练腓肠肌，今天坐姿练比目鱼肌，两个都练到'),
+      Exercise(name: '哈克深蹲', muscles: ['股四头', '臀', '腘绳肌'], muscleTarget: '后链复合', sets: 4, reps: '12', rest: '90-120s', isStar: true, note: '双侧各 20kg 保持住，注意下去时慢一点，感受后侧链和臀部协同发力'),
+      Exercise(name: '坐姿腿弯举', muscles: ['腘绳肌'], muscleTarget: '后侧', sets: 4, reps: '12-15', rest: '60s', note: '补足后侧，平衡膝关节压力'),
+      Exercise(name: '外展机', muscles: ['臀中肌'], muscleTarget: '', sets: 3, reps: '15', rest: '60s', note: '针对臀中肌，让臀部侧面更饱满，视觉上更显腰细'),
+      Exercise(name: '坡度走', muscles: ['有氧'], muscleTarget: '心率125-130', sets: 1, reps: '40分钟', rest: '-', note: '坡度走 40 分钟，匀速保持心率'),
+      Exercise(name: '卷腹', muscles: ['腹直肌'], muscleTarget: '', sets: 5, reps: '20', rest: '30s', note: '感受腹部的极致灼烧感'),
     ],
   ),
   WorkoutDay(
@@ -639,14 +636,38 @@ class WorkoutPage extends StatefulWidget {
 class _WorkoutPageState extends State<WorkoutPage> {
   int _day = 0;
   Map<String, dynamic> _done = {};
+  // 计算当前是今年的第几周（ISO 8601）
+  static int _currentWeek() {
+    final now = DateTime.now();
+    final dayOfYear = now.difference(DateTime(now.year, 1, 1)).inDays;
+    // ISO周：周一为起始，第1周包含该年第一个周四
+    final jan1Weekday = DateTime(now.year, 1, 1).weekday; // 1=Mon, 7=Sun
+    final offset = jan1Weekday <= 4 ? jan1Weekday - 1 : jan1Weekday - 8;
+    return ((dayOfYear + offset) ~/ 7) + 1;
+  }
+
   @override
   void initState() {
     super.initState();
     final d = DateTime.now().weekday;
     if (d >= 1 && d <= 7) _day = d - 1;
-    SharedPreferences.getInstance().then((p) {
-      final r = p.getString('recomp_done_v6');
-      if (r != null) try { _done = jsonDecode(r) as Map<String, dynamic>; } catch (_) {}
+    SharedPreferences.getInstance().then((p) async {
+      // 每周自动重置：检查存储的周数是否与当前周数一致
+      final storedWeek = p.getInt('recomp_done_v6_week');
+      final currentWeek = _currentWeek();
+      final storedYear = p.getInt('recomp_done_v6_year');
+      final currentYear = DateTime.now().year;
+
+      if (storedWeek == null || storedYear == null || storedYear != currentYear || storedWeek != currentWeek) {
+        // 新的一周，清空所有完成记录
+        await p.setString('recomp_done_v6', jsonEncode({}));
+        await p.setInt('recomp_done_v6_week', currentWeek);
+        await p.setInt('recomp_done_v6_year', currentYear);
+        _done = {};
+      } else {
+        final r = p.getString('recomp_done_v6');
+        if (r != null) try { _done = jsonDecode(r) as Map<String, dynamic>; } catch (_) {}
+      }
       if (mounted) setState(() {});
     });
   }
