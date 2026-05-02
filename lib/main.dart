@@ -599,7 +599,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                   children: [
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       GradientTitle(text: 'Body Recomp', primary: t.primary, accent: t.primaryLight, fontSize: 26),
-                      Text('27M · 173cm · 72.5kg · BMI 24.2', style: GoogleFonts.inter(fontSize: 11, color: t.text3, fontWeight: FontWeight.w500)),
+                      Text('27M · 176cm · 72.5kg · BMI 24.2', style: GoogleFonts.inter(fontSize: 11, color: t.text3, fontWeight: FontWeight.w500)),
                     ])),
                     PressScale(onTap: _showThemeSheet, child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
