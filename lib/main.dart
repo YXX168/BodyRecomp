@@ -150,61 +150,61 @@ const workoutDays = [
     dayName: '周一', subtitle: '上肢 A', badge: '推力 + 后束',
     description: '胸 / 肩（前束+中束+后束） / 肱三头',
     exercises: [
-      Exercise(name: '上斜哑铃卧推 30\u00B0', muscles: ['胸大肌'], muscleTarget: '上部', sets: 4, reps: '10-12', rest: '90s', isStar: true, note: '核心动作 · 上胸优先 — 穿衣显锁骨的关键，控制离心3秒下放'),
-      Exercise(name: '平板杠铃卧推', muscles: ['胸大肌'], muscleTarget: '整体厚度', sets: 4, reps: '8-10', rest: '90-120s', note: '肩胛骨后缩下沉，全握距比窄握更安全'),
-      Exercise(name: '坐姿器械推肩', muscles: ['三角肌'], muscleTarget: '前束 / 中束', sets: 3, reps: '12', rest: '90s', note: '器械比哑铃安全，固定轨道适合推大重量打造饱满肩头'),
-      Exercise(name: '哑铃侧平举', muscles: ['三角肌'], muscleTarget: '中束', sets: 4, reps: '15-20', rest: '60s', note: '灵魂动作 — 小重量慢动作，3秒上2秒下，身体不摆动，肩膀越练越宽'),
-      Exercise(name: '面拉', muscles: ['三角肌后束'], muscleTarget: '上背', sets: 3, reps: '15-20', rest: '60s', note: '改善圆肩体态必练，绳索拉到脸前，外旋拇指朝后'),
-      Exercise(name: '蝴蝶机夹胸', muscles: ['胸大肌'], muscleTarget: '中缝', sets: 3, reps: '15-20', rest: '60s', note: '雕刻胸肌中缝线条，顶峰收缩2秒'),
-      Exercise(name: '绳索下压', muscles: ['肱三头'], muscleTarget: '外侧头', sets: 3, reps: '12-15', rest: '60s', note: '手臂后侧线条，拒绝拜拜肉，肘部固定不动'),
-      Exercise(name: '坐姿哑铃颈后臂屈伸', muscles: ['肱三头'], muscleTarget: '长头', sets: 3, reps: '10-12', rest: '60s', note: '双手持一个哑铃颈后，肘朝天花板，安全稳定'),
+      Exercise(name: '上斜哑铃卧推 30\u00B0', muscles: ['胸大肌'], muscleTarget: '上部', sets: 4, reps: '10-12', rest: '90s', isStar: true, note: '上胸发力，肩胛后缩下沉，离心下放约 3 秒。'),
+      Exercise(name: '平板杠铃卧推', muscles: ['胸大肌'], muscleTarget: '整体厚度', sets: 4, reps: '8-10', rest: '90-120s', note: '脚踩稳，肩胛后缩，全程控制，不要弹胸。'),
+      Exercise(name: '坐姿器械推肩', muscles: ['三角肌'], muscleTarget: '前束 / 中束', sets: 3, reps: '12', rest: '90s', note: '背部贴紧靠垫，手肘略在身体前侧，推起不耸肩。'),
+      Exercise(name: '哑铃侧平举', muscles: ['三角肌'], muscleTarget: '中束', sets: 4, reps: '15-20', rest: '60s', note: '小重量慢节奏，肘略弯，抬到肩高即可。'),
+      Exercise(name: '面拉', muscles: ['三角肌后束'], muscleTarget: '上背', sets: 3, reps: '15-20', rest: '60s', note: '绳索拉向眉眼高度，外旋打开，重点找后束和上背。'),
+      Exercise(name: '蝴蝶机夹胸', muscles: ['胸大肌'], muscleTarget: '中缝', sets: 3, reps: '15-20', rest: '60s', note: '胸肌主动夹紧，顶峰停 1-2 秒，手臂不锁死。'),
+      Exercise(name: '绳索下压', muscles: ['肱三头'], muscleTarget: '外侧头', sets: 3, reps: '12-15', rest: '60s', note: '肘部固定贴近身体，只让前臂移动，底部充分收缩。'),
+      Exercise(name: '坐姿哑铃颈后臂屈伸', muscles: ['肱三头'], muscleTarget: '长头', sets: 3, reps: '10-12', rest: '60s', note: '肘朝上并保持稳定，下放到舒适深度，避免肩部不适。'),
     ],
   ),
   WorkoutDay(
     dayName: '周二', subtitle: '下肢 A', badge: '股四头肌 / 前侧重点',
     description: '股四头 / 内收 / 有氧 / 核心',
     exercises: [
-      Exercise(name: '倒蹬机', muscles: ['股四头', '臀'], muscleTarget: '', sets: 4, reps: '12-15', rest: '90s', isStar: true, note: '核心动作 — 脚位中低更偏股四头，膝盖对准脚尖，比自由深蹲更稳定'),
-      Exercise(name: '坐姿腿屈伸', muscles: ['股四头'], muscleTarget: '孤立', sets: 3, reps: '15', rest: '60s', note: '顶峰收缩，雕刻线条'),
-      Exercise(name: '内收机', muscles: ['大腿内收肌'], muscleTarget: '', sets: 3, reps: '15', rest: '60s', note: '收紧大腿内侧'),
-      Exercise(name: '坡度走', muscles: ['心肺'], muscleTarget: '', sets: 1, reps: '40min', rest: '', note: '心率125-130'),
-      Exercise(name: '卷腹', muscles: ['腹直肌'], muscleTarget: '', sets: 5, reps: '20', rest: '60s', note: '有氧后腹部灼烧'),
+      Exercise(name: '倒蹬机', muscles: ['股四头', '臀'], muscleTarget: '', sets: 4, reps: '12-15', rest: '90s', isStar: true, note: '脚位中低更偏股四头，膝盖对准脚尖，控制下放。'),
+      Exercise(name: '坐姿腿屈伸', muscles: ['股四头'], muscleTarget: '孤立', sets: 3, reps: '15', rest: '60s', note: '顶峰停 1 秒，慢慢下放，专注股四头收缩。'),
+      Exercise(name: '内收机', muscles: ['大腿内收肌'], muscleTarget: '', sets: 3, reps: '15', rest: '60s', note: '动作全程可控，不借力弹回，感受大腿内侧发力。'),
+      Exercise(name: '坡度走', muscles: ['心肺'], muscleTarget: '', sets: 1, reps: '40min', rest: '', note: '保持能说短句的强度，心率约 125-130，稳定完成。'),
+      Exercise(name: '卷腹', muscles: ['腹直肌'], muscleTarget: '', sets: 5, reps: '20', rest: '60s', note: '下背贴紧，吐气卷起，避免用脖子代偿。'),
     ],
   ),
   WorkoutDay(
     dayName: '周三', subtitle: '上肢 B', badge: '拉力 + 手臂',
     description: '背 / 后束 / 肱二头',
     exercises: [
-      Exercise(name: '助力引体向上机', muscles: ['背阔肌', '肱二头'], muscleTarget: '', sets: 4, reps: '8-12', rest: '90-120s', isStar: true, note: '核心动作 — 调助力等级逐步减助力；没有就做反向划船'),
-      Exercise(name: '坐姿器械划船', muscles: ['背阔肌', '菱形肌'], muscleTarget: '', sets: 4, reps: '10-12', rest: '90s', note: '器械轨道稳定，胸部贴住靠垫，手肘拉过身体'),
-      Exercise(name: '高位下拉', muscles: ['背阔肌'], muscleTarget: '宽度', sets: 3, reps: '10-12', rest: '90s', note: '感受背阔肌像翅膀一样拉开，手肘往下拉不后仰'),
-      Exercise(name: '反向蝴蝶机夹胸', muscles: ['三角肌后束'], muscleTarget: '上背', sets: 3, reps: '15-20', rest: '60s', note: '后束第2次刺激（周一面拉 + 今天蝴蝶机 = 6组/周）'),
-      Exercise(name: '直臂下压', muscles: ['背阔肌'], muscleTarget: '下部', sets: 3, reps: '12-15', rest: '60s', note: '手臂保持微弯，从头顶压到大腿前侧，感受背阔拉伸'),
-      Exercise(name: '杠铃弯举', muscles: ['肱二头'], muscleTarget: '长头', sets: 4, reps: '12', rest: '60s', note: '手臂正面线条，控制离心不甩腰，全幅度动作'),
-      Exercise(name: '锤式弯举', muscles: ['肱肌', '肱桡肌'], muscleTarget: '', sets: 3, reps: '12', rest: '60s', note: '掌心相对，让手臂侧面看起来更厚实有力量'),
+      Exercise(name: '助力引体向上机', muscles: ['背阔肌', '肱二头'], muscleTarget: '', sets: 4, reps: '8-12', rest: '90-120s', isStar: true, note: '逐步减少助力，胸口主动上提，肩膀不要耸。'),
+      Exercise(name: '坐姿器械划船', muscles: ['背阔肌', '菱形肌'], muscleTarget: '', sets: 4, reps: '10-12', rest: '90s', note: '胸部贴垫，手肘向后拉，顶峰夹背 1 秒。'),
+      Exercise(name: '高位下拉', muscles: ['背阔肌'], muscleTarget: '宽度', sets: 3, reps: '10-12', rest: '90s', note: '先沉肩再下拉，手肘向身体两侧下沉，身体不后仰。'),
+      Exercise(name: '反向蝴蝶机夹胸', muscles: ['三角肌后束'], muscleTarget: '上背', sets: 3, reps: '15-20', rest: '60s', note: '手肘微弯，打开到身体两侧，重点找后束发力。'),
+      Exercise(name: '直臂下压', muscles: ['背阔肌'], muscleTarget: '下部', sets: 3, reps: '12-15', rest: '60s', note: '手臂微弯固定，从头顶压到大腿前，感受背阔拉伸收缩。'),
+      Exercise(name: '杠铃弯举', muscles: ['肱二头'], muscleTarget: '长头', sets: 4, reps: '12', rest: '60s', note: '身体不晃，手腕中立，离心慢放。'),
+      Exercise(name: '锤式弯举', muscles: ['肱肌', '肱桡肌'], muscleTarget: '', sets: 3, reps: '12', rest: '60s', note: '掌心相对，手肘稳定，感受肱肌和前臂参与。'),
     ],
   ),
   WorkoutDay(
     dayName: '周四', subtitle: '下肢 B', badge: '臀腿后链 / 稳定重点',
     description: '臀腿后链 / 稳定 / 有氧 / 核心',
     exercises: [
-      Exercise(name: '哈克深蹲', muscles: ['股四头', '臀'], muscleTarget: '', sets: 4, reps: '12', rest: '90s', isStar: true, note: '核心动作 — 控制下放，膝盖跟脚尖同向，逐步加重'),
-      Exercise(name: '坐姿腿弯举', muscles: ['腘绳肌'], muscleTarget: '', sets: 4, reps: '12-15', rest: '60s', note: '和周二互补，两个动作腘绳肌受力角度不同'),
-      Exercise(name: '外展机', muscles: ['臀中肌'], muscleTarget: '', sets: 3, reps: '15', rest: '60s', note: '臀中肌稳定'),
-      Exercise(name: '坡度走', muscles: ['心肺'], muscleTarget: '', sets: 1, reps: '40min', rest: '', note: '心率125-130'),
-      Exercise(name: '卷腹', muscles: ['腹直肌'], muscleTarget: '', sets: 5, reps: '20', rest: '60s', note: '有氧后腹部灼烧'),
+      Exercise(name: '哈克深蹲', muscles: ['股四头', '臀'], muscleTarget: '', sets: 4, reps: '12', rest: '90s', isStar: true, note: '脚踩稳，膝盖跟脚尖同向，控制下放后再发力站起。'),
+      Exercise(name: '坐姿腿弯举', muscles: ['腘绳肌'], muscleTarget: '', sets: 4, reps: '12-15', rest: '60s', note: '顶峰夹紧腘绳肌，慢慢还原，不要甩重量。'),
+      Exercise(name: '外展机', muscles: ['臀中肌'], muscleTarget: '', sets: 3, reps: '15', rest: '60s', note: '身体稳定，外展到顶峰停顿，重点找臀中肌。'),
+      Exercise(name: '坡度走', muscles: ['心肺'], muscleTarget: '', sets: 1, reps: '40min', rest: '', note: '保持能说短句的强度，心率约 125-130，稳定完成。'),
+      Exercise(name: '卷腹', muscles: ['腹直肌'], muscleTarget: '', sets: 5, reps: '20', rest: '60s', note: '下背贴紧，吐气卷起，避免用脖子代偿。'),
     ],
   ),
   WorkoutDay(
     dayName: '周五', subtitle: '可选', badge: '可选循环',
     description: '有空就来，没空跳过', isOptional: true,
     exercises: [
-      Exercise(name: '哑铃高脚杯深蹲', muscles: ['股四头', '臀', '核心'], muscleTarget: '', sets: 3, reps: '12', rest: '循环', note: '做不到可先徒手深蹲'),
-      Exercise(name: '俯卧撑', muscles: ['胸', '肩', '肱三头'], muscleTarget: '', sets: 3, reps: '10-15', rest: '循环', note: '做不到可跪姿或扶高位'),
-      Exercise(name: '哑铃罗马尼亚硬拉', muscles: ['腘绳', '臀'], muscleTarget: '', sets: 3, reps: '12', rest: '循环'),
-      Exercise(name: '哑铃俯身划船', muscles: ['背阔肌'], muscleTarget: '', sets: 3, reps: '每侧10', rest: '循环'),
-      Exercise(name: '哑铃侧平举', muscles: ['三角肌'], muscleTarget: '中束', sets: 3, reps: '15', rest: '循环', note: '肩部本周第2次，高频次是肩宽秘诀'),
-      Exercise(name: '登山者', muscles: ['核心', '心肺'], muscleTarget: '', sets: 3, reps: '每侧15', rest: '循环'),
+      Exercise(name: '哑铃高脚杯深蹲', muscles: ['股四头', '臀', '核心'], muscleTarget: '', sets: 3, reps: '12', rest: '循环', note: '抱紧哑铃，躯干稳定，下蹲到可控深度。'),
+      Exercise(name: '俯卧撑', muscles: ['胸', '肩', '肱三头'], muscleTarget: '', sets: 3, reps: '10-15', rest: '循环', note: '身体保持一条线，胸靠近地面，做不到可跪姿或扶高位。'),
+      Exercise(name: '哑铃罗马尼亚硬拉', muscles: ['腘绳', '臀'], muscleTarget: '', sets: 3, reps: '12', rest: '循环', note: '髋部向后折叠，背部中立，感受腘绳肌拉伸。'),
+      Exercise(name: '哑铃俯身划船', muscles: ['背阔肌'], muscleTarget: '', sets: 3, reps: '每侧10', rest: '循环', note: '背部保持平，手肘贴近身体向后拉。'),
+      Exercise(name: '哑铃侧平举', muscles: ['三角肌'], muscleTarget: '中束', sets: 3, reps: '15', rest: '循环', note: '小重量慢节奏，肘略弯，抬到肩高即可。'),
+      Exercise(name: '登山者', muscles: ['核心', '心肺'], muscleTarget: '', sets: 3, reps: '每侧15', rest: '循环', note: '核心收紧，节奏稳定，膝盖向胸口交替带动。'),
     ],
     circuitNote: '6 个动作依次做完 = 1 轮 \u2192 休息 90-120s \u2192 共 3 轮',
   ),
@@ -233,7 +233,7 @@ const progressionPhases = [
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// v6.4.1: HISTORY HELPERS — ISO 周 + 真实日期归档
+// v6.4.3: HISTORY HELPERS — ISO 周 + 真实日期归档
 // ═══════════════════════════════════════════════════════════════════════════════
 
 DateTime dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
@@ -698,7 +698,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                     PressScale(onTap: _showThemeSheet, child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(color: t.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(20)),
-                      child: Text('目标 68-70kg · 主题', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: t.primary)),
+                      child: Text('目标 68-70kg', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: t.primary)),
                     )),
                   ],
                 ),
@@ -981,18 +981,9 @@ class _WorkoutPageState extends State<WorkoutPage> {
         },
       )),
       const SizedBox(height: 8),
-      Expanded(child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 280),
-        switchInCurve: Curves.easeOutCubic, switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (child, a) => FadeTransition(
-          opacity: a,
-          child: SlideTransition(
-            position: Tween<Offset>(begin: const Offset(0.03, 0), end: Offset.zero)
-                .animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)),
-            child: child,
-          ),
-        ),
-        child: KeyedSubtree(key: ValueKey('day_$_day'), child: _buildContent(wd, t)),
+      Expanded(child: KeyedSubtree(
+        key: ValueKey('day_$_day'),
+        child: _buildContent(wd, t),
       )),
     ]);
   }
@@ -1162,7 +1153,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// RECORD PAGE — v6.4.2: 训练记录（月度日历热力图 + 年度统计）
+// RECORD PAGE — v6.4.3: 训练记录（月度日历热力图 + 年度统计）
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class RecordPage extends StatefulWidget {
@@ -1531,9 +1522,22 @@ class NutritionPage extends StatelessWidget {
       SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
         child: GradientTitle(text: '饮食营养', primary: t.primary, accent: t.primaryLight, fontSize: 22))),
       SliverPadding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 24), sliver: SliverList(delegate: SliverChildListDelegate([
-        FadeScaleEntry(index: 0, child: Card(child: Padding(padding: const EdgeInsets.all(16), child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [_st('每日热量', '2200', 'kcal', t), _st('蛋白质', '130-160', 'g', t), _st('碳水', '200-270', 'g', t), _st('脂肪', '58-73', 'g', t)])))),
+        FadeScaleEntry(index: 0, child: Card(child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: LayoutBuilder(builder: (context, box) {
+            final itemWidth = (box.maxWidth - 8) / 2;
+            return Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _macroStat('每日热量', '2200', 'kcal', Icons.local_fire_department_rounded, t.primary, t, itemWidth),
+                _macroStat('蛋白质', '130-160', 'g', Icons.fitness_center_rounded, t.success, t, itemWidth),
+                _macroStat('碳水', '200-270', 'g', Icons.grain_rounded, t.warning, t, itemWidth),
+                _macroStat('脂肪', '58-73', 'g', Icons.water_drop_rounded, t.accent, t, itemWidth),
+              ],
+            );
+          }),
+        ))),
         const SizedBox(height: 16),
         FadeScaleEntry(index: 1, child: _mc('蛋白质', '130-160g', '1.8-2.2g/kg · 25%', '鸡胸 · 牛肉 · 鸡蛋 · 鱼虾 · 豆腐 · 蛋白粉', t.primary, t)),
         const SizedBox(height: 8),
@@ -1557,11 +1561,35 @@ class NutritionPage extends StatelessWidget {
       ]))),
     ]);
   }
-  Widget _st(String l, String v, String u, WorkoutTheme t) => Column(children: [
-    Text(l, style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: t.text4, letterSpacing: 0.5)),
-    const SizedBox(height: 4), Text(v, style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: t.primary)),
-    Text(u, style: GoogleFonts.inter(fontSize: 9, color: t.text4)),
-  ]);
+  Widget _macroStat(String label, String value, String unit, IconData icon, Color color, WorkoutTheme t, double width) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(t.isDark ? 0.10 : 0.07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.14), width: 0.8),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 5),
+          Expanded(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: t.text3))),
+        ]),
+        const SizedBox(height: 6),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text(value, style: GoogleFonts.inter(fontSize: 19, fontWeight: FontWeight.w900, color: color, letterSpacing: -0.5)),
+            const SizedBox(width: 3),
+            Padding(padding: const EdgeInsets.only(bottom: 2), child: Text(unit, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: t.text4))),
+          ]),
+        ),
+      ]),
+    );
+  }
   Widget _mc(String l, String v, String p, String f, Color c, WorkoutTheme t) => Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(
     crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
