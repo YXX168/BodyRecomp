@@ -233,15 +233,36 @@ const progressionPhases = [
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// v6.4: HISTORY HELPERS — 每周重置 + 月度历史记录
+// v6.4.1: HISTORY HELPERS — ISO 周 + 真实日期归档
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// 计算 ISO 8601 周数
+DateTime dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
+
+/// ISO 8601 周所在年份：年初/年末跨周时可能不同于 calendar year。
+int isoWeekYear(DateTime date) {
+  final d = dateOnly(date);
+  final thursday = d.add(Duration(days: 4 - d.weekday));
+  return thursday.year;
+}
+
+/// 计算 ISO 8601 周数，避免年初返回 0 或跨年周错误。
 int isoWeekNumber(DateTime date) {
-  final dayOfYear = date.difference(DateTime(date.year, 1, 1)).inDays;
-  final jan1Weekday = DateTime(date.year, 1, 1).weekday;
-  final offset = jan1Weekday <= 4 ? jan1Weekday - 1 : jan1Weekday - 8;
-  return ((dayOfYear + offset) ~/ 7) + 1;
+  final d = dateOnly(date);
+  final thursday = d.add(Duration(days: 4 - d.weekday));
+  final firstThursday = DateTime(thursday.year, 1, 4);
+  final firstIsoThursday = firstThursday.add(Duration(days: 4 - firstThursday.weekday));
+  return 1 + (thursday.difference(firstIsoThursday).inDays ~/ 7);
+}
+
+DateTime startOfIsoWeek(DateTime date) {
+  final d = dateOnly(date);
+  return d.subtract(Duration(days: d.weekday - 1));
+}
+
+DateTime startOfIsoWeekByYearWeek(int isoYear, int isoWeek) {
+  final jan4 = DateTime(isoYear, 1, 4);
+  final firstMonday = startOfIsoWeek(jan4);
+  return firstMonday.add(Duration(days: (isoWeek - 1) * 7));
 }
 
 /// 月份历史 key 格式: recomp_history_2026_05
@@ -249,31 +270,51 @@ String historyKey(int year, int month) {
   return 'recomp_history_${year}_${month.toString().padLeft(2, '0')}';
 }
 
-/// 从 _done map 统计每天完成数: {"0": 5, "2": 8} => dayIndex -> count
-Map<int, int> countByDay(Map<String, dynamic> done) {
+/// 从 _done map 统计每个训练日完成数：key 形如 "0_5"，0 表示周一。
+Map<int, int> countByWeekday(Map<String, dynamic> done) {
   final result = <int, int>{};
-  done.forEach((key, _) {
+  done.forEach((key, value) {
+    if (value != true) return;
     final parts = key.split('_');
     if (parts.length == 2) {
-      final day = int.tryParse(parts[0]);
-      if (day != null) {
-        result[day] = (result[day] ?? 0) + 1;
+      final weekdayIndex = int.tryParse(parts[0]);
+      if (weekdayIndex != null && weekdayIndex >= 0 && weekdayIndex < 7) {
+        result[weekdayIndex] = (result[weekdayIndex] ?? 0) + 1;
       }
     }
   });
   return result;
 }
 
-/// 读取指定月份的历史: {dayIndex: 完成动作数}
+/// 兼容旧调用名。
+Map<int, int> countByDay(Map<String, dynamic> done) => countByWeekday(done);
+
+/// 将某个 ISO 周的完成记录转换为真实日期：{DateTime(yyyy,mm,dd): count}。
+Map<DateTime, int> countByActualDate(Map<String, dynamic> done, int isoYear, int isoWeek) {
+  final monday = startOfIsoWeekByYearWeek(isoYear, isoWeek);
+  final result = <DateTime, int>{};
+  countByWeekday(done).forEach((weekdayIndex, count) {
+    final date = dateOnly(monday.add(Duration(days: weekdayIndex)));
+    result[date] = (result[date] ?? 0) + count;
+  });
+  return result;
+}
+
+/// 读取指定月份的历史：{monthDay: 完成动作数}。
 Future<Map<int, int>> loadMonthHistory(SharedPreferences p, int year, int month) async {
   final raw = p.getString(historyKey(year, month));
   if (raw == null) return {};
+  final daysInMonth = DateTime(year, month + 1, 0).day;
   try {
     final map = jsonDecode(raw) as Map<String, dynamic>;
     final result = <int, int>{};
     map.forEach((k, v) {
       final day = int.tryParse(k);
-      if (day != null) result[day] = v as int;
+      final count = v is int ? v : int.tryParse('$v');
+      // v6.4 曾错误写入 0-6 的周几索引；这里直接过滤掉非法日期。
+      if (day != null && day >= 1 && day <= daysInMonth && count != null && count > 0) {
+        result[day] = count;
+      }
     });
     return result;
   } catch (_) {
@@ -281,22 +322,75 @@ Future<Map<int, int>> loadMonthHistory(SharedPreferences p, int year, int month)
   }
 }
 
-/// 将完成数据写入月度历史（merge 方式，不覆盖其他天）
+Future<Map<String, dynamic>> _readMonthHistoryRaw(SharedPreferences p, int year, int month) async {
+  final existing = p.getString(historyKey(year, month));
+  if (existing == null) return {};
+  try {
+    return jsonDecode(existing) as Map<String, dynamic>;
+  } catch (_) {
+    return {};
+  }
+}
+
+Future<void> _writeMonthHistoryRaw(SharedPreferences p, int year, int month, Map<String, dynamic> history) async {
+  final cleaned = <String, dynamic>{};
+  final daysInMonth = DateTime(year, month + 1, 0).day;
+  history.forEach((k, v) {
+    final day = int.tryParse(k);
+    final count = v is int ? v : int.tryParse('$v');
+    if (day != null && day >= 1 && day <= daysInMonth && count != null && count > 0) {
+      cleaned[day.toString()] = count;
+    }
+  });
+  await p.setString(historyKey(year, month), jsonEncode(cleaned));
+}
+
+/// 将真实日期计数同步到月度历史。count<=0 时删除该日期，支持取消勾选。
+Future<void> saveActualDateCountsToHistory(SharedPreferences p, Map<DateTime, int> dateCounts) async {
+  final grouped = <String, Map<int, int>>{};
+  for (final entry in dateCounts.entries) {
+    final date = dateOnly(entry.key);
+    final groupKey = '${date.year}_${date.month}';
+    grouped.putIfAbsent(groupKey, () => {})[date.day] = entry.value;
+  }
+
+  for (final group in grouped.entries) {
+    final parts = group.key.split('_');
+    final year = int.parse(parts[0]);
+    final month = int.parse(parts[1]);
+    final history = await _readMonthHistoryRaw(p, year, month);
+    group.value.forEach((day, count) {
+      if (count > 0) {
+        history[day.toString()] = count;
+      } else {
+        history.remove(day.toString());
+      }
+    });
+    await _writeMonthHistoryRaw(p, year, month, history);
+  }
+}
+
+/// 归档整周记录：会写入周一到周日的真实日期，并清理取消勾选后的 0 记录。
+Future<void> saveWeekDoneToHistory(SharedPreferences p, Map<String, dynamic> done, int isoYear, int isoWeek) async {
+  final counts = countByActualDate(done, isoYear, isoWeek);
+  final monday = startOfIsoWeekByYearWeek(isoYear, isoWeek);
+  for (int i = 0; i < 7; i++) {
+    final date = dateOnly(monday.add(Duration(days: i)));
+    counts.putIfAbsent(date, () => 0);
+  }
+  await saveActualDateCountsToHistory(p, counts);
+}
+
+/// 旧版兼容：按真实日期保存，不再把 0-6 当作月日期。
 Future<void> saveToMonthHistory(SharedPreferences p, int year, int month, Map<int, int> dayCounts) async {
-  final key = historyKey(year, month);
-  final existing = p.getString(key);
-  Map<String, dynamic> history = {};
-  if (existing != null) {
-    try {
-      history = jsonDecode(existing) as Map<String, dynamic>;
-    } catch (_) {
-      history = {};
+  final dateCounts = <DateTime, int>{};
+  final daysInMonth = DateTime(year, month + 1, 0).day;
+  for (final entry in dayCounts.entries) {
+    if (entry.key >= 1 && entry.key <= daysInMonth) {
+      dateCounts[DateTime(year, month, entry.key)] = entry.value;
     }
   }
-  for (final entry in dayCounts.entries) {
-    history[entry.key.toString()] = entry.value;
-  }
-  await p.setString(key, jsonEncode(history));
+  await saveActualDateCountsToHistory(p, dateCounts);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -797,20 +891,19 @@ class _WorkoutPageState extends State<WorkoutPage> {
     SharedPreferences.getInstance().then((p) async {
       final now = DateTime.now();
       final currentWeek = isoWeekNumber(now);
-      final currentYear = now.year;
+      final currentYear = isoWeekYear(now);
       final storedWeek = p.getInt('recomp_done_v6_week');
       final storedYear = p.getInt('recomp_done_v6_year');
 
       if (storedWeek == null || storedYear == null || storedYear != currentYear || storedWeek != currentWeek) {
-        // 新的一周：先将旧数据归档到月度历史，再清空
+        // 新的一周：先将旧数据按真实日期归档，再清空。
         final oldRaw = p.getString('recomp_done_v6');
         if (oldRaw != null && oldRaw != '{}') {
           try {
             final oldDone = jsonDecode(oldRaw) as Map<String, dynamic>;
-            final dayCounts = countByDay(oldDone);
-            if (dayCounts.isNotEmpty) {
-              await saveToMonthHistory(p, now.year, now.month, dayCounts);
-            }
+            final archiveYear = storedYear ?? currentYear;
+            final archiveWeek = storedWeek ?? currentWeek;
+            await saveWeekDoneToHistory(p, oldDone, archiveYear, archiveWeek);
           } catch (_) {}
         }
         await p.setString('recomp_done_v6', jsonEncode({}));
@@ -840,10 +933,13 @@ class _WorkoutPageState extends State<WorkoutPage> {
     });
     final p = await SharedPreferences.getInstance();
     await p.setString('recomp_done_v6', jsonEncode(_done));
-    // 同步写入月度历史
+    // 同步写入本周真实日期历史；取消勾选时也会移除当天记录。
     final now = DateTime.now();
-    final dayCounts = countByDay(_done);
-    await saveToMonthHistory(p, now.year, now.month, dayCounts);
+    final currentWeek = isoWeekNumber(now);
+    final currentYear = isoWeekYear(now);
+    await p.setInt('recomp_done_v6_week', currentWeek);
+    await p.setInt('recomp_done_v6_year', currentYear);
+    await saveWeekDoneToHistory(p, _done, currentYear, currentWeek);
   }
 
   int _cnt(int d) {
@@ -1109,9 +1205,13 @@ class _RecordPageState extends State<RecordPage> {
       try {
         final done = jsonDecode(curDone) as Map<String, dynamic>;
         if (now.year == _viewYear && now.month == _viewMonth) {
-          final dayCounts = countByDay(done);
-          for (final entry in dayCounts.entries) {
-            data[entry.key] = (data[entry.key] ?? 0) + entry.value;
+          final currentWeek = p.getInt('recomp_done_v6_week') ?? isoWeekNumber(now);
+          final currentYear = p.getInt('recomp_done_v6_year') ?? isoWeekYear(now);
+          final dateCounts = countByActualDate(done, currentYear, currentWeek);
+          for (final entry in dateCounts.entries) {
+            if (entry.key.year == _viewYear && entry.key.month == _viewMonth && entry.value > 0) {
+              data[entry.key.day] = entry.value;
+            }
           }
         }
         if (now.year == _viewYear) {
@@ -1347,7 +1447,7 @@ class _RecordPageState extends State<RecordPage> {
         if (!snap.hasData) return const SizedBox(height: 100);
         final p = snap.data!;
         return Wrap(spacing: 8, runSpacing: 8, children: [
-          for (int m = 1; m <= 12; m++) _buildMiniMonth(p, _viewYear, m, '$m', t, m == now.month),
+          for (int m = 1; m <= 12; m++) _buildMiniMonth(p, _viewYear, m, '$m', t, _viewYear == now.year && m == now.month),
         ]);
       },
     );
@@ -1359,7 +1459,13 @@ class _RecordPageState extends State<RecordPage> {
     if (data != null) {
       try { history = jsonDecode(data) as Map<String, dynamic>; } catch (_) {}
     }
-    final total = history.values.fold(0, (s, v) => s + (v as int));
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    history.removeWhere((k, v) {
+      final day = int.tryParse(k);
+      final count = v is int ? v : int.tryParse('$v');
+      return day == null || day < 1 || day > daysInMonth || count == null || count <= 0;
+    });
+    final total = history.values.fold<int>(0, (s, v) => s + (v is int ? v : int.tryParse('$v') ?? 0));
     return Container(
       width: (MediaQuery.of(context).size.width - 32 - 24) / 4,
       padding: const EdgeInsets.all(8),
@@ -1391,7 +1497,8 @@ class _RecordPageState extends State<RecordPage> {
         if (row == 0 && col < firstWeekday || day > daysInMonth) {
           cells.add(SizedBox(width: 4, height: 4));
         } else {
-          final count = history[day.toString()] ?? 0;
+          final rawCount = history[day.toString()];
+          final count = rawCount is int ? rawCount : int.tryParse('$rawCount') ?? 0;
           final intensity = count > 0 ? (count / 8).clamp(0.0, 1.0) : 0.0;
           cells.add(Container(
             width: 4, height: 4,
