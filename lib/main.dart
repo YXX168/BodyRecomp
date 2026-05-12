@@ -895,33 +895,34 @@ class _DaySegmentedNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = theme;
-    return LayoutBuilder(builder: (context, box) {
-      final w = box.maxWidth / workoutDays.length;
-      return Container(
-        height: 54,
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: t.navbarBg.withOpacity(t.isDark ? 0.92 : 0.78),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: t.border.withOpacity(t.isDark ? 0.8 : 0.72), width: 0.8),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(t.isDark ? 0.20 : 0.035), blurRadius: 18, offset: const Offset(0, 8)),
-          ],
-        ),
-        child: Stack(children: [
+    return Container(
+      height: 54,
+      padding: const EdgeInsets.all(4),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: t.navbarBg.withOpacity(t.isDark ? 0.92 : 0.78),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: t.border.withOpacity(t.isDark ? 0.8 : 0.72), width: 0.8),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(t.isDark ? 0.16 : 0.025), blurRadius: 12, offset: const Offset(0, 5)),
+        ],
+      ),
+      child: LayoutBuilder(builder: (context, box) {
+        final itemWidth = box.maxWidth / workoutDays.length;
+        final pillInset = 2.0;
+        return Stack(children: [
           AnimatedPositioned(
             duration: const Duration(milliseconds: 340),
             curve: Curves.easeOutCubic,
-            left: w * selected,
-            top: 0,
-            bottom: 0,
-            width: w,
+            left: itemWidth * selected + pillInset,
+            top: pillInset,
+            bottom: pillInset,
+            width: itemWidth - pillInset * 2,
             child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 2),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(15),
                 gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [t.primary, t.primaryLight]),
-                boxShadow: [BoxShadow(color: t.primary.withOpacity(t.isDark ? 0.28 : 0.22), blurRadius: 16, offset: const Offset(0, 5))],
+                boxShadow: [BoxShadow(color: t.primary.withOpacity(t.isDark ? 0.20 : 0.14), blurRadius: 8, offset: const Offset(0, 3))],
               ),
             ),
           ),
@@ -951,9 +952,9 @@ class _DaySegmentedNav extends StatelessWidget {
               ),
             );
           })),
-        ]),
-      );
-    });
+        ]);
+      }),
+    );
   }
 }
 
