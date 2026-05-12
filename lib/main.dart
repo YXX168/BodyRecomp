@@ -164,7 +164,7 @@ const workoutDays = [
     dayName: '周二', subtitle: '下肢 A', badge: '股四头肌 / 前侧重点',
     description: '股四头 / 内收 / 有氧 / 核心',
     exercises: [
-      Exercise(name: '倒蹬机', muscles: ['股四头', '臀'], muscleTarget: '', sets: 4, reps: '12-15', rest: '90s', isStar: true, note: '核心动作 — 脚踩高踩外侧重臀和后侧链，比深蹲安全'),
+      Exercise(name: '倒蹬机', muscles: ['股四头', '臀'], muscleTarget: '', sets: 4, reps: '12-15', rest: '90s', isStar: true, note: '核心动作 — 脚位中低更偏股四头，膝盖对准脚尖，比自由深蹲更稳定'),
       Exercise(name: '坐姿腿屈伸', muscles: ['股四头'], muscleTarget: '孤立', sets: 3, reps: '15', rest: '60s', note: '顶峰收缩，雕刻线条'),
       Exercise(name: '内收机', muscles: ['大腿内收肌'], muscleTarget: '', sets: 3, reps: '15', rest: '60s', note: '收紧大腿内侧'),
       Exercise(name: '坡度走', muscles: ['心肺'], muscleTarget: '', sets: 1, reps: '40min', rest: '', note: '心率125-130'),
@@ -188,7 +188,7 @@ const workoutDays = [
     dayName: '周四', subtitle: '下肢 B', badge: '臀腿后链 / 稳定重点',
     description: '臀腿后链 / 稳定 / 有氧 / 核心',
     exercises: [
-      Exercise(name: '哈克深蹲', muscles: ['股四头', '臀'], muscleTarget: '', sets: 4, reps: '12', rest: '90s', isStar: true, note: '核心动作 — 双侧各20kg'),
+      Exercise(name: '哈克深蹲', muscles: ['股四头', '臀'], muscleTarget: '', sets: 4, reps: '12', rest: '90s', isStar: true, note: '核心动作 — 控制下放，膝盖跟脚尖同向，逐步加重'),
       Exercise(name: '坐姿腿弯举', muscles: ['腘绳肌'], muscleTarget: '', sets: 4, reps: '12-15', rest: '60s', note: '和周二互补，两个动作腘绳肌受力角度不同'),
       Exercise(name: '外展机', muscles: ['臀中肌'], muscleTarget: '', sets: 3, reps: '15', rest: '60s', note: '臀中肌稳定'),
       Exercise(name: '坡度走', muscles: ['心肺'], muscleTarget: '', sets: 1, reps: '40min', rest: '', note: '心率125-130'),
@@ -199,8 +199,8 @@ const workoutDays = [
     dayName: '周五', subtitle: '可选', badge: '可选循环',
     description: '有空就来，没空跳过', isOptional: true,
     exercises: [
-      Exercise(name: '哑铃高脚杯深蹲', muscles: ['股四头', '臀', '核心'], muscleTarget: '', sets: 3, reps: '12', rest: '循环', note: '做不到可跪姿'),
-      Exercise(name: '俯卧撑', muscles: ['胸', '肩', '肱三头'], muscleTarget: '', sets: 3, reps: '10-15', rest: '循环', note: '做不到可跪姿'),
+      Exercise(name: '哑铃高脚杯深蹲', muscles: ['股四头', '臀', '核心'], muscleTarget: '', sets: 3, reps: '12', rest: '循环', note: '做不到可先徒手深蹲'),
+      Exercise(name: '俯卧撑', muscles: ['胸', '肩', '肱三头'], muscleTarget: '', sets: 3, reps: '10-15', rest: '循环', note: '做不到可跪姿或扶高位'),
       Exercise(name: '哑铃罗马尼亚硬拉', muscles: ['腘绳', '臀'], muscleTarget: '', sets: 3, reps: '12', rest: '循环'),
       Exercise(name: '哑铃俯身划船', muscles: ['背阔肌'], muscleTarget: '', sets: 3, reps: '每侧10', rest: '循环'),
       Exercise(name: '哑铃侧平举', muscles: ['三角肌'], muscleTarget: '中束', sets: 3, reps: '15', rest: '循环', note: '肩部本周第2次，高频次是肩宽秘诀'),
@@ -220,8 +220,8 @@ const workoutDays = [
 const nutritionTips = [
   '热量缺口 300-500 大卡，减脂靠饮食缺口，少吃半碗饭 > 跑 20 分钟',
   '蛋白质分 4-5 餐，每餐 30-40g',
-  '练后 30min 内补 20-30g 蛋白质',
-  '训练日碳水 +30-50g，放练前 2h / 练后 1h',
+  '训练后 1-2 小时内补 20-30g 蛋白质',
+  '训练日碳水 +30-50g，放训练前 2h / 训练后 1h',
   '每天 2.5-3L 水',
 ];
 
@@ -401,7 +401,7 @@ class FadeScaleEntry extends StatefulWidget {
   final Widget child;
   final int index;
   final Duration delay;
-  const FadeScaleEntry({super.key, required this.child, this.index = 0, this.delay = const Duration(milliseconds: 50)});
+  const FadeScaleEntry({super.key, required this.child, this.index = 0, this.delay = const Duration(milliseconds: 35)});
   @override
   State<FadeScaleEntry> createState() => _FadeScaleEntryState();
 }
@@ -412,9 +412,9 @@ class _FadeScaleEntryState extends State<FadeScaleEntry> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
+    _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 280));
     _fade = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _c, curve: Curves.easeOutCubic));
-    _scale = Tween<double>(begin: 0.92, end: 1).animate(CurvedAnimation(parent: _c, curve: Curves.easeOutBack));
+    _scale = Tween<double>(begin: 0.96, end: 1).animate(CurvedAnimation(parent: _c, curve: Curves.easeOutCubic));
     Future.delayed(widget.delay * widget.index, () { if (mounted) _c.forward(); });
   }
   @override
@@ -659,7 +659,7 @@ class RecompApp extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MAIN PAGE — v6.4: 5-tab bottom nav
+// MAIN PAGE — v6.4.2: 4-tab bottom nav + smoother micro-interactions
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class MainPage extends StatefulWidget {
@@ -693,12 +693,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                   children: [
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       GradientTitle(text: 'Body Recomp', primary: t.primary, accent: t.primaryLight, fontSize: 26),
-                      Text('27M · 176cm · 72.5kg · BMI 24.2', style: GoogleFonts.inter(fontSize: 11, color: t.text3, fontWeight: FontWeight.w500)),
+                      Text('27岁 · 176cm · 72.5kg · BMI 23.4', style: GoogleFonts.inter(fontSize: 11, color: t.text3, fontWeight: FontWeight.w500)),
                     ])),
                     PressScale(onTap: _showThemeSheet, child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(color: t.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(20)),
-                      child: Text('目标 68-70kg', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: t.primary)),
+                      child: Text('目标 68-70kg · 主题', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: t.primary)),
                     )),
                   ],
                 ),
@@ -760,13 +760,13 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
           height: 52,
           child: Column(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
             AnimatedContainer(
-              duration: const Duration(milliseconds: 300), curve: Curves.easeOutBack,
-              transform: Matrix4.diagonal3Values(sel ? 1.15 : 1.0, sel ? 1.15 : 1.0, 1.0),
+              duration: const Duration(milliseconds: 220), curve: Curves.easeOutCubic,
+              transform: Matrix4.diagonal3Values(sel ? 1.10 : 1.0, sel ? 1.10 : 1.0, 1.0),
               child: Icon(icon, size: 22, color: Color.lerp(t.text4, t.primary, sel ? 1.0 : 0.0)),
             ),
             const SizedBox(height: 3),
             AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 300),
+              duration: const Duration(milliseconds: 220),
               style: GoogleFonts.inter(fontSize: 10, fontWeight: sel ? FontWeight.w700 : FontWeight.w500, color: sel ? t.primary : t.text4),
               child: Text(label),
             ),
@@ -1162,7 +1162,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// RECORD PAGE — v6.4: 训练记录（月度日历热力图 + 年度统计）
+// RECORD PAGE — v6.4.2: 训练记录（月度日历热力图 + 年度统计）
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class RecordPage extends StatefulWidget {
@@ -1232,6 +1232,7 @@ class _RecordPageState extends State<RecordPage> {
 
   void _prevMonth() {
     setState(() {
+      _loading = true;
       if (_viewMonth == 1) {
         _viewMonth = 12;
         _viewYear--;
@@ -1246,6 +1247,7 @@ class _RecordPageState extends State<RecordPage> {
     final now = DateTime.now();
     if (_viewYear == now.year && _viewMonth == now.month) return;
     setState(() {
+      _loading = true;
       if (_viewMonth == 12) {
         _viewMonth = 1;
         _viewYear++;
@@ -1587,7 +1589,7 @@ class ProgressionPage extends StatelessWidget {
         child: GradientTitle(text: '渐进超负荷', primary: t.primary, accent: t.primaryLight, fontSize: 22))),
       SliverPadding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 24), sliver: SliverList(delegate: SliverChildListDelegate([
         FadeScaleEntry(index: 0, child: Card(color: t.primary.withOpacity(0.04), child: Padding(padding: const EdgeInsets.all(16),
-          child: Text('渐进超负荷是增肌的核心原则：逐步增加训练负荷，迫使身体适应并变得更强。每 1-2 周尝试加重或增加次数，保持训练日志记录进步。',
+          child: Text('渐进超负荷是增肌的核心原则：在动作稳定、恢复充足的前提下，逐步增加重量、次数或组数，让身体持续适应。每 1-2 周尝试一次小幅进步，并记录训练表现。',
             style: GoogleFonts.inter(fontSize: 12, color: t.text2, height: 1.7))))),
         const SizedBox(height: 16),
         FadeScaleEntry(index: 1, child: Text('四阶段计划', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: t.text1))),

@@ -40,8 +40,8 @@ android {
         applicationId "com.body.recomp"
         minSdk 21
         targetSdk 35
-        versionCode 65
-        versionName "6.4.1"
+        versionCode 66
+        versionName "6.4.2"
     }
 
     buildTypes {
