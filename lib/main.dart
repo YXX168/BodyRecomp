@@ -6,7 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// THEME SYSTEM — v6.0: Renamed themes + new cyberpunk dark theme
+// THEME SYSTEM — v6.5: tonal completion colors + refined surfaces
 // ═══════════════════════════════════════════════════════════════════════════════
 
 enum AppTheme { blue, pink, orange, purple, green, dark }
@@ -57,7 +57,7 @@ const themes = {
     bg: Color(0xFFF0F4FF), card: Color(0xFFFFFFFF),
     primary: Color(0xFF2563EB), primaryLight: Color(0xFF60A5FA), accent: Color(0xFF7C3AED),
     text1: Color(0xFF1E293B), text2: Color(0xFF334155), text3: Color(0xFF64748B), text4: Color(0xFF94A3B8),
-    success: Color(0xFF059669), successLight: Color(0xFF34D399), warning: Color(0xFFD97706),
+    success: Color(0xFF2563EB), successLight: Color(0xFF93C5FD), warning: Color(0xFFD97706),
     border: Color(0xFFE2E8F0), navbarBg: Color(0xFFFFFFFF),
   ),
   AppTheme.pink: WorkoutTheme(
@@ -65,7 +65,7 @@ const themes = {
     bg: Color(0xFFFDF2F8), card: Color(0xFFFFFFFF),
     primary: Color(0xFFDB2777), primaryLight: Color(0xFFF472B6), accent: Color(0xFF7C3AED),
     text1: Color(0xFF1E293B), text2: Color(0xFF334155), text3: Color(0xFF64748B), text4: Color(0xFF94A3B8),
-    success: Color(0xFF0D9488), successLight: Color(0xFF2DD4BF), warning: Color(0xFFD97706),
+    success: Color(0xFFDB2777), successLight: Color(0xFFF9A8D4), warning: Color(0xFFD97706),
     border: Color(0xFFE2E8F0), navbarBg: Color(0xFFFFFFFF),
   ),
   AppTheme.orange: WorkoutTheme(
@@ -73,7 +73,7 @@ const themes = {
     bg: Color(0xFFFFF7ED), card: Color(0xFFFFFFFF),
     primary: Color(0xFFEA580C), primaryLight: Color(0xFFFB923C), accent: Color(0xFFCA8A04),
     text1: Color(0xFF1E293B), text2: Color(0xFF334155), text3: Color(0xFF64748B), text4: Color(0xFF94A3B8),
-    success: Color(0xFF0D9488), successLight: Color(0xFF2DD4BF), warning: Color(0xFFDC2626),
+    success: Color(0xFFEA580C), successLight: Color(0xFFFDBA74), warning: Color(0xFFDC2626),
     border: Color(0xFFE2E8F0), navbarBg: Color(0xFFFFFFFF),
   ),
   AppTheme.purple: WorkoutTheme(
@@ -81,7 +81,7 @@ const themes = {
     bg: Color(0xFFFAF5FF), card: Color(0xFFFFFFFF),
     primary: Color(0xFF7C3AED), primaryLight: Color(0xFFA78BFA), accent: Color(0xFFDB2777),
     text1: Color(0xFF1E293B), text2: Color(0xFF334155), text3: Color(0xFF64748B), text4: Color(0xFF94A3B8),
-    success: Color(0xFF0891B2), successLight: Color(0xFF22D3EE), warning: Color(0xFFD97706),
+    success: Color(0xFF7C3AED), successLight: Color(0xFFC4B5FD), warning: Color(0xFFD97706),
     border: Color(0xFFE2E8F0), navbarBg: Color(0xFFFFFFFF),
   ),
   AppTheme.green: WorkoutTheme(
@@ -89,7 +89,7 @@ const themes = {
     bg: Color(0xFFF0FDF4), card: Color(0xFFFFFFFF),
     primary: Color(0xFF059669), primaryLight: Color(0xFF34D399), accent: Color(0xFF0891B2),
     text1: Color(0xFF1E293B), text2: Color(0xFF334155), text3: Color(0xFF64748B), text4: Color(0xFF94A3B8),
-    success: Color(0xFF65A30D), successLight: Color(0xFFA3E635), warning: Color(0xFFD97706),
+    success: Color(0xFF059669), successLight: Color(0xFF86EFAC), warning: Color(0xFFD97706),
     border: Color(0xFFE2E8F0), navbarBg: Color(0xFFFFFFFF),
   ),
   AppTheme.dark: WorkoutTheme(
@@ -97,7 +97,7 @@ const themes = {
     bg: Color(0xFF0A0E1A), card: Color(0xFF141A2E),
     primary: Color(0xFF00F0FF), primaryLight: Color(0xFF66F7FF), accent: Color(0xFFFF0080),
     text1: Color(0xFFE8ECF4), text2: Color(0xFFB0B8C8), text3: Color(0xFF6B7A90), text4: Color(0xFF3D4A5C),
-    success: Color(0xFF00FF88), successLight: Color(0xFF66FFB2), warning: Color(0xFFFFB800),
+    success: Color(0xFF00F0FF), successLight: Color(0xFF66F7FF), warning: Color(0xFFFFB800),
     border: Color(0xFF1E2740), navbarBg: Color(0xFF0D1220),
     isDark: true,
   ),
@@ -233,7 +233,7 @@ const progressionPhases = [
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// v6.4.3: HISTORY HELPERS — ISO 周 + 真实日期归档
+// v6.5: HISTORY HELPERS — ISO 周 + 真实日期归档
 // ═══════════════════════════════════════════════════════════════════════════════
 
 DateTime dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
@@ -648,7 +648,12 @@ class RecompApp extends StatelessWidget {
             onError: Colors.white,
           ),
           appBarTheme: AppBarTheme(backgroundColor: t.bg, foregroundColor: t.text1, elevation: 0, scrolledUnderElevation: dark ? 0.2 : 0.5),
-          cardTheme: CardThemeData(color: t.card, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: t.border, width: 1))),
+          cardTheme: CardThemeData(
+            color: t.card,
+            elevation: 0,
+            margin: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: BorderSide(color: t.border.withOpacity(dark ? 0.72 : 0.85), width: 0.8)),
+          ),
           useMaterial3: true,
           textTheme: GoogleFonts.interTextTheme(dark ? ThemeData.dark().textTheme : ThemeData.light().textTheme),
         ),
@@ -659,7 +664,7 @@ class RecompApp extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MAIN PAGE — v6.4.2: 4-tab bottom nav + smoother micro-interactions
+// MAIN PAGE — v6.5: refined chrome + smoother tonal navigation
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class MainPage extends StatefulWidget {
@@ -688,16 +693,20 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
             SafeArea(
               bottom: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
                 child: Row(
                   children: [
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      GradientTitle(text: 'Body Recomp', primary: t.primary, accent: t.primaryLight, fontSize: 26),
+                      GradientTitle(text: 'Body Recomp', primary: t.primary, accent: t.primaryLight, fontSize: 27),
                       Text('27岁 · 176cm · 72.5kg · BMI 23.4', style: GoogleFonts.inter(fontSize: 11, color: t.text3, fontWeight: FontWeight.w500)),
                     ])),
                     PressScale(onTap: _showThemeSheet, child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(color: t.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(20)),
+                      decoration: BoxDecoration(
+                        color: t.primary.withOpacity(t.isDark ? 0.12 : 0.08),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: t.primary.withOpacity(0.12), width: 0.8),
+                      ),
                       child: Text('目标 68-70kg', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: t.primary)),
                     )),
                   ],
@@ -715,7 +724,11 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
           ],
         ),
         bottomNavigationBar: Container(
-          decoration: BoxDecoration(color: t.navbarBg, border: Border(top: BorderSide(color: t.border, width: 0.5))),
+          decoration: BoxDecoration(
+            color: t.navbarBg.withOpacity(t.isDark ? 0.96 : 0.94),
+            border: Border(top: BorderSide(color: t.border.withOpacity(0.8), width: 0.5)),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(t.isDark ? 0.28 : 0.05), blurRadius: 18, offset: const Offset(0, -8))],
+          ),
           child: SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(6, 6, 6, 4),
@@ -870,8 +883,79 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// WORKOUT PAGE — v6.4: 每周自动重置 + 历史记录同步
+// WORKOUT PAGE — v6.5: 每周自动重置 + 滑动周选择器 + 历史记录同步
 // ═══════════════════════════════════════════════════════════════════════════════
+
+class _DaySegmentedNav extends StatelessWidget {
+  final int selected;
+  final WorkoutTheme theme;
+  final ValueChanged<int> onSelect;
+  const _DaySegmentedNav({required this.selected, required this.theme, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = theme;
+    return LayoutBuilder(builder: (context, box) {
+      final w = box.maxWidth / workoutDays.length;
+      return Container(
+        height: 54,
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: t.navbarBg.withOpacity(t.isDark ? 0.92 : 0.78),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: t.border.withOpacity(t.isDark ? 0.8 : 0.72), width: 0.8),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(t.isDark ? 0.20 : 0.035), blurRadius: 18, offset: const Offset(0, 8)),
+          ],
+        ),
+        child: Stack(children: [
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 340),
+            curve: Curves.easeOutCubic,
+            left: w * selected,
+            top: 0,
+            bottom: 0,
+            width: w,
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [t.primary, t.primaryLight]),
+                boxShadow: [BoxShadow(color: t.primary.withOpacity(t.isDark ? 0.28 : 0.22), blurRadius: 16, offset: const Offset(0, 5))],
+              ),
+            ),
+          ),
+          Row(children: List.generate(workoutDays.length, (i) {
+            final d = workoutDays[i];
+            final sel = i == selected;
+            return Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onSelect(i),
+                child: SizedBox(
+                  height: 46,
+                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 220),
+                      style: GoogleFonts.inter(fontSize: 11, fontWeight: sel ? FontWeight.w900 : FontWeight.w700, color: sel ? Colors.white : t.text2, letterSpacing: -0.2),
+                      child: Text(d.dayName.replaceFirst('周', '')),
+                    ),
+                    const SizedBox(height: 2),
+                    AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 220),
+                      style: GoogleFonts.inter(fontSize: 7.5, fontWeight: sel ? FontWeight.w700 : FontWeight.w500, color: sel ? Colors.white.withOpacity(0.86) : t.text4),
+                      child: Text(d.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ),
+                  ]),
+                ),
+              ),
+            );
+          })),
+        ]),
+      );
+    });
+  }
+}
 
 class WorkoutPage extends StatefulWidget {
   const WorkoutPage({super.key});
@@ -955,32 +1039,19 @@ class _WorkoutPageState extends State<WorkoutPage> {
     final t = ThemeInherited.of(context).theme;
     final wd = workoutDays[_day];
     return Column(children: [
-      SizedBox(height: 44, child: ListView.separated(
-        scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: workoutDays.length, separatorBuilder: (_, __) => const SizedBox(width: 6),
-        itemBuilder: (ctx, i) {
-          final d = workoutDays[i];
-          final s = i == _day;
-          return PressScale(
-            onTap: () { if (_day != i) { HapticFeedback.selectionClick(); setState(() => _day = i); } },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: s ? t.primary : Colors.transparent,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: s ? t.primary : t.border, width: s ? 1.5 : 1),
-                boxShadow: s ? [BoxShadow(color: t.primary.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 2))] : null,
-              ),
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Text(d.dayName, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: s ? Colors.white : t.text2)),
-                Text(d.subtitle, style: GoogleFonts.inter(fontSize: 8, fontWeight: FontWeight.w500, color: s ? Colors.white.withOpacity(0.8) : t.text4)),
-              ]),
-            ),
-          );
-        },
-      )),
-      const SizedBox(height: 8),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
+        child: _DaySegmentedNav(
+          selected: _day,
+          theme: t,
+          onSelect: (i) {
+            if (_day != i) {
+              HapticFeedback.selectionClick();
+              setState(() => _day = i);
+            }
+          },
+        ),
+      ),
       Expanded(child: KeyedSubtree(
         key: ValueKey('day_$_day'),
         child: _buildContent(wd, t),
@@ -1063,14 +1134,18 @@ class _WorkoutPageState extends State<WorkoutPage> {
         const SizedBox(height: 12),
         FadeScaleEntry(index: 1, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text('训练进度', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: t.text3)),
-            Text('$done/$total', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: t.primary, fontFeatures: const [FontFeature.tabularFigures()])),
+            Row(children: [
+              Container(width: 6, height: 6, decoration: BoxDecoration(color: t.success, shape: BoxShape.circle, boxShadow: [BoxShadow(color: t.success.withOpacity(0.28), blurRadius: 8)])),
+              const SizedBox(width: 7),
+              Text('训练进度', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: t.text3)),
+            ]),
+            Text('$done/$total', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w800, color: t.success, fontFeatures: const [FontFeature.tabularFigures()])),
           ]),
           const SizedBox(height: 6),
           ClipRRect(borderRadius: BorderRadius.circular(4), child: TweenAnimationBuilder<double>(
             tween: Tween<double>(end: total > 0 ? done / total : 0),
             duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic,
-            builder: (_, v, __) => LinearProgressIndicator(value: v, minHeight: 6, backgroundColor: t.border, valueColor: AlwaysStoppedAnimation(full ? t.success : t.primary)),
+            builder: (_, v, __) => LinearProgressIndicator(value: v, minHeight: 7, backgroundColor: t.border.withOpacity(t.isDark ? 0.7 : 0.9), valueColor: AlwaysStoppedAnimation(t.success)),
           )),
         ])),
         const SizedBox(height: 14),
@@ -1112,15 +1187,17 @@ class _WorkoutPageState extends State<WorkoutPage> {
 
   Widget _exCard(Exercise ex, int num, bool done, WorkoutTheme t, VoidCallback tap) {
     return Padding(padding: const EdgeInsets.only(bottom: 6), child: PressScale(onTap: tap, child: Card(
-      color: ex.isStar && !done ? t.primary.withOpacity(0.02) : null,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14),
-        side: ex.isStar && !done ? BorderSide(color: t.primary.withOpacity(0.3), width: 1.5) : BorderSide(color: t.border, width: 1)),
+      color: done ? t.success.withOpacity(t.isDark ? 0.045 : 0.035) : (ex.isStar ? t.primary.withOpacity(0.025) : null),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18),
+        side: done
+          ? BorderSide(color: t.success.withOpacity(0.22), width: 1)
+          : (ex.isStar ? BorderSide(color: t.primary.withOpacity(0.26), width: 1.2) : BorderSide(color: t.border.withOpacity(0.9), width: 0.8))),
       child: Padding(padding: const EdgeInsets.all(14), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        PressScale(onTap: tap, child: AnimatedContainer(duration: const Duration(milliseconds: 250), curve: Curves.easeOutBack,
-          width: 26, height: 26,
-          decoration: BoxDecoration(shape: BoxShape.circle, color: done ? t.success : Colors.transparent,
-            border: Border.all(color: done ? t.success : t.text4, width: 1.5),
-            boxShadow: done ? [BoxShadow(color: t.success.withOpacity(0.3), blurRadius: 6)] : null),
+        PressScale(onTap: tap, child: AnimatedContainer(duration: const Duration(milliseconds: 220), curve: Curves.easeOutCubic,
+          width: 28, height: 28,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: done ? t.success : t.card,
+            border: Border.all(color: done ? t.success : t.border, width: 1.4),
+            boxShadow: done ? [BoxShadow(color: t.success.withOpacity(0.28), blurRadius: 10, offset: const Offset(0, 3))] : null),
           child: AnimatedSwitcher(duration: const Duration(milliseconds: 200),
             transitionBuilder: (c, a) => FadeTransition(opacity: a, child: ScaleTransition(
               scale: Tween<double>(begin: 0.8, end: 1.0).animate(CurvedAnimation(parent: a, curve: Curves.easeOutBack)), child: c)),
@@ -1153,7 +1230,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// RECORD PAGE — v6.4.3: 训练记录（月度日历热力图 + 年度统计）
+// RECORD PAGE — v6.5: 训练记录（月度日历热力图 + 年度统计）
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class RecordPage extends StatefulWidget {
@@ -1401,7 +1478,7 @@ class _RecordPageState extends State<RecordPage> {
                 width: 26, height: 26,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: count == 0 ? Colors.transparent : Color.lerp(t.card, t.success, intensity),
+                  color: count == 0 ? Colors.transparent : Color.lerp(t.card, t.successLight, intensity),
                   border: isToday ? Border.all(color: t.primary, width: 2) : null,
                   boxShadow: isToday ? [BoxShadow(color: t.primary.withOpacity(0.2), blurRadius: 4)] : null,
                 ),
@@ -1409,7 +1486,7 @@ class _RecordPageState extends State<RecordPage> {
                   style: GoogleFonts.inter(
                     fontSize: 10,
                     fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
-                    color: count == 0 ? (isToday ? t.primary : t.text4) : (intensity > 0.5 ? Colors.white : t.text1),
+                    color: count == 0 ? (isToday ? t.primary : t.text4) : (intensity > 0.62 ? Colors.white : t.text1),
                   ))),
               )),
             ),
@@ -1427,7 +1504,7 @@ class _RecordPageState extends State<RecordPage> {
       width: 12, height: 12,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: intensity == 0 ? t.border : Color.lerp(t.card, t.success, intensity),
+        color: intensity == 0 ? t.border : Color.lerp(t.card, t.successLight, intensity),
       ),
     );
   }
@@ -1497,7 +1574,7 @@ class _RecordPageState extends State<RecordPage> {
             width: 4, height: 4,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: count == 0 ? t.border.withOpacity(0.3) : Color.lerp(t.card, t.success, intensity),
+              color: count == 0 ? t.border.withOpacity(0.3) : Color.lerp(t.card, t.successLight, intensity),
             ),
           ));
           day++;
