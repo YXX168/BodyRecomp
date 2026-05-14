@@ -6,8 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// THEME SYSTEM — v6.5: tonal completion colors + refined surfaces
-// ═══════════════════════════════════════════════════════════════════════════════
+// THEME SYSTEM — v6.6: profile + chart + settings support
+// ═════════════════════════════════════════════════════════════════════════════==
 
 enum AppTheme { blue, pink, orange, purple, green, dark }
 
@@ -106,6 +106,105 @@ const themes = {
 // ═══════════════════════════════════════════════════════════════════════════════
 // DATA MODELS
 // ═══════════════════════════════════════════════════════════════════════════════
+
+/// 用户档案
+class UserProfile {
+  String birthday; // ISO 8601 date string or empty
+  double heightCm;
+  double weightKg;
+  String gender; // 'male' or 'female'
+
+  UserProfile({
+    this.birthday = '',
+    this.heightCm = 176.0,
+    this.weightKg = 72.5,
+    this.gender = 'male',
+  });
+
+  int get age {
+    if (birthday.isEmpty) return 0;
+    try {
+      final b = DateTime.parse(birthday);
+      final now = DateTime.now();
+      int a = now.year - b.year;
+      if (now.month < b.month || (now.month == b.month && now.day < b.day)) a--;
+      return a < 0 ? 0 : a;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  double get bmi => heightCm > 0 ? weightKg / ((heightCm / 100) * (heightCm / 100)) : 0;
+
+  Map<String, dynamic> toJson() => {
+        'birthday': birthday,
+        'heightCm': heightCm,
+        'weightKg': weightKg,
+        'gender': gender,
+      };
+
+  factory UserProfile.fromJson(Map<String, dynamic> j) => UserProfile(
+        birthday: j['birthday'] as String? ?? '',
+        heightCm: (j['heightCm'] as num?)?.toDouble() ?? 176.0,
+        weightKg: (j['weightKg'] as num?)?.toDouble() ?? 72.5,
+        gender: j['gender'] as String? ?? 'male',
+      );
+}
+
+/// 体重记录
+class WeightEntry {
+  final DateTime date;
+  final double weightKg;
+  const WeightEntry({required this.date, required this.weightKg});
+  Map<String, dynamic> toJson() => {'d': date.toIso8601String().substring(0, 10), 'w': weightKg};
+  factory WeightEntry.fromJson(Map<String, dynamic> j) =>
+      WeightEntry(date: DateTime.parse(j['d'] as String), weightKg: (j['w'] as num).toDouble());
+}
+
+/// 围度记录
+class BodyMeasurement {
+  final DateTime date;
+  final Map<String, double> values; // e.g. {'waist': 80.5, 'chest': 95, ...}
+  const BodyMeasurement({required this.date, required this.values});
+  Map<String, dynamic> toJson() => {'d': date.toIso8601String().substring(0, 10), 'v': values};
+  factory BodyMeasurement.fromJson(Map<String, dynamic> j) => BodyMeasurement(
+        date: DateTime.parse(j['d'] as String),
+        values: (j['v'] as Map).map((k, v) => MapEntry(k as String, (v as num).toDouble())),
+      );
+}
+
+/// 动作重量记录
+class ExerciseLog {
+  final String exerciseName;
+  final double weightKg;
+  final int sets;
+  final int reps;
+  final int rpe;
+  const ExerciseLog({
+    required this.exerciseName,
+    this.weightKg = 0,
+    this.sets = 0,
+    this.reps = 0,
+    this.rpe = 0,
+  });
+
+  double get estimated1RM => weightKg > 0 && reps > 0 ? weightKg * (1 + reps / 30.0) : 0;
+
+  Map<String, dynamic> toJson() => {
+        'e': exerciseName,
+        'w': weightKg,
+        's': sets,
+        'r': reps,
+        'rpe': rpe,
+      };
+  factory ExerciseLog.fromJson(Map<String, dynamic> j) => ExerciseLog(
+        exerciseName: j['e'] as String,
+        weightKg: (j['w'] as num?)?.toDouble() ?? 0,
+        sets: (j['s'] as num?)?.toInt() ?? 0,
+        reps: (j['r'] as num?)?.toInt() ?? 0,
+        rpe: (j['rpe'] as num?)?.toInt() ?? 0,
+      );
+}
 
 class Exercise {
   final String name;
@@ -394,6 +493,122 @@ Future<void> saveToMonthHistory(SharedPreferences p, int year, int month, Map<in
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PROFILE & DATA HELPERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+Future<UserProfile> loadProfile() async {
+  final p = await SharedPreferences.getInstance();
+  final raw = p.getString('recomp_profile_v6');
+  if (raw == null) return UserProfile();
+  try {
+    return UserProfile.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+  } catch (_) {
+    return UserProfile();
+  }
+}
+
+Future<void> saveProfile(UserProfile profile) async {
+  final p = await SharedPreferences.getInstance();
+  await p.setString('recomp_profile_v6', jsonEncode(profile.toJson()));
+}
+
+Future<List<WeightEntry>> loadWeightHistory() async {
+  final p = await SharedPreferences.getInstance();
+  final raw = p.getString('recomp_weight_history_v6');
+  if (raw == null) return [];
+  try {
+    final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+    return list.map(WeightEntry.fromJson).toList()..sort((a, b) => a.date.compareTo(b.date));
+  } catch (_) {
+    return [];
+  }
+}
+
+Future<void> saveWeightHistory(List<WeightEntry> entries) async {
+  final p = await SharedPreferences.getInstance();
+  entries.sort((a, b) => a.date.compareTo(b.date));
+  await p.setString('recomp_weight_history_v6', jsonEncode(entries.map((e) => e.toJson()).toList()));
+}
+
+Future<Map<String, ExerciseLog>> loadExerciseLogs() async {
+  final p = await SharedPreferences.getInstance();
+  final raw = p.getString('recomp_exercise_logs_v6');
+  if (raw == null) return {};
+  try {
+    final map = jsonDecode(raw) as Map<String, dynamic>;
+    return map.map((k, v) => MapEntry(k, ExerciseLog.fromJson(v as Map<String, dynamic>)));
+  } catch (_) {
+    return {};
+  }
+}
+
+Future<void> saveExerciseLog(String exerciseName, ExerciseLog log) async {
+  final p = await SharedPreferences.getInstance();
+  final raw = p.getString('recomp_exercise_logs_v6');
+  Map<String, dynamic> map = {};
+  if (raw != null) {
+    try { map = jsonDecode(raw) as Map<String, dynamic>; } catch (_) {}
+  }
+  map[exerciseName] = log.toJson();
+  await p.setString('recomp_exercise_logs_v6', jsonEncode(map));
+}
+
+/// 导出所有数据为 JSON
+Future<String> exportAllData() async {
+  final p = await SharedPreferences.getInstance();
+  final profile = await loadProfile();
+  final weightHistory = await loadWeightHistory();
+  final exerciseLogs = await loadExerciseLogs();
+
+  // 也导出训练记录和设置
+  final doneRaw = p.getString('recomp_done_v6') ?? '{}';
+  final themeIndex = p.getInt('recomp_theme_v6') ?? 0;
+  final week = p.getInt('recomp_done_v6_week');
+  final year = p.getInt('recomp_done_v6_year');
+
+  final data = {
+    'version': '6.6.0',
+    'exportDate': DateTime.now().toIso8601String(),
+    'profile': profile.toJson(),
+    'weightHistory': weightHistory.map((e) => e.toJson()).toList(),
+    'exerciseLogs': exerciseLogs,
+    'workoutDone': jsonDecode(doneRaw),
+    'settings': {
+      'themeIndex': themeIndex,
+      'week': week,
+      'year': year,
+    },
+  };
+  return JsonEncoder.withIndent('  ').convert(data);
+}
+
+/// 从 JSON 导入数据
+Future<void> importAllData(String jsonStr) async {
+  final data = jsonDecode(jsonStr) as Map<String, dynamic>;
+  final p = await SharedPreferences.getInstance();
+
+  if (data.containsKey('profile')) {
+    await saveProfile(UserProfile.fromJson(data['profile'] as Map<String, dynamic>));
+  }
+  if (data.containsKey('weightHistory')) {
+    final list = (data['weightHistory'] as List).cast<Map<String, dynamic>>();
+    await saveWeightHistory(list.map(WeightEntry.fromJson).toList());
+  }
+  if (data.containsKey('exerciseLogs')) {
+    await p.setString('recomp_exercise_logs_v6', jsonEncode(data['exerciseLogs']));
+  }
+  if (data.containsKey('workoutDone')) {
+    await p.setString('recomp_done_v6', jsonEncode(data['workoutDone']));
+  }
+  if (data.containsKey('settings')) {
+    final s = data['settings'] as Map<String, dynamic>;
+    if (s.containsKey('themeIndex')) await p.setInt('recomp_theme_v6', s['themeIndex'] as int);
+    if (s.containsKey('week')) await p.setInt('recomp_done_v6_week', s['week'] as int);
+    if (s.containsKey('year')) await p.setInt('recomp_done_v6_year', s['year'] as int);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // ANIMATION HELPERS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -675,12 +890,25 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   int _tab = 0;
-  final _pages = const [WorkoutPage(), NutritionPage(), ProgressionPage(), RecordPage()];
+  UserProfile? _profile;
+
+  @override
+  void initState() {
+    super.initState();
+    loadProfile().then((p) => setState(() => _profile = p));
+  }
 
   @override
   Widget build(BuildContext context) {
     final t = ThemeInherited.of(context).theme;
     final dark = t.isDark;
+    final p = _profile;
+    final bmi = p != null && p.heightCm > 0 ? (p.weightKg / ((p.heightCm / 100) * (p.heightCm / 100))).toStringAsFixed(1) : '--';
+    final ageStr = (p != null && p.age > 0) ? '${p.age}岁' : '--';
+    final heightStr = (p != null && p.heightCm > 0) ? '${p.heightCm.toInt()}cm' : '--';
+    final weightStr = (p != null && p.weightKg > 0) ? '${p.weightKg}kg' : '--';
+    final statusText = '$ageStr · $heightStr · $weightStr · BMI $bmi';
+    final pages = [WorkoutPage(), NutritionPage(), ProgressionPage(), RecordPage(), SettingsPage(onProfileChanged: () => loadProfile().then((pp) => setState(() => _profile = pp)))];
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -698,7 +926,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                   children: [
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       GradientTitle(text: 'Body Recomp', primary: t.primary, accent: t.primaryLight, fontSize: 27),
-                      Text('27岁 · 176cm · 72.5kg · BMI 23.4', style: GoogleFonts.inter(fontSize: 11, color: t.text3, fontWeight: FontWeight.w500)),
+                      Text(statusText, style: GoogleFonts.inter(fontSize: 11, color: t.text3, fontWeight: FontWeight.w500)),
                     ])),
                     PressScale(onTap: _showThemeSheet, child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -707,7 +935,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: t.primary.withOpacity(0.12), width: 0.8),
                       ),
-                      child: Text('目标 68-70kg', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: t.primary)),
+                      child: const Icon(Icons.palette_rounded, size: 18),
                     )),
                   ],
                 ),
@@ -719,7 +947,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
               transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: SlideTransition(
                 position: Tween<Offset>(begin: const Offset(0.02, 0), end: Offset.zero)
                     .animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)), child: child)),
-              child: KeyedSubtree(key: ValueKey(_tab), child: _pages[_tab]),
+              child: KeyedSubtree(key: ValueKey(_tab), child: pages[_tab]),
             )),
           ],
         ),
@@ -733,7 +961,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(6, 6, 6, 4),
               child: LayoutBuilder(builder: (context, box) {
-                final w = box.maxWidth / 4;
+                final w = box.maxWidth / 5;
                 return Stack(children: [
                   AnimatedPositioned(
                     duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic,
@@ -753,6 +981,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                     _navItem(Icons.restaurant, '饮食', 1, t, w),
                     _navItem(Icons.trending_up, '超负荷', 2, t, w),
                     _navItem(Icons.bar_chart_rounded, '记录', 3, t, w),
+                    _navItem(Icons.settings_rounded, '设置', 4, t, w),
                   ]),
                 ]);
               }),
@@ -1789,5 +2018,428 @@ class ThemePage extends StatelessWidget {
         }, childCount: AppTheme.values.length),
       )),
     ]);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TREND CHART WIDGET — lightweight CustomPainter line chart
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class TrendChartPainter extends CustomPainter {
+  final List<(String, double)> data; // (label, value)
+  final WorkoutTheme theme;
+  TrendChartPainter({required this.data, required this.theme});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (data.length < 2) return;
+    final padding = const EdgeInsets.only(left: 50, right: 16, top: 16, bottom: 40);
+    final chartW = size.width - padding.left - padding.right;
+    final chartH = size.height - padding.top - padding.bottom;
+    final values = data.map((d) => d.$2).toList();
+    double minV = values.reduce(math.min);
+    double maxV = values.reduce(math.max);
+    if (maxV == minV) { maxV += 1; minV -= 1; }
+    final range = maxV - minV;
+    final paint = Paint()
+      ..color = theme.primary.withOpacity(0.15)
+      ..style = PaintingStyle.fill;
+    final linePaint = Paint()
+      ..color = theme.primary
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    final dotPaint = Paint()..color = theme.primary..style = PaintingStyle.fill;
+    final textPainter = TextPainter(textDirection: TextDirection.ltr);
+
+    final path = Path();
+    final fillPath = Path();
+    final points = <Offset>[];
+    for (int i = 0; i < data.length; i++) {
+      final x = padding.left + (data.length == 1 ? chartW / 2 : (i / (data.length - 1)) * chartW);
+      final y = padding.top + chartH - ((data[i].$2 - minV) / range) * chartH;
+      points.add(Offset(x, y));
+    }
+    if (points.length >= 2) {
+      path.moveTo(points[0].dx, points[0].dy);
+      for (int i = 1; i < points.length; i++) {
+        path.lineTo(points[i].dx, points[i].dy);
+      }
+      fillPath.addPath(path, Offset.zero);
+      fillPath.lineTo(points.last.dx, padding.top + chartH);
+      fillPath.lineTo(points.first.dx, padding.top + chartH);
+      fillPath.close();
+    }
+    canvas.drawPath(fillPath, paint);
+    canvas.drawPath(path, linePaint);
+    for (int i = 0; i < points.length; i++) {
+      canvas.drawCircle(points[i], 4, dotPaint);
+      canvas.drawCircle(points[i], 2.5, Paint()..color = theme.bg..style = PaintingStyle.fill);
+      textPainter.text = TextSpan(
+        text: data[i].$2.toStringAsFixed(1),
+        style: GoogleFonts.inter(fontSize: 9, color: theme.text3, fontWeight: FontWeight.w600),
+      );
+      textPainter.layout();
+      textPainter.paint(canvas, Offset(points[i].dx - textPainter.width / 2, points[i].dy - 20));
+      textPainter.text = TextSpan(
+        text: data[i].$1,
+        style: GoogleFonts.inter(fontSize: 8, color: theme.text4),
+      );
+      textPainter.layout();
+      textPainter.paint(canvas, Offset(points[i].dx - textPainter.width / 2, padding.top + chartH + 6));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant TrendChartPainter oldDelegate) => data != oldDelegate.data;
+}
+
+class MiniTrendChart extends StatelessWidget {
+  final List<(String, double)> data;
+  final WorkoutTheme theme;
+  const MiniTrendChart({super.key, required this.data, required this.theme});
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(height: 180, child: CustomPaint(painter: TrendChartPainter(data: data, theme: theme)));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SETTINGS PAGE — v6.6: profile, weight log, trends, import/export
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class SettingsPage extends StatefulWidget {
+  final VoidCallback onProfileChanged;
+  const SettingsPage({super.key, required this.onProfileChanged});
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  UserProfile? _profile;
+  List<WeightEntry> _weightHistory = [];
+  String _trendTab = 'weight'; // weight or measurements
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAll();
+  }
+
+  Future<void> _loadAll() async {
+    final profile = await loadProfile();
+    final weights = await loadWeightHistory();
+    if (mounted) setState(() {
+      _profile = profile;
+      _weightHistory = weights;
+    });
+  }
+
+  Future<void> _saveProfile(UserProfile p) async {
+    await saveProfile(p);
+    if (mounted) setState(() => _profile = p);
+    widget.onProfileChanged();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = ThemeInherited.of(context).theme;
+    final p = _profile;
+    if (p == null) return const Center(child: CircularProgressIndicator());
+    final bmi = p.heightCm > 0 ? (p.weightKg / ((p.heightCm / 100) * (p.heightCm / 100))).toStringAsFixed(1) : '--';
+    final bmiCategory = _bmiCategory(double.tryParse(bmi));
+    return CustomScrollView(slivers: [
+      SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+        child: GradientTitle(text: '设置', primary: t.primary, accent: t.primaryLight, fontSize: 22))),
+      SliverPadding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), sliver: SliverList(
+        delegate: SliverChildListDelegate([
+          // ── 个人资料卡片 ──
+          FadeScaleEntry(index: 0, child: _profileCard(p, t)),
+          const SizedBox(height: 12),
+          // ── 体重趋势 ──
+          FadeScaleEntry(index: 1, child: _weightTrendCard(t)),
+          const SizedBox(height: 12),
+          // ── 数据管理 ──
+          FadeScaleEntry(index: 2, child: _dataCard(t)),
+          const SizedBox(height: 12),
+          // ── 关于 ──
+          FadeScaleEntry(index: 3, child: Container(
+            decoration: BoxDecoration(color: t.card, borderRadius: BorderRadius.circular(16)),
+            child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('关于', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: t.text3)),
+              const SizedBox(height: 12),
+              Text('Body Recomp v6.6.0', style: GoogleFonts.inter(fontSize: 13, color: t.text2, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Text('健身追踪 · 趋势分析 · 数据备份', style: GoogleFonts.inter(fontSize: 11, color: t.text4)),
+              const SizedBox(height: 4),
+              Text('GitHub: YXX168/BodyRecomp', style: GoogleFonts.inter(fontSize: 10, color: t.text4)),
+            ])),
+          )),
+        ]),
+      )),
+    ]);
+  }
+
+  Widget _profileCard(UserProfile p, WorkoutTheme t) {
+    return Container(
+      decoration: BoxDecoration(color: t.card, borderRadius: BorderRadius.circular(16)),
+      child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(Icons.person_outline_rounded, color: t.primary, size: 20),
+          const SizedBox(width: 8),
+          Text('个人资料', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: t.text1)),
+        ]),
+        const SizedBox(height: 12),
+        // 生日
+        _profileTile(t, Icons.cake_rounded, '生日', p.birthday.isEmpty ? '未设置' : p.birthday, () => _editBirthday(p)),
+        const Divider(height: 1),
+        // 性别
+        _profileTile(t, Icons.wc_rounded, '性别', p.gender == 'male' ? '👨 男' : '👩 女', () => _editGender(p)),
+        const Divider(height: 1),
+        // 身高
+        _profileTile(t, Icons.height_rounded, '身高', '${p.heightCm.toInt()} cm', () => _editHeight(p)),
+        const Divider(height: 1),
+        // 体重
+        _profileTile(t, Icons.monitor_weight_rounded, '当前体重', '${p.weightKg} kg', () => _editWeight(p)),
+        const SizedBox(height: 12),
+        // BMI 展示
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: [t.primary.withOpacity(0.08), t.accent.withOpacity(0.05)]),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(children: [
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('BMI', style: GoogleFonts.inter(fontSize: 11, color: t.text3)),
+              Text(_bmiDisplay(p), style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w900, color: t.primary)),
+            ])),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('状态', style: GoogleFonts.inter(fontSize: 11, color: t.text3)),
+              Text(_bmiCategory(double.tryParse(_bmiDisplay(p).split(' ')[0])), style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: t.accent)),
+            ])),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('年龄', style: GoogleFonts.inter(fontSize: 11, color: t.text3)),
+              Text(p.age > 0 ? '${p.age} 岁' : '--', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: t.text1)),
+            ])),
+          ]),
+        ),
+      ])),
+    );
+  }
+
+  String _bmiDisplay(UserProfile p) {
+    final v = p.bmi;
+    if (v == 0) return '--';
+    return '${v.toStringAsFixed(1)}';
+  }
+
+  String _bmiCategory(double? bmi) {
+    if (bmi == null) return '未计算';
+    if (bmi < 18.5) return '偏瘦';
+    if (bmi < 24) return '正常';
+    if (bmi < 28) return '偏胖';
+    return '肥胖';
+  }
+
+  Widget _profileTile(WorkoutTheme t, IconData icon, String label, String value, VoidCallback onTap) {
+    return PressScale(onTap: onTap, child: Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Row(children: [
+      Icon(icon, size: 18, color: t.text3),
+      const SizedBox(width: 10),
+      Text(label, style: GoogleFonts.inter(fontSize: 13, color: t.text2)),
+      const Spacer(),
+      Text(value, style: GoogleFonts.inter(fontSize: 13, color: t.text1, fontWeight: FontWeight.w600)),
+      const SizedBox(width: 4),
+      Icon(Icons.chevron_right, size: 16, color: t.text4),
+    ]));
+  }
+
+  Future<void> _editBirthday(UserProfile p) async {
+    final ctrl = TextEditingController(text: p.birthday);
+    final result = await showDialog<String>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('选择生日'),
+      content: TextField(controller: ctrl, keyboardType: TextInputType.datetime, decoration: const InputDecoration(hintText: 'YYYY-MM-DD', labelText: '生日日期')),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+        TextButton(onPressed: () => Navigator.pop(ctx, ctrl.text), child: const Text('确定'))],
+    ));
+    if (result != null && result.isNotEmpty) {
+      try { DateTime.parse(result); _saveProfile(UserProfile(birthday: result, heightCm: p.heightCm, weightKg: p.weightKg, gender: p.gender)); } catch (_) {}
+    }
+  }
+
+  Future<void> _editGender(UserProfile p) async {
+    final result = await showDialog<String>(context: context, builder: (ctx) => SimpleDialog(
+      title: const Text('选择性别'),
+      children: ['👨 男', '👩 女'].map((g) => SimpleDialogOption(child: Text(g), onPressed: () => Navigator.pop(ctx, g == '👨 男' ? 'male' : 'female'))).toList(),
+    ));
+    if (result != null) _saveProfile(UserProfile(birthday: p.birthday, heightCm: p.heightCm, weightKg: p.weightKg, gender: result));
+  }
+
+  Future<void> _editHeight(UserProfile p) async {
+    final ctrl = TextEditingController(text: p.heightCm.toInt().toString());
+    final result = await showDialog<double>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('设置身高 (cm)'),
+      content: TextField(controller: ctrl, keyboardType: const TextInputType.numberWithOptions(decimal: true)),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+        TextButton(onPressed: () { final v = double.tryParse(ctrl.text); if (v != null) Navigator.pop(ctx, v); }, child: const Text('确定'))],
+    ));
+    if (result != null) _saveProfile(UserProfile(birthday: p.birthday, heightCm: result, weightKg: p.weightKg, gender: p.gender));
+  }
+
+  Future<void> _editWeight(UserProfile p) async {
+    final ctrl = TextEditingController(text: p.weightKg.toString());
+    final result = await showDialog<double>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('记录体重 (kg)'),
+      content: TextField(controller: ctrl, keyboardType: const TextInputType.numberWithOptions(decimal: true)),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+        TextButton(onPressed: () { final v = double.tryParse(ctrl.text); if (v != null) Navigator.pop(ctx, v); }, child: const Text('确定'))],
+    ));
+    if (result != null) {
+      _saveProfile(UserProfile(birthday: p.birthday, heightCm: p.heightCm, weightKg: result, gender: p.gender));
+      final entries = await loadWeightHistory();
+      entries.add(WeightEntry(date: DateTime.now(), weightKg: result));
+      await saveWeightHistory(entries);
+      setState(() => _weightHistory = entries);
+    }
+  }
+
+  Widget _weightTrendCard(WorkoutTheme t) {
+    final weights = _weightHistory;
+    return Container(
+      decoration: BoxDecoration(color: t.card, borderRadius: BorderRadius.circular(16)),
+      child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(Icons.show_chart_rounded, color: t.primary, size: 20),
+          const SizedBox(width: 8),
+          Text('体重趋势', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: t.text1)),
+          const Spacer(),
+          PressScale(onTap: _addWeightEntry, child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(color: t.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+            child: Row(children: [Icon(Icons.add, size: 14, color: t.primary), Text('记录', style: GoogleFonts.inter(fontSize: 11, color: t.primary, fontWeight: FontWeight.w600))],
+          ))),
+        ]),
+        const SizedBox(height: 8),
+        if (weights.length < 2)
+          Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Center(
+            child: Text('至少记录 2 次体重后显示趋势图', style: GoogleFonts.inter(fontSize: 12, color: t.text4)),
+          ))
+        else
+          MiniTrendChart(data: weights.take(30).map((e) => ('${e.date.month}/${e.date.day}', e.weightKg)).toList(), theme: t),
+        if (weights.isNotEmpty)
+          Padding(padding: const EdgeInsets.only(top: 8), child: Row(children: [
+            Text('最新: ${weights.last.weightKg}kg', style: GoogleFonts.inter(fontSize: 11, color: t.text3)),
+            if (weights.length >= 2)
+              Padding(padding: const EdgeInsets.only(left: 12), child: Text(
+                '变化: ${weights.last.weightKg > weights[weights.length - 2].weightKg ? "+" : ""}${(weights.last.weightKg - weights[weights.length - 2].weightKg).toStringAsFixed(1)}kg',
+                style: GoogleFonts.inter(fontSize: 11, color: weights.last.weightKg > weights[weights.length - 2].weightKg ? t.warning : t.success),
+              )),
+          ])),
+      ])),
+    );
+  }
+
+  Future<void> _addWeightEntry() async {
+    final ctrl = TextEditingController(text: _profile?.weightKg.toString() ?? '');
+    final result = await showDialog<double>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('记录体重 (kg)'),
+      content: TextField(controller: ctrl, keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: const InputDecoration(hintText: '输入今日体重', labelText: '体重 kg')),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+        TextButton(onPressed: () { final v = double.tryParse(ctrl.text); if (v != null) Navigator.pop(ctx, v); }, child: const Text('确定'))],
+    ));
+    if (result != null) {
+      final entries = await loadWeightHistory();
+      entries.add(WeightEntry(date: DateTime.now(), weightKg: result));
+      await saveWeightHistory(entries);
+      setState(() => _weightHistory = entries);
+      // 同步更新 profile
+      final p = _profile!;
+      _saveProfile(UserProfile(birthday: p.birthday, heightCm: p.heightCm, weightKg: result, gender: p.gender));
+    }
+  }
+
+  Widget _dataCard(WorkoutTheme t) {
+    return Container(
+      decoration: BoxDecoration(color: t.card, borderRadius: BorderRadius.circular(16)),
+      child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(Icons.backup_outlined, color: t.primary, size: 20),
+          const SizedBox(width: 8),
+          Text('数据管理', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: t.text1)),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: PressScale(onTap: _exportData, child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(color: t.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
+            child: Column(children: [Icon(Icons.download_rounded, color: t.primary, size: 24), const SizedBox(height: 4),
+              Text('导出备份', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: t.primary))],
+          ))),
+          const SizedBox(width: 8),
+          Expanded(child: PressScale(onTap: _importData, child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(color: t.accent.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
+            child: Column(children: [Icon(Icons.upload_rounded, color: t.accent, size: 24), const SizedBox(height: 4),
+              Text('导入恢复', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: t.accent))],
+          ))),
+        ]),
+        const SizedBox(height: 8),
+        Text('JSON 格式 · 含个人资料+训练记录+体重数据', style: GoogleFonts.inter(fontSize: 10, color: t.text4)),
+      ])),
+    );
+  }
+
+  Future<void> _exportData() async {
+    try {
+      final json = await exportAllData();
+      if (mounted) {
+        showDialog(context: context, builder: (ctx) => AlertDialog(
+          title: const Text('数据导出'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(child: SelectableText(json, style: GoogleFonts.inter(fontSize: 10))),
+          ),
+          actions: [
+            TextButton(onPressed: () {
+              Clipboard.setData(ClipboardData(text: json));
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ 已复制到剪贴板')));
+            }, child: const Text('复制')),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('关闭')),
+          ],
+        ));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ 导出失败: $e')));
+    }
+  }
+
+  Future<void> _importData() async {
+    final ctrl = TextEditingController();
+    final result = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('导入数据'),
+      content: TextField(
+        controller: ctrl,
+        maxLines: 8,
+        decoration: const InputDecoration(hintText: '粘贴 JSON 备份数据...', border: OutlineInputBorder()),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+        TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('导入')),
+      ],
+    ));
+    if (result == true && ctrl.text.isNotEmpty) {
+      try {
+        await importAllData(ctrl.text);
+        if (mounted) {
+          await _loadAll();
+          widget.onProfileChanged();
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ 导入成功')));
+        }
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ 导入失败: $e')));
+      }
+    }
   }
 }
