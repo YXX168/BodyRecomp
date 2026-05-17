@@ -928,6 +928,17 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                       GradientTitle(text: 'Body Recomp', primary: t.primary, accent: t.primaryLight, fontSize: 27),
                       Text(statusText, style: GoogleFonts.inter(fontSize: 11, color: t.text3, fontWeight: FontWeight.w500)),
                     ])),
+                    const SizedBox(width: 12),
+                    PressScale(onTap: _showThemeSheet, child: Container(
+                      width: 42, height: 42,
+                      decoration: BoxDecoration(
+                        color: t.card.withOpacity(t.isDark ? 0.92 : 0.86),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: t.border.withOpacity(0.9), width: 0.8),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(t.isDark ? 0.24 : 0.05), blurRadius: 14, offset: const Offset(0, 6))],
+                      ),
+                      child: Icon(Icons.palette_rounded, size: 20, color: t.primary),
+                    )),
                   ],
                 ),
               ),
@@ -2137,8 +2148,6 @@ class _SettingsPageState extends State<SettingsPage> {
     final t = ThemeInherited.of(context).theme;
     final p = _profile;
     if (p == null) return const Center(child: CircularProgressIndicator());
-    final bmi = p.heightCm > 0 ? (p.weightKg / ((p.heightCm / 100) * (p.heightCm / 100))).toStringAsFixed(1) : '--';
-    final bmiCategory = _bmiCategory(double.tryParse(bmi));
     return CustomScrollView(slivers: [
       SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
         child: GradientTitle(text: '设置', primary: t.primary, accent: t.primaryLight, fontSize: 22))),
@@ -2154,7 +2163,7 @@ class _SettingsPageState extends State<SettingsPage> {
           FadeScaleEntry(index: 2, child: _dataCard(t)),
           const SizedBox(height: 12),
           // ── 主题设置 ──
-          FadeScaleEntry(index: 3, child: const ThemePage()),
+          FadeScaleEntry(index: 3, child: _themeCard(t)),
           const SizedBox(height: 12),
           // ── 关于 ──
           FadeScaleEntry(index: 4, child: Container(
@@ -2172,6 +2181,39 @@ class _SettingsPageState extends State<SettingsPage> {
         ]),
       )),
     ]);
+  }
+
+  Widget _themeCard(WorkoutTheme t) {
+    final inh = ThemeInherited.of(context);
+    final cur = inh.current;
+    return Container(
+      decoration: BoxDecoration(color: t.card, borderRadius: BorderRadius.circular(16)),
+      child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+        Row(children: [
+          Icon(Icons.palette_rounded, color: t.primary, size: 20),
+          const SizedBox(width: 8),
+          Text('主题选择', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: t.text1)),
+        ]),
+        const SizedBox(height: 12),
+        Wrap(spacing: 8, runSpacing: 8, children: AppTheme.values.map((m) {
+          final mt = themes[m]!;
+          final sel = m == cur;
+          return PressScale(onTap: () => inh.setTheme(m), child: AnimatedContainer(
+            duration: const Duration(milliseconds: 240), curve: Curves.easeOutCubic,
+            width: 46, height: 46,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [mt.primary, mt.accent]),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: sel ? t.text1 : Colors.white.withOpacity(0.75), width: sel ? 2.4 : 1.0),
+              boxShadow: sel ? [BoxShadow(color: mt.primary.withOpacity(t.isDark ? 0.42 : 0.24), blurRadius: 12, offset: const Offset(0, 5))] : null,
+            ),
+            child: AnimatedSwitcher(duration: const Duration(milliseconds: 180), child: sel ? const Icon(Icons.check_rounded, key: ValueKey('selected'), color: Colors.white, size: 22) : const SizedBox.shrink(key: ValueKey('empty'))),
+          ));
+        }).toList()),
+        const SizedBox(height: 10),
+        Text(themes[cur]!.name, style: GoogleFonts.inter(fontSize: 12, color: t.text3, fontWeight: FontWeight.w600)),
+      ])),
+    );
   }
 
   Widget _profileCard(UserProfile p, WorkoutTheme t) {
@@ -2319,7 +2361,7 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Text('至少记录 2 次体重后显示趋势图', style: GoogleFonts.inter(fontSize: 12, color: t.text4)),
           ))
         else
-          MiniTrendChart(data: weights.take(30).map((e) => ('${e.date.month}/${e.date.day}', e.weightKg)).toList(), theme: t),
+          MiniTrendChart(data: weights.length > 30 ? weights.sublist(weights.length - 30).map((e) => ('${e.date.month}/${e.date.day}', e.weightKg)).toList() : weights.map((e) => ('${e.date.month}/${e.date.day}', e.weightKg)).toList(), theme: t),
         if (weights.isNotEmpty)
           Padding(padding: const EdgeInsets.only(top: 8), child: Row(children: [
             Text('最新: ${weights.last.weightKg}kg', style: GoogleFonts.inter(fontSize: 11, color: t.text3)),
