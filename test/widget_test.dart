@@ -5,7 +5,7 @@ import 'package:body_recomp/main.dart';
 
 void main() {
   testWidgets('App smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(const ThemeState(child: RecompApp()));
     await tester.pumpAndSettle();
     expect(find.byType(MaterialApp), findsOneWidget);
   });

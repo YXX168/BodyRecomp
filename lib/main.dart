@@ -2251,7 +2251,7 @@ class _SettingsPageState extends State<SettingsPage> {
       Text(value, style: GoogleFonts.inter(fontSize: 13, color: t.text1, fontWeight: FontWeight.w600)),
       const SizedBox(width: 4),
       Icon(Icons.chevron_right, size: 16, color: t.text4),
-    ]));
+    ])));
   }
 
   Future<void> _editBirthday(UserProfile p) async {
@@ -2375,6 +2375,7 @@ class _SettingsPageState extends State<SettingsPage> {
             decoration: BoxDecoration(color: t.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
             child: Column(children: [Icon(Icons.download_rounded, color: t.primary, size: 24), const SizedBox(height: 4),
               Text('导出备份', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: t.primary))],
+            ),
           ))),
           const SizedBox(width: 8),
           Expanded(child: PressScale(onTap: _importData, child: Container(
@@ -2382,6 +2383,7 @@ class _SettingsPageState extends State<SettingsPage> {
             decoration: BoxDecoration(color: t.accent.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
             child: Column(children: [Icon(Icons.upload_rounded, color: t.accent, size: 24), const SizedBox(height: 4),
               Text('导入恢复', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: t.accent))],
+            ),
           ))),
         ]),
         const SizedBox(height: 8),
