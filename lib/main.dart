@@ -928,15 +928,6 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                       GradientTitle(text: 'Body Recomp', primary: t.primary, accent: t.primaryLight, fontSize: 27),
                       Text(statusText, style: GoogleFonts.inter(fontSize: 11, color: t.text3, fontWeight: FontWeight.w500)),
                     ])),
-                    PressScale(onTap: _showThemeSheet, child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: t.primary.withOpacity(t.isDark ? 0.12 : 0.08),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: t.primary.withOpacity(0.12), width: 0.8),
-                      ),
-                      child: const Icon(Icons.palette_rounded, size: 18),
-                    )),
                   ],
                 ),
               ),
@@ -2162,8 +2153,11 @@ class _SettingsPageState extends State<SettingsPage> {
           // ── 数据管理 ──
           FadeScaleEntry(index: 2, child: _dataCard(t)),
           const SizedBox(height: 12),
+          // ── 主题设置 ──
+          FadeScaleEntry(index: 3, child: const ThemePage()),
+          const SizedBox(height: 12),
           // ── 关于 ──
-          FadeScaleEntry(index: 3, child: Container(
+          FadeScaleEntry(index: 4, child: Container(
             decoration: BoxDecoration(color: t.card, borderRadius: BorderRadius.circular(16)),
             child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('关于', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: t.text3)),
