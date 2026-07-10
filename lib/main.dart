@@ -567,7 +567,7 @@ Future<String> exportAllData() async {
   final year = p.getInt('recomp_done_v6_year');
 
   final data = {
-    'version': '6.6.0',
+    'version': '6.6.1',
     'exportDate': DateTime.now().toIso8601String(),
     'profile': profile.toJson(),
     'weightHistory': weightHistory.map((e) => e.toJson()).toList(),
@@ -2171,7 +2171,7 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('关于', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: t.text3)),
               const SizedBox(height: 12),
-              Text('Body Recomp v6.6.0', style: GoogleFonts.inter(fontSize: 13, color: t.text2, fontWeight: FontWeight.w600)),
+              Text('Body Recomp v6.6.1', style: GoogleFonts.inter(fontSize: 13, color: t.text2, fontWeight: FontWeight.w600)),
               const SizedBox(height: 4),
               Text('健身追踪 · 趋势分析 · 数据备份', style: GoogleFonts.inter(fontSize: 11, color: t.text4)),
               const SizedBox(height: 4),
