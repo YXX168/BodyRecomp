@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models/recomp_models.dart';
@@ -703,7 +702,8 @@ class _AnimatedNoteState extends State<AnimatedNote>
               padding: const EdgeInsets.only(top: 6),
               child: Text(
                 widget.note,
-                style: GoogleFonts.inter(
+                style: TextStyle(
+                  fontFamily: 'NotoSansSC',
                   fontSize: 10.5,
                   color: widget.color,
                   height: 1.5,
@@ -832,7 +832,8 @@ class GradientTitle extends StatelessWidget {
       blendMode: BlendMode.srcIn,
       child: Text(
         text,
-        style: GoogleFonts.inter(
+        style: TextStyle(
+          fontFamily: 'NotoSansSC',
           fontSize: fontSize,
           fontWeight: FontWeight.w900,
           letterSpacing: -0.5,
@@ -955,9 +956,12 @@ class RecompApp extends StatelessWidget {
               ),
             ),
             useMaterial3: true,
-            textTheme: GoogleFonts.interTextTheme(
-              dark ? ThemeData.dark().textTheme : ThemeData.light().textTheme,
-            ),
+            fontFamily: 'NotoSansSC',
+            fontFamilyFallback: const ['Noto Sans CJK SC', 'sans-serif'],
+            textTheme: (dark
+                    ? ThemeData.dark().textTheme
+                    : ThemeData.light().textTheme)
+                .apply(fontFamily: 'NotoSansSC'),
           ),
           home: const MainPage(),
         );
@@ -1037,7 +1041,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                           ),
                           Text(
                             statusText,
-                            style: GoogleFonts.inter(
+                            style: TextStyle(
+                              fontFamily: 'NotoSansSC',
                               fontSize: 11,
                               color: t.text3,
                               fontWeight: FontWeight.w500,
@@ -1216,7 +1221,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
               const SizedBox(height: 3),
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 220),
-                style: GoogleFonts.inter(
+                style: TextStyle(
+                  fontFamily: 'NotoSansSC',
                   fontSize: 10,
                   fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
                   color: sel ? t.primary : t.text4,
@@ -1256,7 +1262,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                     children: [
                       Text(
                         '主题选择',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(
+                          fontFamily: 'NotoSansSC',
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
                           color: t.text1,
@@ -1334,7 +1341,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                         children: [
                                           Text(
                                             mt.name,
-                                            style: GoogleFonts.inter(
+                                            style: TextStyle(
+                                              fontFamily: 'NotoSansSC',
                                               fontSize: 14,
                                               fontWeight: FontWeight.w700,
                                               color: sel ? mt.primary : t.text1,
@@ -1342,7 +1350,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                           ),
                                           Text(
                                             sel ? '当前使用中' : '点击切换',
-                                            style: GoogleFonts.inter(
+                                            style: TextStyle(
+                                              fontFamily: 'NotoSansSC',
                                               fontSize: 10,
                                               color: sel
                                                   ? mt.primary.withOpacity(0.7)
@@ -1453,7 +1462,8 @@ class _DaySegmentedNav extends StatelessWidget {
                           children: [
                             AnimatedDefaultTextStyle(
                               duration: const Duration(milliseconds: 220),
-                              style: GoogleFonts.inter(
+                              style: TextStyle(
+                                fontFamily: 'NotoSansSC',
                                 fontSize: 11,
                                 fontWeight:
                                     sel ? FontWeight.w900 : FontWeight.w700,
@@ -1465,7 +1475,8 @@ class _DaySegmentedNav extends StatelessWidget {
                             const SizedBox(height: 2),
                             AnimatedDefaultTextStyle(
                               duration: const Duration(milliseconds: 220),
-                              style: GoogleFonts.inter(
+                              style: TextStyle(
+                                fontFamily: 'NotoSansSC',
                                 fontSize: 7.5,
                                 fontWeight:
                                     sel ? FontWeight.w700 : FontWeight.w500,
@@ -1663,7 +1674,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
                       blendMode: BlendMode.srcIn,
                       child: Text(
                         '休息日',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(
+                          fontFamily: 'NotoSansSC',
                           fontSize: 24,
                           fontWeight: FontWeight.w900,
                           letterSpacing: -0.5,
@@ -1673,7 +1685,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
                     const SizedBox(height: 12),
                     Text(
                       '肌肉在休息时生长',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(
+                        fontFamily: 'NotoSansSC',
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                         color: t.text2,
@@ -1731,7 +1744,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
                     Expanded(
                       child: Text(
                         day.optionalDesc!,
-                        style: GoogleFonts.inter(
+                        style: TextStyle(
+                          fontFamily: 'NotoSansSC',
                           fontSize: 12,
                           color: t.text3,
                           height: 1.5,
@@ -1773,7 +1787,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
                             const SizedBox(width: 12),
                             Text(
                               e.value,
-                              style: GoogleFonts.inter(
+                              style: TextStyle(
+                                fontFamily: 'NotoSansSC',
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
                                 color: t.text2,
@@ -1826,7 +1841,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
                         const SizedBox(width: 7),
                         Text(
                           '训练进度',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(
+                            fontFamily: 'NotoSansSC',
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                             color: t.text3,
@@ -1836,7 +1852,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
                     ),
                     Text(
                       '$done/$total',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(
+                        fontFamily: 'NotoSansSC',
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
                         color: t.success,
@@ -1889,7 +1906,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
                     padding: const EdgeInsets.all(14),
                     child: Text(
                       day.circuitNote!,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(
+                        fontFamily: 'NotoSansSC',
                         fontSize: 11,
                         color: t.text3,
                         height: 1.6,
@@ -1917,7 +1935,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
               children: [
                 Text(
                   '${d.dayName} ${d.subtitle}',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(
+                    fontFamily: 'NotoSansSC',
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: t.text1,
@@ -1936,7 +1955,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
                   ),
                   child: Text(
                     d.badge,
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
+                      fontFamily: 'NotoSansSC',
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                       color: t.primary,
@@ -1949,7 +1969,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
               const SizedBox(height: 4),
               Text(
                 d.description,
-                style: GoogleFonts.inter(fontSize: 12, color: t.text3),
+                style: TextStyle(
+                    fontFamily: 'NotoSansSC', fontSize: 12, color: t.text3),
               ),
             ],
           ],
@@ -1972,7 +1993,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
           const SizedBox(width: 10),
           Text(
             txt,
-            style: GoogleFonts.inter(
+            style: TextStyle(
+              fontFamily: 'NotoSansSC',
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: t.text2,
@@ -1995,26 +2017,33 @@ class _WorkoutPageState extends State<WorkoutPage> {
     final pr = exercisePersonalRecord(_exerciseLogs, ex.name);
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: Card(
-        color: done
-            ? t.success.withOpacity(t.isDark ? 0.045 : 0.035)
-            : (ex.isStar ? t.primary.withOpacity(0.025) : null),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-          side: done
-              ? BorderSide(color: t.success.withOpacity(0.22), width: 1)
-              : (ex.isStar
-                  ? BorderSide(color: t.primary.withOpacity(0.26), width: 1.2)
-                  : BorderSide(color: t.border.withOpacity(0.9), width: 0.8)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              PressScale(
-                onTap: tap,
-                child: AnimatedContainer(
+      child: PressScale(
+        onTap: tap,
+        child: Card(
+          key: ValueKey('exercise_card_${_day}_${num - 1}'),
+          color: done
+              ? t.success.withOpacity(t.isDark ? 0.045 : 0.035)
+              : (ex.isStar ? t.primary.withOpacity(0.025) : null),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: done
+                ? BorderSide(color: t.success.withOpacity(0.22), width: 1)
+                : (ex.isStar
+                    ? BorderSide(
+                        color: t.primary.withOpacity(0.26),
+                        width: 1.2,
+                      )
+                    : BorderSide(
+                        color: t.border.withOpacity(0.9),
+                        width: 0.8,
+                      )),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AnimatedContainer(
                   duration: const Duration(milliseconds: 220),
                   curve: Curves.easeOutCubic,
                   width: 28,
@@ -2042,7 +2071,10 @@ class _WorkoutPageState extends State<WorkoutPage> {
                       opacity: a,
                       child: ScaleTransition(
                         scale: Tween<double>(begin: 0.8, end: 1.0).animate(
-                          CurvedAnimation(parent: a, curve: Curves.easeOutBack),
+                          CurvedAnimation(
+                            parent: a,
+                            curve: Curves.easeOutBack,
+                          ),
                         ),
                         child: c,
                       ),
@@ -2057,7 +2089,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
                         : Center(
                             child: Text(
                               '$num',
-                              style: GoogleFonts.inter(
+                              style: TextStyle(
+                                fontFamily: 'NotoSansSC',
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
                                 color: t.text4,
@@ -2067,150 +2100,159 @@ class _WorkoutPageState extends State<WorkoutPage> {
                           ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      ex.name,
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: done ? t.text4 : t.text1,
-                        decoration: done ? TextDecoration.lineThrough : null,
-                        decorationColor: t.text4,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        ex.name,
+                        style: TextStyle(
+                          fontFamily: 'NotoSansSC',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: done ? t.text4 : t.text1,
+                          decoration: done ? TextDecoration.lineThrough : null,
+                          decorationColor: t.text4,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 3),
-                    Wrap(
-                      spacing: 4,
-                      runSpacing: 2,
-                      children: [
-                        ...ex.muscles.map(
-                          (m) => Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: t.primary.withOpacity(0.06),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              m,
-                              style: GoogleFonts.inter(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w600,
-                                color: t.text3,
+                      const SizedBox(height: 3),
+                      Wrap(
+                        spacing: 4,
+                        runSpacing: 2,
+                        children: [
+                          ...ex.muscles.map(
+                            (m) => Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: t.primary.withOpacity(0.06),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                m,
+                                style: TextStyle(
+                                  fontFamily: 'NotoSansSC',
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                  color: t.text3,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        if (ex.muscleTarget.isNotEmpty)
-                          Text(
-                            ex.muscleTarget,
-                            style: GoogleFonts.inter(
-                              fontSize: 9,
-                              color: t.text3,
+                          if (ex.muscleTarget.isNotEmpty)
+                            Text(
+                              ex.muscleTarget,
+                              style: TextStyle(
+                                fontFamily: 'NotoSansSC',
+                                fontSize: 9,
+                                color: t.text3,
+                              ),
                             ),
-                          ),
-                      ],
-                    ),
-                    if (ex.note != null)
-                      AnimatedNote(
-                        note: ex.note!,
-                        visible: !done,
-                        color: t.text3,
-                      ),
-                    if (recent != null) ...[
-                      const SizedBox(height: 7),
-                      Text(
-                        '最近 ${recent.weightKg.toStringAsFixed(1)}kg · ${recent.sets}×${recent.reps} · RPE ${recent.rpe.toStringAsFixed(1)}',
-                        style: GoogleFonts.inter(
-                          fontSize: 9.5,
-                          color: t.text3,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                    if (pr != null && pr.estimated1RM > 0)
-                      Text(
-                        'Epley 1RM ${recent?.estimated1RM.toStringAsFixed(1)}kg · PR ${pr.estimated1RM.toStringAsFixed(1)}kg',
-                        style: GoogleFonts.inter(
-                          fontSize: 9.5,
-                          color: t.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '${ex.sets}\u00D7',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: t.primary,
-                    ),
-                  ),
-                  Text(
-                    ex.reps,
-                    style: GoogleFonts.inter(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: t.text2,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    ex.rest,
-                    style: GoogleFonts.inter(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w500,
-                      color: t.text4,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  PressScale(
-                    onTap: () => _recordExercise(ex),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: t.primary.withOpacity(0.09),
-                        borderRadius: BorderRadius.circular(9),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.edit_note_rounded,
-                            size: 13,
-                            color: t.primary,
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            '记录',
-                            style: GoogleFonts.inter(
-                              fontSize: 9,
-                              color: t.primary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
                         ],
                       ),
-                    ),
+                      if (ex.note != null)
+                        AnimatedNote(
+                          note: ex.note!,
+                          visible: !done,
+                          color: t.text3,
+                        ),
+                      if (recent != null) ...[
+                        const SizedBox(height: 7),
+                        Text(
+                          '最近 ${recent.weightKg.toStringAsFixed(1)}kg · ${recent.sets}×${recent.reps} · RPE ${recent.rpe.toStringAsFixed(1)}',
+                          style: TextStyle(
+                            fontFamily: 'NotoSansSC',
+                            fontSize: 9.5,
+                            color: t.text3,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                      if (pr != null && pr.estimated1RM > 0)
+                        Text(
+                          'Epley 1RM ${recent?.estimated1RM.toStringAsFixed(1)}kg · PR ${pr.estimated1RM.toStringAsFixed(1)}kg',
+                          style: TextStyle(
+                            fontFamily: 'NotoSansSC',
+                            fontSize: 9.5,
+                            color: t.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                    ],
                   ),
-                ],
-              ),
-            ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${ex.sets}\u00D7',
+                      style: TextStyle(
+                        fontFamily: 'NotoSansSC',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: t.primary,
+                      ),
+                    ),
+                    Text(
+                      ex.reps,
+                      style: TextStyle(
+                        fontFamily: 'NotoSansSC',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: t.text2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      ex.rest,
+                      style: TextStyle(
+                        fontFamily: 'NotoSansSC',
+                        fontSize: 9,
+                        fontWeight: FontWeight.w500,
+                        color: t.text4,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    PressScale(
+                      onTap: () => _recordExercise(ex),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: t.primary.withOpacity(0.09),
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.edit_note_rounded,
+                              size: 13,
+                              color: t.primary,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              '记录',
+                              style: TextStyle(
+                                fontFamily: 'NotoSansSC',
+                                fontSize: 9,
+                                color: t.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -2528,7 +2570,8 @@ class _RecordPageState extends State<RecordPage> {
                     children: [
                       Text(
                         '$_viewYear年 ${monthNames[_viewMonth - 1]}',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(
+                          fontFamily: 'NotoSansSC',
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
                           color: t.text1,
@@ -2537,7 +2580,8 @@ class _RecordPageState extends State<RecordPage> {
                       if (isCurrentMonth)
                         Text(
                           '当前月',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(
+                            fontFamily: 'NotoSansSC',
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
                             color: t.primary,
@@ -2609,7 +2653,8 @@ class _RecordPageState extends State<RecordPage> {
                               child: Center(
                                 child: Text(
                                   weekLabels[i],
-                                  style: GoogleFonts.inter(
+                                  style: TextStyle(
+                                    fontFamily: 'NotoSansSC',
                                     fontSize: 10,
                                     fontWeight: FontWeight.w700,
                                     color: i >= 5 ? t.text4 : t.text3,
@@ -2633,7 +2678,8 @@ class _RecordPageState extends State<RecordPage> {
                         children: [
                           Text(
                             '少',
-                            style: GoogleFonts.inter(
+                            style: TextStyle(
+                              fontFamily: 'NotoSansSC',
                               fontSize: 9,
                               color: t.text4,
                             ),
@@ -2651,7 +2697,8 @@ class _RecordPageState extends State<RecordPage> {
                           const SizedBox(width: 4),
                           Text(
                             '多',
-                            style: GoogleFonts.inter(
+                            style: TextStyle(
+                              fontFamily: 'NotoSansSC',
                               fontSize: 9,
                               color: t.text4,
                             ),
@@ -2676,7 +2723,8 @@ class _RecordPageState extends State<RecordPage> {
                 children: [
                   Text(
                     '$_viewYear 年度统计',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
+                      fontFamily: 'NotoSansSC',
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
                       color: t.text1,
@@ -2709,7 +2757,8 @@ class _RecordPageState extends State<RecordPage> {
               children: [
                 Text(
                   '全年概览',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(
+                    fontFamily: 'NotoSansSC',
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
                     color: t.text1,
@@ -2731,7 +2780,8 @@ class _RecordPageState extends State<RecordPage> {
       children: [
         Text(
           label,
-          style: GoogleFonts.inter(
+          style: TextStyle(
+            fontFamily: 'NotoSansSC',
             fontSize: 9,
             fontWeight: FontWeight.w700,
             color: t.text4,
@@ -2741,13 +2791,16 @@ class _RecordPageState extends State<RecordPage> {
         const SizedBox(height: 2),
         Text(
           value,
-          style: GoogleFonts.inter(
+          style: TextStyle(
+            fontFamily: 'NotoSansSC',
             fontSize: 20,
             fontWeight: FontWeight.w800,
             color: t.primary,
           ),
         ),
-        Text(unit, style: GoogleFonts.inter(fontSize: 9, color: t.text4)),
+        Text(unit,
+            style: TextStyle(
+                fontFamily: 'NotoSansSC', fontSize: 9, color: t.text4)),
       ],
     );
   }
@@ -2801,7 +2854,8 @@ class _RecordPageState extends State<RecordPage> {
                     child: Center(
                       child: Text(
                         '$day',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(
+                          fontFamily: 'NotoSansSC',
                           fontSize: 10,
                           fontWeight:
                               isToday ? FontWeight.w800 : FontWeight.w600,
@@ -2915,7 +2969,8 @@ class _RecordPageState extends State<RecordPage> {
             children: [
               Text(
                 '$label月',
-                style: GoogleFonts.inter(
+                style: TextStyle(
+                  fontFamily: 'NotoSansSC',
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                   color: isCurrent ? t.primary : t.text3,
@@ -2924,7 +2979,8 @@ class _RecordPageState extends State<RecordPage> {
               if (total > 0)
                 Text(
                   '$total',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(
+                    fontFamily: 'NotoSansSC',
                     fontSize: 9,
                     fontWeight: FontWeight.w700,
                     color: t.success,
@@ -3105,7 +3161,8 @@ class NutritionPage extends StatelessWidget {
                 index: 4,
                 child: Text(
                   '饮食建议',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(
+                    fontFamily: 'NotoSansSC',
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: t.text1,
@@ -3139,7 +3196,8 @@ class NutritionPage extends StatelessWidget {
                               Expanded(
                                 child: Text(
                                   nutritionTips[e.key],
-                                  style: GoogleFonts.inter(
+                                  style: TextStyle(
+                                    fontFamily: 'NotoSansSC',
                                     fontSize: 12,
                                     color: t.text2,
                                     height: 1.6,
@@ -3189,7 +3247,8 @@ class NutritionPage extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
+                  style: TextStyle(
+                    fontFamily: 'NotoSansSC',
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                     color: t.text3,
@@ -3207,7 +3266,8 @@ class NutritionPage extends StatelessWidget {
               children: [
                 Text(
                   value,
-                  style: GoogleFonts.inter(
+                  style: TextStyle(
+                    fontFamily: 'NotoSansSC',
                     fontSize: 19,
                     fontWeight: FontWeight.w900,
                     color: color,
@@ -3219,7 +3279,8 @@ class NutritionPage extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 2),
                   child: Text(
                     unit,
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
+                      fontFamily: 'NotoSansSC',
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                       color: t.text4,
@@ -3261,7 +3322,8 @@ class NutritionPage extends StatelessWidget {
                   const SizedBox(width: 8),
                   Text(
                     l,
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
+                      fontFamily: 'NotoSansSC',
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                       color: t.text4,
@@ -3270,13 +3332,17 @@ class NutritionPage extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(p,
-                      style: GoogleFonts.inter(fontSize: 10, color: t.text3)),
+                      style: TextStyle(
+                          fontFamily: 'NotoSansSC',
+                          fontSize: 10,
+                          color: t.text3)),
                 ],
               ),
               const SizedBox(height: 10),
               Text(
                 v,
-                style: GoogleFonts.inter(
+                style: TextStyle(
+                  fontFamily: 'NotoSansSC',
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
                   color: c,
@@ -3285,8 +3351,11 @@ class NutritionPage extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 f,
-                style: GoogleFonts.inter(
-                    fontSize: 11, color: t.text3, height: 1.5),
+                style: TextStyle(
+                    fontFamily: 'NotoSansSC',
+                    fontSize: 11,
+                    color: t.text3,
+                    height: 1.5),
               ),
             ],
           ),
@@ -3328,7 +3397,8 @@ class ProgressionPage extends StatelessWidget {
                     padding: const EdgeInsets.all(16),
                     child: Text(
                       '渐进超负荷是增肌的核心原则：在动作稳定、恢复充足的前提下，逐步增加重量、次数或组数，让身体持续适应。每 1-2 周尝试一次小幅进步，并记录训练表现。',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(
+                        fontFamily: 'NotoSansSC',
                         fontSize: 12,
                         color: t.text2,
                         height: 1.7,
@@ -3342,7 +3412,8 @@ class ProgressionPage extends StatelessWidget {
                 index: 1,
                 child: Text(
                   '四阶段计划',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(
+                    fontFamily: 'NotoSansSC',
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: t.text1,
@@ -3372,7 +3443,8 @@ class ProgressionPage extends StatelessWidget {
                               child: Center(
                                 child: Text(
                                   '${e.key + 1}',
-                                  style: GoogleFonts.inter(
+                                  style: TextStyle(
+                                    fontFamily: 'NotoSansSC',
                                     fontSize: 16,
                                     fontWeight: FontWeight.w800,
                                     color: t.primary,
@@ -3389,7 +3461,8 @@ class ProgressionPage extends StatelessWidget {
                                     children: [
                                       Text(
                                         ti,
-                                        style: GoogleFonts.inter(
+                                        style: TextStyle(
+                                          fontFamily: 'NotoSansSC',
                                           fontSize: 15,
                                           fontWeight: FontWeight.w800,
                                           color: t.text1,
@@ -3409,7 +3482,8 @@ class ProgressionPage extends StatelessWidget {
                                         ),
                                         child: Text(
                                           w,
-                                          style: GoogleFonts.inter(
+                                          style: TextStyle(
+                                            fontFamily: 'NotoSansSC',
                                             fontSize: 9,
                                             fontWeight: FontWeight.w700,
                                             color: t.primary,
@@ -3421,7 +3495,8 @@ class ProgressionPage extends StatelessWidget {
                                   const SizedBox(height: 4),
                                   Text(
                                     d,
-                                    style: GoogleFonts.inter(
+                                    style: TextStyle(
+                                      fontFamily: 'NotoSansSC',
                                       fontSize: 12,
                                       color: t.text3,
                                       height: 1.6,
@@ -3442,7 +3517,8 @@ class ProgressionPage extends StatelessWidget {
                 index: 7,
                 child: Text(
                   '加重策略',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(
+                    fontFamily: 'NotoSansSC',
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: t.text1,
@@ -3464,7 +3540,8 @@ class ProgressionPage extends StatelessWidget {
                           dense: true,
                           title: Text(
                             i.value.$1,
-                            style: GoogleFonts.inter(
+                            style: TextStyle(
+                              fontFamily: 'NotoSansSC',
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                               color: t.text1,
@@ -3472,7 +3549,8 @@ class ProgressionPage extends StatelessWidget {
                           ),
                           subtitle: Text(
                             i.value.$2,
-                            style: GoogleFonts.inter(
+                            style: TextStyle(
+                              fontFamily: 'NotoSansSC',
                               fontSize: 11,
                               color: t.text3,
                               height: 1.5,
@@ -3614,7 +3692,8 @@ class ThemePage extends StatelessWidget {
                                 children: [
                                   Text(
                                     mt.name,
-                                    style: GoogleFonts.inter(
+                                    style: TextStyle(
+                                      fontFamily: 'NotoSansSC',
                                       fontSize: 15,
                                       fontWeight: FontWeight.w700,
                                       color: sel ? mt.primary : t.text1,
@@ -3622,7 +3701,8 @@ class ThemePage extends StatelessWidget {
                                   ),
                                   Text(
                                     sel ? '当前使用中' : '点击切换',
-                                    style: GoogleFonts.inter(
+                                    style: TextStyle(
+                                      fontFamily: 'NotoSansSC',
                                       fontSize: 11,
                                       color: sel
                                           ? mt.primary.withOpacity(0.7)
@@ -3649,7 +3729,8 @@ class ThemePage extends StatelessWidget {
                                   : null,
                               child: AnimatedDefaultTextStyle(
                                 duration: const Duration(milliseconds: 250),
-                                style: GoogleFonts.inter(
+                                style: TextStyle(
+                                  fontFamily: 'NotoSansSC',
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
                                   color: sel ? mt.primary : Colors.transparent,
@@ -3745,7 +3826,8 @@ class TrendChartPainter extends CustomPainter {
       );
       textPainter.text = TextSpan(
         text: data[i].$2.toStringAsFixed(1),
-        style: GoogleFonts.inter(
+        style: TextStyle(
+          fontFamily: 'NotoSansSC',
           fontSize: 9,
           color: theme.text3,
           fontWeight: FontWeight.w600,
@@ -3758,7 +3840,8 @@ class TrendChartPainter extends CustomPainter {
       );
       textPainter.text = TextSpan(
         text: data[i].$1,
-        style: GoogleFonts.inter(fontSize: 8, color: theme.text4),
+        style: TextStyle(
+            fontFamily: 'NotoSansSC', fontSize: 8, color: theme.text4),
       );
       textPainter.layout();
       textPainter.paint(
@@ -3878,7 +3961,8 @@ class _SettingsPageState extends State<SettingsPage> {
                       children: [
                         Text(
                           '关于',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(
+                            fontFamily: 'NotoSansSC',
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: t.text3,
@@ -3887,7 +3971,8 @@ class _SettingsPageState extends State<SettingsPage> {
                         const SizedBox(height: 12),
                         Text(
                           'Body Recomp v6.7.0',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(
+                            fontFamily: 'NotoSansSC',
                             fontSize: 13,
                             color: t.text2,
                             fontWeight: FontWeight.w600,
@@ -3896,7 +3981,8 @@ class _SettingsPageState extends State<SettingsPage> {
                         const SizedBox(height: 4),
                         Text(
                           '健身追踪 · 趋势分析 · 数据备份',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(
+                            fontFamily: 'NotoSansSC',
                             fontSize: 11,
                             color: t.text4,
                           ),
@@ -3904,7 +3990,8 @@ class _SettingsPageState extends State<SettingsPage> {
                         const SizedBox(height: 4),
                         Text(
                           'GitHub: YXX168/BodyRecomp',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(
+                            fontFamily: 'NotoSansSC',
                             fontSize: 10,
                             color: t.text4,
                           ),
@@ -3941,7 +4028,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 const SizedBox(width: 8),
                 Text(
                   '主题选择',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(
+                    fontFamily: 'NotoSansSC',
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: t.text1,
@@ -4000,7 +4088,8 @@ class _SettingsPageState extends State<SettingsPage> {
             const SizedBox(height: 10),
             Text(
               themes[cur]!.name,
-              style: GoogleFonts.inter(
+              style: TextStyle(
+                fontFamily: 'NotoSansSC',
                 fontSize: 12,
                 color: t.text3,
                 fontWeight: FontWeight.w600,
@@ -4029,7 +4118,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 const SizedBox(width: 8),
                 Text(
                   '个人资料',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(
+                    fontFamily: 'NotoSansSC',
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: t.text1,
@@ -4094,14 +4184,16 @@ class _SettingsPageState extends State<SettingsPage> {
                       children: [
                         Text(
                           'BMI',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(
+                            fontFamily: 'NotoSansSC',
                             fontSize: 11,
                             color: t.text3,
                           ),
                         ),
                         Text(
                           _bmiDisplay(p),
-                          style: GoogleFonts.inter(
+                          style: TextStyle(
+                            fontFamily: 'NotoSansSC',
                             fontSize: 24,
                             fontWeight: FontWeight.w900,
                             color: t.primary,
@@ -4116,7 +4208,8 @@ class _SettingsPageState extends State<SettingsPage> {
                       children: [
                         Text(
                           '状态',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(
+                            fontFamily: 'NotoSansSC',
                             fontSize: 11,
                             color: t.text3,
                           ),
@@ -4125,7 +4218,8 @@ class _SettingsPageState extends State<SettingsPage> {
                           _bmiCategory(
                             double.tryParse(_bmiDisplay(p).split(' ')[0]),
                           ),
-                          style: GoogleFonts.inter(
+                          style: TextStyle(
+                            fontFamily: 'NotoSansSC',
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: t.accent,
@@ -4140,14 +4234,16 @@ class _SettingsPageState extends State<SettingsPage> {
                       children: [
                         Text(
                           '年龄',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(
+                            fontFamily: 'NotoSansSC',
                             fontSize: 11,
                             color: t.text3,
                           ),
                         ),
                         Text(
                           p.age > 0 ? '${p.age} 岁' : '--',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(
+                            fontFamily: 'NotoSansSC',
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: t.text1,
@@ -4194,11 +4290,14 @@ class _SettingsPageState extends State<SettingsPage> {
           children: [
             Icon(icon, size: 18, color: t.text3),
             const SizedBox(width: 10),
-            Text(label, style: GoogleFonts.inter(fontSize: 13, color: t.text2)),
+            Text(label,
+                style: TextStyle(
+                    fontFamily: 'NotoSansSC', fontSize: 13, color: t.text2)),
             const Spacer(),
             Text(
               value,
-              style: GoogleFonts.inter(
+              style: TextStyle(
+                fontFamily: 'NotoSansSC',
                 fontSize: 13,
                 color: t.text1,
                 fontWeight: FontWeight.w600,
@@ -4375,7 +4474,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 const SizedBox(width: 8),
                 Text(
                   '身体数据',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(
+                    fontFamily: 'NotoSansSC',
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: t.text1,
@@ -4398,7 +4498,8 @@ class _SettingsPageState extends State<SettingsPage> {
                         Icon(Icons.add, size: 14, color: t.primary),
                         Text(
                           '记录',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(
+                            fontFamily: 'NotoSansSC',
                             fontSize: 11,
                             color: t.primary,
                             fontWeight: FontWeight.w600,
@@ -4459,7 +4560,8 @@ class _SettingsPageState extends State<SettingsPage> {
           child: Text(
             label,
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: TextStyle(
+              fontFamily: 'NotoSansSC',
               fontSize: 11,
               fontWeight: FontWeight.w700,
               color: selected ? t.primary : t.text4,
@@ -4481,7 +4583,8 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Center(
               child: Text(
                 '至少记录 2 次体重后显示趋势图',
-                style: GoogleFonts.inter(fontSize: 12, color: t.text4),
+                style: TextStyle(
+                    fontFamily: 'NotoSansSC', fontSize: 12, color: t.text4),
               ),
             ),
           )
@@ -4502,14 +4605,16 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               Text(
                 '最新: ${weights.last.weightKg.toStringAsFixed(1)}kg',
-                style: GoogleFonts.inter(fontSize: 11, color: t.text3),
+                style: TextStyle(
+                    fontFamily: 'NotoSansSC', fontSize: 11, color: t.text3),
               ),
               if (weights.length >= 2)
                 Padding(
                   padding: const EdgeInsets.only(left: 12),
                   child: Text(
                     '变化: ${weights.last.weightKg > weights[weights.length - 2].weightKg ? "+" : ""}${(weights.last.weightKg - weights[weights.length - 2].weightKg).toStringAsFixed(1)}kg',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
+                      fontFamily: 'NotoSansSC',
                       fontSize: 11,
                       color: weights.last.weightKg >
                               weights[weights.length - 2].weightKg
@@ -4535,12 +4640,14 @@ class _SettingsPageState extends State<SettingsPage> {
           Expanded(
             child: Text(
               '${entry.date.year}-${entry.date.month.toString().padLeft(2, '0')}-${entry.date.day.toString().padLeft(2, '0')}',
-              style: GoogleFonts.inter(fontSize: 11, color: t.text3),
+              style: TextStyle(
+                  fontFamily: 'NotoSansSC', fontSize: 11, color: t.text3),
             ),
           ),
           Text(
             '${entry.weightKg.toStringAsFixed(1)} kg',
-            style: GoogleFonts.inter(
+            style: TextStyle(
+              fontFamily: 'NotoSansSC',
               fontSize: 11,
               color: t.text1,
               fontWeight: FontWeight.w700,
@@ -4592,7 +4699,8 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Center(
               child: Text(
                 '记录至少 2 次腰围后显示围度趋势',
-                style: GoogleFonts.inter(fontSize: 12, color: t.text4),
+                style: TextStyle(
+                    fontFamily: 'NotoSansSC', fontSize: 12, color: t.text4),
               ),
             ),
           )
@@ -4613,7 +4721,10 @@ class _SettingsPageState extends State<SettingsPage> {
                       width: 76,
                       child: Text(
                         '${entry.date.month}/${entry.date.day}',
-                        style: GoogleFonts.inter(fontSize: 11, color: t.text3),
+                        style: TextStyle(
+                            fontFamily: 'NotoSansSC',
+                            fontSize: 11,
+                            color: t.text3),
                       ),
                     ),
                     Expanded(
@@ -4624,7 +4735,8 @@ class _SettingsPageState extends State<SettingsPage> {
                                   '${labels[value.key] ?? value.key} ${value.value.toStringAsFixed(1)}cm',
                             )
                             .join(' · '),
-                        style: GoogleFonts.inter(
+                        style: TextStyle(
+                          fontFamily: 'NotoSansSC',
                           fontSize: 10.5,
                           color: t.text1,
                           height: 1.5,
@@ -4842,7 +4954,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 const SizedBox(width: 8),
                 Text(
                   '数据管理',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(
+                    fontFamily: 'NotoSansSC',
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: t.text1,
@@ -4872,7 +4985,8 @@ class _SettingsPageState extends State<SettingsPage> {
                           const SizedBox(height: 4),
                           Text(
                             '导出备份',
-                            style: GoogleFonts.inter(
+                            style: TextStyle(
+                              fontFamily: 'NotoSansSC',
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
                               color: t.primary,
@@ -4899,7 +5013,8 @@ class _SettingsPageState extends State<SettingsPage> {
                           const SizedBox(height: 4),
                           Text(
                             '导入恢复',
-                            style: GoogleFonts.inter(
+                            style: TextStyle(
+                              fontFamily: 'NotoSansSC',
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
                               color: t.accent,
@@ -4915,7 +5030,8 @@ class _SettingsPageState extends State<SettingsPage> {
             const SizedBox(height: 8),
             Text(
               'JSON 格式 · 含资料、训练、体重与围度 · 导入前自动备份',
-              style: GoogleFonts.inter(fontSize: 10, color: t.text4),
+              style: TextStyle(
+                  fontFamily: 'NotoSansSC', fontSize: 10, color: t.text4),
             ),
           ],
         ),
@@ -4936,7 +5052,7 @@ class _SettingsPageState extends State<SettingsPage> {
               child: SingleChildScrollView(
                 child: SelectableText(
                   json,
-                  style: GoogleFonts.inter(fontSize: 10),
+                  style: TextStyle(fontFamily: 'NotoSansSC', fontSize: 10),
                 ),
               ),
             ),
