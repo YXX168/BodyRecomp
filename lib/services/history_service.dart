@@ -13,8 +13,9 @@ int isoWeekNumber(DateTime date) {
   final day = dateOnly(date);
   final thursday = day.add(Duration(days: 4 - day.weekday));
   final firstThursday = DateTime(thursday.year, 1, 4);
-  final firstIsoThursday =
-      firstThursday.add(Duration(days: 4 - firstThursday.weekday));
+  final firstIsoThursday = firstThursday.add(
+    Duration(days: 4 - firstThursday.weekday),
+  );
   return 1 + (thursday.difference(firstIsoThursday).inDays ~/ 7);
 }
 

@@ -71,8 +71,10 @@ List<WeightEntry> upsertWeightEntry(
   final byDate = <DateTime, WeightEntry>{
     for (final value in entries) dateOnly(value.date): value,
   };
-  byDate[dateOnly(entry.date)] =
-      WeightEntry(date: dateOnly(entry.date), weightKg: entry.weightKg);
+  byDate[dateOnly(entry.date)] = WeightEntry(
+    date: dateOnly(entry.date),
+    weightKg: entry.weightKg,
+  );
   return byDate.values.toList()..sort((a, b) => a.date.compareTo(b.date));
 }
 

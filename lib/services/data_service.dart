@@ -132,7 +132,7 @@ Future<List<ExerciseLog>> loadExerciseLogs() async {
 Future<void> saveExerciseLogs(List<ExerciseLog> logs) async {
   final preferences = await SharedPreferences.getInstance();
   final unique = <String, ExerciseLog>{
-    for (final log in logs) log.identity: log
+    for (final log in logs) log.identity: log,
   };
   final sorted = unique.values.toList()
     ..sort((a, b) => b.date.compareTo(a.date));
@@ -408,11 +408,7 @@ Future<ImportResult?> restoreLastImportBackup({
   final prefs = preferences ?? await SharedPreferences.getInstance();
   final backup = prefs.getString(lastImportBackupKey);
   if (backup == null) return null;
-  return importAllData(
-    backup,
-    mode: ImportMode.overwrite,
-    preferences: prefs,
-  );
+  return importAllData(backup, mode: ImportMode.overwrite, preferences: prefs);
 }
 
 Future<void> _mergeWeightHistory(
@@ -525,9 +521,8 @@ List<ExerciseLog> _decodeExerciseLogs(String? raw) {
     if (decoded is List) {
       return decoded
           .map(
-            (item) => ExerciseLog.fromJson(
-              Map<String, dynamic>.from(item as Map),
-            ),
+            (item) =>
+                ExerciseLog.fromJson(Map<String, dynamic>.from(item as Map)),
           )
           .toList();
     }
