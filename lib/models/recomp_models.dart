@@ -176,6 +176,51 @@ class Exercise {
     this.note,
     this.isStar = false,
   });
+
+  Exercise copyWith({
+    String? name,
+    List<String>? muscles,
+    String? muscleTarget,
+    int? sets,
+    String? reps,
+    String? rest,
+    String? note,
+    bool? isStar,
+  }) =>
+      Exercise(
+        name: name ?? this.name,
+        muscles: muscles ?? this.muscles,
+        muscleTarget: muscleTarget ?? this.muscleTarget,
+        sets: sets ?? this.sets,
+        reps: reps ?? this.reps,
+        rest: rest ?? this.rest,
+        note: note ?? this.note,
+        isStar: isStar ?? this.isStar,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'muscles': muscles,
+        'muscleTarget': muscleTarget,
+        'sets': sets,
+        'reps': reps,
+        'rest': rest,
+        'note': note,
+        'isStar': isStar,
+      };
+
+  factory Exercise.fromJson(Map<String, dynamic> json) => Exercise(
+        name: json['name'] as String? ?? '未命名动作',
+        muscles: (json['muscles'] as List? ?? const [])
+            .map((value) => value.toString())
+            .toList(),
+        muscleTarget: json['muscleTarget'] as String? ?? '',
+        sets: (json['sets'] as num?)?.toInt() ?? 3,
+        reps: json['reps'] as String? ?? '12',
+        rest: json['rest'] as String? ?? '60s',
+        note: json['note'] as String?,
+        isStar: json['isStar'] as bool? ?? false,
+      );
 }
 
 class WorkoutDay {
@@ -202,4 +247,48 @@ class WorkoutDay {
     this.recoveryOptions,
     this.circuitNote,
   });
+
+  WorkoutDay copyWith({List<Exercise>? exercises}) => WorkoutDay(
+        dayName: dayName,
+        subtitle: subtitle,
+        badge: badge,
+        description: description,
+        isRest: isRest,
+        isOptional: isOptional,
+        optionalDesc: optionalDesc,
+        exercises: exercises ?? this.exercises,
+        recoveryOptions: recoveryOptions,
+        circuitNote: circuitNote,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'dayName': dayName,
+        'subtitle': subtitle,
+        'badge': badge,
+        'description': description,
+        'isRest': isRest,
+        'isOptional': isOptional,
+        'optionalDesc': optionalDesc,
+        'exercises': exercises.map((exercise) => exercise.toJson()).toList(),
+        'recoveryOptions': recoveryOptions,
+        'circuitNote': circuitNote,
+      };
+
+  factory WorkoutDay.fromJson(Map<String, dynamic> json) => WorkoutDay(
+        dayName: json['dayName'] as String? ?? '',
+        subtitle: json['subtitle'] as String? ?? '',
+        badge: json['badge'] as String? ?? '',
+        description: json['description'] as String? ?? '',
+        isRest: json['isRest'] as bool? ?? false,
+        isOptional: json['isOptional'] as bool? ?? false,
+        optionalDesc: json['optionalDesc'] as String?,
+        exercises: (json['exercises'] as List? ?? const [])
+            .whereType<Map>()
+            .map((value) => Exercise.fromJson(Map<String, dynamic>.from(value)))
+            .toList(),
+        recoveryOptions: (json['recoveryOptions'] as List?)
+            ?.map((value) => value.toString())
+            .toList(),
+        circuitNote: json['circuitNote'] as String?,
+      );
 }

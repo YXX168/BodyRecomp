@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'models/recomp_models.dart';
 import 'services/data_service.dart';
 import 'services/history_service.dart';
+import 'services/workout_plan_service.dart';
 import 'widgets/horizontal_day_swipe.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -518,6 +519,8 @@ const workoutDays = [
     ],
   ),
 ];
+
+final workoutPlanRevision = ValueNotifier<int>(0);
 
 const nutritionTips = [
   '热量缺口 300-500 大卡，减脂靠饮食缺口，少吃半碗饭 > 跑 20 分钟',
@@ -1514,11 +1517,12 @@ class WorkoutPage extends StatefulWidget {
 class _WorkoutPageState extends State<WorkoutPage> {
   int _day = 0;
   Map<String, dynamic> _done = {};
-  List<ExerciseLog> _exerciseLogs = [];
+  List<WorkoutDay> _plan = List<WorkoutDay>.from(workoutDays);
 
   @override
   void initState() {
     super.initState();
+    workoutPlanRevision.addListener(_reloadPlan);
     final d = DateTime.now().weekday;
     if (d >= 1 && d <= 7) _day = d - 1;
     SharedPreferences.getInstance().then((p) async {
@@ -1556,9 +1560,18 @@ class _WorkoutPageState extends State<WorkoutPage> {
       }
       if (mounted) setState(() {});
     });
-    loadExerciseLogs().then((logs) {
-      if (mounted) setState(() => _exerciseLogs = logs);
-    });
+    _reloadPlan();
+  }
+
+  Future<void> _reloadPlan() async {
+    final plan = await loadWorkoutPlan(workoutDays);
+    if (mounted) setState(() => _plan = plan);
+  }
+
+  @override
+  void dispose() {
+    workoutPlanRevision.removeListener(_reloadPlan);
+    super.dispose();
   }
 
   void _selectDay(int day) {
@@ -1592,7 +1605,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
 
   int _cnt(int d) {
     int c = 0;
-    for (int i = 0; i < workoutDays[d].exercises.length; i++) {
+    for (int i = 0; i < _plan[d].exercises.length; i++) {
       if (_done.containsKey('${d}_$i')) c++;
     }
     return c;
@@ -1601,7 +1614,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
   @override
   Widget build(BuildContext context) {
     final t = ThemeInherited.of(context).theme;
-    final wd = workoutDays[_day];
+    final wd = _plan[_day];
     return Column(
       children: [
         Padding(
@@ -2012,9 +2025,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
     WorkoutTheme t,
     VoidCallback tap,
   ) {
-    final history = exerciseHistory(_exerciseLogs, ex.name);
-    final recent = history.isEmpty ? null : history.first;
-    final pr = exercisePersonalRecord(_exerciseLogs, ex.name);
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: PressScale(
@@ -2159,28 +2169,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
                           visible: !done,
                           color: t.text3,
                         ),
-                      if (recent != null) ...[
-                        const SizedBox(height: 7),
-                        Text(
-                          '最近 ${recent.weightKg.toStringAsFixed(1)}kg · ${recent.sets}×${recent.reps} · RPE ${recent.rpe.toStringAsFixed(1)}',
-                          style: TextStyle(
-                            fontFamily: 'NotoSansSC',
-                            fontSize: 9.5,
-                            color: t.text3,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                      if (pr != null && pr.estimated1RM > 0)
-                        Text(
-                          'Epley 1RM ${recent?.estimated1RM.toStringAsFixed(1)}kg · PR ${pr.estimated1RM.toStringAsFixed(1)}kg',
-                          style: TextStyle(
-                            fontFamily: 'NotoSansSC',
-                            fontSize: 9.5,
-                            color: t.primary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
                     ],
                   ),
                 ),
@@ -2215,40 +2203,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
                         color: t.text4,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    PressScale(
-                      onTap: () => _recordExercise(ex),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: t.primary.withOpacity(0.09),
-                          borderRadius: BorderRadius.circular(9),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.edit_note_rounded,
-                              size: 13,
-                              color: t.primary,
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              '记录',
-                              style: TextStyle(
-                                fontFamily: 'NotoSansSC',
-                                fontSize: 9,
-                                color: t.primary,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ],
@@ -2257,132 +2211,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
         ),
       ),
     );
-  }
-
-  Future<void> _recordExercise(Exercise exercise) async {
-    final previous = exerciseHistory(_exerciseLogs, exercise.name);
-    final latest = previous.isEmpty ? null : previous.first;
-    final weightCtrl = TextEditingController(
-      text: latest == null || latest.weightKg == 0
-          ? ''
-          : latest.weightKg.toString(),
-    );
-    final setsCtrl = TextEditingController(
-      text: '${latest?.sets ?? exercise.sets}',
-    );
-    final repsCtrl = TextEditingController(
-      text: '${latest?.reps ?? _suggestedReps(exercise.reps)}',
-    );
-    final rpeCtrl = TextEditingController(text: latest?.rpe.toString() ?? '8');
-    final result = await showDialog<ExerciseLog>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('记录 ${exercise.name}'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _numberField(weightCtrl, '重量 (kg)', decimal: true),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(child: _numberField(setsCtrl, '组数')),
-                  const SizedBox(width: 10),
-                  Expanded(child: _numberField(repsCtrl, '次数')),
-                ],
-              ),
-              const SizedBox(height: 10),
-              _numberField(rpeCtrl, 'RPE (1-10)', decimal: true),
-              if (latest != null) ...[
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    '上次：${latest.weightKg.toStringAsFixed(1)}kg · ${latest.sets}×${latest.reps} · RPE ${latest.rpe.toStringAsFixed(1)}',
-                    style: Theme.of(ctx).textTheme.bodySmall,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final weight = double.tryParse(weightCtrl.text);
-              final sets = int.tryParse(setsCtrl.text);
-              final reps = int.tryParse(repsCtrl.text);
-              final rpe = double.tryParse(rpeCtrl.text);
-              if (weight == null ||
-                  weight < 0 ||
-                  sets == null ||
-                  sets <= 0 ||
-                  reps == null ||
-                  reps <= 0 ||
-                  rpe == null ||
-                  rpe < 1 ||
-                  rpe > 10) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('请检查重量、组数、次数和 RPE')),
-                );
-                return;
-              }
-              Navigator.pop(
-                ctx,
-                ExerciseLog(
-                  exerciseName: exercise.name,
-                  weightKg: weight,
-                  sets: sets,
-                  reps: reps,
-                  rpe: rpe,
-                ),
-              );
-            },
-            child: const Text('保存'),
-          ),
-        ],
-      ),
-    );
-    if (result == null) return;
-    final logs = await saveExerciseLog(exercise.name, result);
-    if (!mounted) return;
-    setState(() => _exerciseLogs = logs);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '已记录，Epley 1RM ${result.estimated1RM.toStringAsFixed(1)}kg',
-        ),
-      ),
-    );
-  }
-
-  Widget _numberField(
-    TextEditingController controller,
-    String label, {
-    bool decimal = false,
-  }) {
-    return TextField(
-      controller: controller,
-      keyboardType: TextInputType.numberWithOptions(decimal: decimal),
-      inputFormatters: [
-        FilteringTextInputFormatter.allow(
-          RegExp(decimal ? r'[0-9.]' : r'[0-9]'),
-        ),
-      ],
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-      ),
-    );
-  }
-
-  int _suggestedReps(String reps) {
-    final match = RegExp(r'\d+').firstMatch(reps);
-    return int.tryParse(match?.group(0) ?? '') ?? 10;
   }
 }
 
@@ -3753,6 +3581,219 @@ class ThemePage extends StatelessWidget {
   }
 }
 
+class WorkoutPlanEditorPage extends StatefulWidget {
+  const WorkoutPlanEditorPage({super.key});
+
+  @override
+  State<WorkoutPlanEditorPage> createState() => _WorkoutPlanEditorPageState();
+}
+
+class _WorkoutPlanEditorPageState extends State<WorkoutPlanEditorPage> {
+  List<WorkoutDay>? _plan;
+
+  @override
+  void initState() {
+    super.initState();
+    loadWorkoutPlan(workoutDays).then((plan) {
+      if (mounted) setState(() => _plan = plan);
+    });
+  }
+
+  Future<void> _editExercise(int dayIndex, int exerciseIndex) async {
+    final current = _plan![dayIndex].exercises[exerciseIndex];
+    final name = TextEditingController(text: current.name);
+    final sets = TextEditingController(text: '${current.sets}');
+    final reps = TextEditingController(text: current.reps);
+    final rest = TextEditingController(text: current.rest);
+    final note = TextEditingController(text: current.note ?? '');
+    final result = await showDialog<Exercise>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('修改 ${current.name}'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: name,
+                decoration: const InputDecoration(labelText: '动作名称'),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: sets,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: '组数'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: reps,
+                      decoration: const InputDecoration(labelText: '次数'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: rest,
+                decoration: const InputDecoration(labelText: '休息时间'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: note,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: '动作说明'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final count = int.tryParse(sets.text);
+              if (name.text.trim().isEmpty || count == null || count < 1) {
+                return;
+              }
+              Navigator.pop(
+                ctx,
+                current.copyWith(
+                  name: name.text.trim(),
+                  sets: count,
+                  reps: reps.text.trim(),
+                  rest: rest.text.trim(),
+                  note: note.text.trim(),
+                ),
+              );
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (result == null) return;
+    final nextExercises = List<Exercise>.from(_plan![dayIndex].exercises);
+    nextExercises[exerciseIndex] = result;
+    final next = List<WorkoutDay>.from(_plan!);
+    next[dayIndex] = next[dayIndex].copyWith(exercises: nextExercises);
+    await saveWorkoutPlan(next);
+    workoutPlanRevision.value++;
+    if (mounted) setState(() => _plan = next);
+  }
+
+  Future<void> _reset() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('恢复默认训练计划？'),
+        content: const Text('将恢复当前内置的周一至周日健身安排。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('恢复默认'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await resetWorkoutPlan();
+    workoutPlanRevision.value++;
+    if (mounted) setState(() => _plan = List<WorkoutDay>.from(workoutDays));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = ThemeInherited.of(context).theme;
+    final plan = _plan;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('训练计划'),
+        actions: [
+          TextButton(onPressed: _reset, child: const Text('恢复默认')),
+        ],
+      ),
+      body: plan == null
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+              itemCount: plan.length,
+              itemBuilder: (context, dayIndex) {
+                final day = plan[dayIndex];
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: ExpansionTile(
+                    initiallyExpanded: dayIndex == DateTime.now().weekday - 1,
+                    title: Text(
+                      '${day.dayName} · ${day.subtitle}',
+                      style: TextStyle(
+                        fontFamily: 'NotoSansSC',
+                        fontWeight: FontWeight.w700,
+                        color: t.text1,
+                      ),
+                    ),
+                    subtitle: Text(
+                      day.isRest ? '休息日' : '${day.exercises.length} 个动作',
+                      style: TextStyle(
+                        fontFamily: 'NotoSansSC',
+                        color: t.text3,
+                      ),
+                    ),
+                    children: [
+                      if (day.exercises.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          child: Text(
+                            day.recoveryOptions == null ? '无训练动作' : '恢复日项目保持默认',
+                            style: TextStyle(
+                              fontFamily: 'NotoSansSC',
+                              color: t.text3,
+                            ),
+                          ),
+                        )
+                      else
+                        for (var i = 0; i < day.exercises.length; i++)
+                          ListTile(
+                            key: ValueKey('plan_${dayIndex}_$i'),
+                            leading: CircleAvatar(
+                              radius: 15,
+                              backgroundColor: t.primary.withOpacity(0.1),
+                              child: Text(
+                                '${i + 1}',
+                                style: TextStyle(
+                                  fontFamily: 'NotoSansSC',
+                                  color: t.primary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            title: Text(day.exercises[i].name),
+                            subtitle: Text(
+                              '${day.exercises[i].sets}组 × ${day.exercises[i].reps} · 休息 ${day.exercises[i].rest}',
+                            ),
+                            trailing: const Icon(Icons.edit_rounded, size: 19),
+                            onTap: () => _editExercise(dayIndex, i),
+                          ),
+                    ],
+                  ),
+                );
+              },
+            ),
+    );
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TREND CHART WIDGET — lightweight CustomPainter line chart
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -3912,6 +3953,69 @@ class _SettingsPageState extends State<SettingsPage> {
     widget.onProfileChanged();
   }
 
+  Widget _workoutPlanCard(WorkoutTheme t) {
+    return Container(
+      decoration: BoxDecoration(
+        color: t.card,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: PressScale(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const WorkoutPlanEditorPage(),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: t.primary.withOpacity(0.09),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(
+                  Icons.fitness_center_rounded,
+                  color: t.primary,
+                  size: 21,
+                ),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '训练计划',
+                      style: TextStyle(
+                        fontFamily: 'NotoSansSC',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: t.text1,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '修改动作、组数、次数和休息时间',
+                      style: TextStyle(
+                        fontFamily: 'NotoSansSC',
+                        fontSize: 11,
+                        color: t.text3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: t.text4),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = ThemeInherited.of(context).theme;
@@ -3940,15 +4044,18 @@ class _SettingsPageState extends State<SettingsPage> {
               // ── 身体数据趋势 ──
               FadeScaleEntry(index: 1, child: _bodyTrendCard(t)),
               const SizedBox(height: 12),
+              // ── 训练计划 ──
+              FadeScaleEntry(index: 2, child: _workoutPlanCard(t)),
+              const SizedBox(height: 12),
               // ── 数据管理 ──
-              FadeScaleEntry(index: 2, child: _dataCard(t)),
+              FadeScaleEntry(index: 3, child: _dataCard(t)),
               const SizedBox(height: 12),
               // ── 主题设置 ──
-              FadeScaleEntry(index: 3, child: _themeCard(t)),
+              FadeScaleEntry(index: 4, child: _themeCard(t)),
               const SizedBox(height: 12),
               // ── 关于 ──
               FadeScaleEntry(
-                index: 4,
+                index: 5,
                 child: Container(
                   decoration: BoxDecoration(
                     color: t.card,
@@ -3970,7 +4077,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'Body Recomp v6.7.0',
+                          'Body Recomp v6.8.0',
                           style: TextStyle(
                             fontFamily: 'NotoSansSC',
                             fontSize: 13,
