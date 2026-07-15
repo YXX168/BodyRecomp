@@ -1,34 +1,47 @@
-# BodyRecomp - 智能训练规划应用
+# BodyRecomp
 
-一款简洁美观的 Flutter 健身训练规划应用，支持：
+一个基于 Flutter 的本地健身训练追踪应用。
 
-- 📅 周训练计划（上肢/下肢循环）
-- ✅ 训练进度追踪
-- 🎨 6 种主题配色（蓝/绿/粉/紫/橙/黑）
-- 🍽️ 营养建议
-- 📈 进阶计划指导
-- 📊 月度训练记录热力图与年度统计
-- 💾 本地数据持久化
+## 功能
+
+- 🏋️ 每周训练计划与动作完成记录
+- 📊 月度训练热力图和年度统计
+- 👤 个人资料与 BMI 信息
+- ⚖️ 体重历史与趋势
+- 🎨 多套主题
+- 💾 JSON 数据导入导出
+- 🔒 SharedPreferences 本地持久化
+
+## v6.7.0 新功能
+
+v6.7.0 在 v6.6.1 基础上新增：
+
+- 动作训练日志的数据模型与本地存储，包括重量、组数、次数、RPE 和 Epley 1RM 估算。
+- 体重和身体围度记录的按日更新、查询与删除。
+- JSON 备份 schema v2 的校验、v6.6 备份迁移、导入前备份以及合并/覆盖导入。
+- 训练页周一至周日横向滑动切换的基础交互。
+- models、services、历史归档与横向滑动的单元/Widget 测试。
 
 ## 下载
 
-从 [Releases](https://github.com/YXX168/BodyRecomp/releases) 页面下载最新 APK。
+- GitHub Releases: https://github.com/YXX168/BodyRecomp/releases
 
-## 构建
+## 本地验证
 
 ```bash
 flutter pub get
+flutter analyze --no-fatal-infos
+flutter test
 flutter build apk --release
 ```
 
 ## 当前版本
 
-- v6.6.1+71
-- v6.6.1 包含设置页、体重趋势、JSON 导入导出、1RM 估算，并修复主题设置与体重图表细节。
+- `v6.7.0+72`
 
 ## 技术栈
 
-- Flutter 3.29.0
+- Flutter
 - Google Fonts
 - SharedPreferences
 

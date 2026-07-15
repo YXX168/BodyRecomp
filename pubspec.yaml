@@ -1,7 +1,7 @@
 name: body_recomp
 description: Body Recomposition workout tracker with animations and glassmorphism UI.
 publish_to: 'none'
-version: 6.6.1+71
+version: 6.7.0+72
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -10,8 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   google_fonts: ^6.2.1
-  path_provider_android: 2.2.17
-  shared_preferences: 2.3.4
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:
