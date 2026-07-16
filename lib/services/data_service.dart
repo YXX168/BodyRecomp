@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/recomp_models.dart';
 
 const int currentSchemaVersion = 2;
-const String appDataVersion = '6.7.0';
+const String appDataVersion = '6.9.0';
 const String profileKey = 'recomp_profile_v6';
 const String weightHistoryKey = 'recomp_weight_history_v6';
 const String measurementHistoryKey = 'recomp_measurements_v6';

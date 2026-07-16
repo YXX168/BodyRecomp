@@ -8,8 +8,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'models/recomp_models.dart';
 import 'services/data_service.dart';
 import 'services/history_service.dart';
+import 'services/record_summary_service.dart';
+import 'services/rest_timer_service.dart';
 import 'services/workout_plan_service.dart';
 import 'widgets/horizontal_day_swipe.dart';
+
+const appVersion = '6.9.0';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // THEME SYSTEM — v6.6: profile + chart + settings support
@@ -893,6 +897,7 @@ class _ThemeStateState extends State<ThemeState> {
   Future<void> setTheme(AppTheme m) async {
     final p = await SharedPreferences.getInstance();
     await p.setInt('recomp_theme_v6', m.index);
+    if (!mounted) return;
     HapticFeedback.selectionClick();
     setState(() => _mode = m);
   }
@@ -991,7 +996,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    loadProfile().then((p) => setState(() => _profile = p));
+    loadProfile().then((p) {
+      if (mounted) setState(() => _profile = p);
+    });
   }
 
   @override
@@ -1014,8 +1021,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       ProgressionPage(),
       RecordPage(),
       SettingsPage(
-        onProfileChanged: () =>
-            loadProfile().then((pp) => setState(() => _profile = pp)),
+        onProfileChanged: () => loadProfile().then((profile) {
+          if (mounted) setState(() => _profile = profile);
+        }),
       ),
     ];
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -1512,6 +1520,12 @@ class _WorkoutPageState extends State<WorkoutPage> {
   int _day = 0;
   Map<String, dynamic> _done = {};
   List<WorkoutDay> _plan = List<WorkoutDay>.from(workoutDays);
+  Timer? _restTimer;
+  int _restTotal = 0;
+  int _restRemaining = 0;
+  String _restExercise = '';
+  bool _autoRestTimer = true;
+  Future<void> _saveQueue = Future<void>.value();
 
   @override
   void initState() {
@@ -1555,6 +1569,9 @@ class _WorkoutPageState extends State<WorkoutPage> {
       if (mounted) setState(() {});
     });
     _reloadPlan();
+    loadAutoRestTimer().then((enabled) {
+      if (mounted) setState(() => _autoRestTimer = enabled);
+    });
   }
 
   Future<void> _reloadPlan() async {
@@ -1565,6 +1582,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
   @override
   void dispose() {
     workoutPlanRevision.removeListener(_reloadPlan);
+    _restTimer?.cancel();
     super.dispose();
   }
 
@@ -1577,8 +1595,9 @@ class _WorkoutPageState extends State<WorkoutPage> {
 
   Future<void> _toggle(int di, int ei) async {
     final k = '${di}_$ei';
+    final completing = !_done.containsKey(k);
     setState(() {
-      if (_done.containsKey(k)) {
+      if (!completing) {
         _done.remove(k);
         HapticFeedback.lightImpact();
       } else {
@@ -1586,15 +1605,79 @@ class _WorkoutPageState extends State<WorkoutPage> {
         HapticFeedback.mediumImpact();
       }
     });
+    if (completing && _autoRestTimer) {
+      _startRestTimer(_plan[di].exercises[ei]);
+    }
+    final snapshot = Map<String, dynamic>.from(_done);
+    final previous = _saveQueue;
+    _saveQueue = () async {
+      try {
+        await previous;
+      } catch (_) {
+        // A later snapshot should still be persisted after a transient error.
+      }
+      await _persistDone(snapshot);
+    }();
+    await _saveQueue;
+  }
+
+  Future<void> _persistDone(Map<String, dynamic> done) async {
     final p = await SharedPreferences.getInstance();
-    await p.setString('recomp_done_v6', jsonEncode(_done));
+    await p.setString('recomp_done_v6', jsonEncode(done));
     // 同步写入本周真实日期历史；取消勾选时也会移除当天记录。
     final now = DateTime.now();
     final currentWeek = isoWeekNumber(now);
     final currentYear = isoWeekYear(now);
     await p.setInt('recomp_done_v6_week', currentWeek);
     await p.setInt('recomp_done_v6_year', currentYear);
-    await saveWeekDoneToHistory(p, _done, currentYear, currentWeek);
+    await saveWeekDoneToHistory(p, done, currentYear, currentWeek);
+  }
+
+  void _startRestTimer(Exercise exercise) {
+    final seconds = parseRestSeconds(exercise.rest);
+    if (seconds == null) return;
+    _restTimer?.cancel();
+    setState(() {
+      _restTotal = seconds;
+      _restRemaining = seconds;
+      _restExercise = exercise.name;
+    });
+    _runRestTicker();
+  }
+
+  void _runRestTicker() {
+    _restTimer?.cancel();
+    _restTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (_restRemaining <= 1) {
+        _restTimer?.cancel();
+        setState(() => _restRemaining = 0);
+        HapticFeedback.heavyImpact();
+        SystemSound.play(SystemSoundType.click);
+      } else {
+        setState(() => _restRemaining--);
+      }
+    });
+  }
+
+  void _addRestTime() {
+    if (_restTotal == 0) return;
+    setState(() {
+      _restRemaining += 30;
+      if (_restRemaining > _restTotal) _restTotal = _restRemaining;
+    });
+    if (_restTimer?.isActive != true) {
+      _runRestTicker();
+    }
+  }
+
+  void _dismissRestTimer() {
+    _restTimer?.cancel();
+    setState(() {
+      _restTotal = 0;
+      _restRemaining = 0;
+      _restExercise = '';
+    });
   }
 
   int _cnt(int d) {
@@ -1836,6 +1919,26 @@ class _WorkoutPageState extends State<WorkoutPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           FadeScaleEntry(child: _dayHdr(day, t), index: 0),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 280),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: SizeTransition(
+                sizeFactor: animation,
+                axisAlignment: -1,
+                child: child,
+              ),
+            ),
+            child: _restTotal > 0
+                ? Padding(
+                    key: const ValueKey('rest-timer-visible'),
+                    padding: const EdgeInsets.only(top: 10),
+                    child: _restTimerPanel(t),
+                  )
+                : const SizedBox.shrink(key: ValueKey('rest-timer-hidden')),
+          ),
           const SizedBox(height: 12),
           FadeScaleEntry(
             index: 1,
@@ -1903,6 +2006,25 @@ class _WorkoutPageState extends State<WorkoutPage> {
               ],
             ),
           ),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 320),
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.97, end: 1).animate(
+                  CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+                ),
+                child: child,
+              ),
+            ),
+            child: total > 0 && done == total
+                ? Padding(
+                    key: ValueKey('workout-complete-$_day'),
+                    padding: const EdgeInsets.only(top: 12),
+                    child: _workoutCompletePanel(day, t),
+                  )
+                : const SizedBox.shrink(key: ValueKey('workout-incomplete')),
+          ),
           const SizedBox(height: 14),
           ...day.exercises.asMap().entries.map(
                 (e) => FadeScaleEntry(
@@ -1916,6 +2038,9 @@ class _WorkoutPageState extends State<WorkoutPage> {
                       _done.containsKey('${_day}_${e.key}'),
                       t,
                       () => _toggle(_day, e.key),
+                      parseRestSeconds(e.value.rest) == null
+                          ? null
+                          : () => _startRestTimer(e.value),
                     ),
                   ),
                 ),
@@ -1943,6 +2068,165 @@ class _WorkoutPageState extends State<WorkoutPage> {
               ),
             ),
           const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _restTimerPanel(WorkoutTheme t) {
+    final finished = _restRemaining == 0;
+    final progress = _restTotal == 0 ? 0.0 : _restRemaining / _restTotal;
+    final minutes = _restRemaining ~/ 60;
+    final seconds = (_restRemaining % 60).toString().padLeft(2, '0');
+    return Container(
+      key: const Key('rest-timer-panel'),
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            t.primary.withOpacity(t.isDark ? 0.16 : 0.10),
+            t.accent.withOpacity(t.isDark ? 0.09 : 0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: t.primary.withOpacity(0.22)),
+        boxShadow: [
+          BoxShadow(
+            color: t.primary.withOpacity(t.isDark ? 0.13 : 0.07),
+            blurRadius: 18,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 52,
+            height: 52,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: progress),
+                  duration: const Duration(milliseconds: 420),
+                  curve: Curves.easeOutCubic,
+                  builder: (_, value, __) => CircularProgressIndicator(
+                    value: value,
+                    strokeWidth: 4,
+                    backgroundColor: t.border.withOpacity(0.72),
+                    valueColor: AlwaysStoppedAnimation(
+                      finished ? t.success : t.primary,
+                    ),
+                  ),
+                ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  child: finished
+                      ? Icon(
+                          Icons.check_rounded,
+                          key: const ValueKey('rest-complete'),
+                          color: t.success,
+                          size: 25,
+                        )
+                      : Text(
+                          '$minutes:$seconds',
+                          key: ValueKey(_restRemaining),
+                          style: TextStyle(
+                            color: t.text1,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  finished ? '休息完成，可以继续' : '组间休息',
+                  style: TextStyle(
+                    color: finished ? t.success : t.text1,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _restExercise,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: t.text3, fontSize: 10.5),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            key: const Key('rest-timer-add'),
+            tooltip: '增加 30 秒',
+            onPressed: _addRestTime,
+            icon: Icon(Icons.add_alarm_rounded, color: t.primary, size: 20),
+          ),
+          IconButton(
+            key: const Key('rest-timer-dismiss'),
+            tooltip: '结束计时',
+            onPressed: _dismissRestTimer,
+            icon: Icon(Icons.close_rounded, color: t.text3, size: 19),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _workoutCompletePanel(WorkoutDay day, WorkoutTheme t) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            t.success.withOpacity(t.isDark ? 0.14 : 0.09),
+            t.primary.withOpacity(t.isDark ? 0.08 : 0.04),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: t.success.withOpacity(0.24)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: t.success.withOpacity(0.13),
+            ),
+            child: Icon(Icons.emoji_events_rounded, color: t.success, size: 20),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${day.dayName}训练已完成',
+                  style: TextStyle(
+                    color: t.text1,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '漂亮收尾，记得补水、拉伸并保证恢复。',
+                  style: TextStyle(color: t.text3, fontSize: 10.5),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -2031,6 +2315,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
     bool done,
     WorkoutTheme t,
     VoidCallback tap,
+    VoidCallback? startTimer,
   ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -2234,14 +2519,46 @@ class _WorkoutPageState extends State<WorkoutPage> {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      ex.rest,
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w500,
-                        color: done ? t.text4.withOpacity(0.72) : t.text4,
+                    if (startTimer == null)
+                      Text(
+                        ex.rest,
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w500,
+                          color: done ? t.text4.withOpacity(0.72) : t.text4,
+                        ),
+                      )
+                    else
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: startTimer,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 2, bottom: 2),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.timer_outlined,
+                                size: 10,
+                                color: done
+                                    ? t.text4.withOpacity(0.72)
+                                    : t.primary,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                ex.rest,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                  color: done
+                                      ? t.text4.withOpacity(0.72)
+                                      : t.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ],
@@ -2270,6 +2587,7 @@ class _RecordPageState extends State<RecordPage> {
   bool _loading = true;
   int _yearTotal = 0;
   int _yearTrainDays = 0;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
@@ -2278,49 +2596,16 @@ class _RecordPageState extends State<RecordPage> {
   }
 
   Future<void> _loadData() async {
+    final generation = ++_loadGeneration;
+    final year = _viewYear;
+    final month = _viewMonth;
     final p = await SharedPreferences.getInstance();
-    final data = await loadMonthHistory(p, _viewYear, _viewMonth);
-
-    // 计算年度统计
-    int yearTotal = 0;
-    int yearTrainDays = 0;
-    for (int m = 1; m <= 12; m++) {
-      final mData = await loadMonthHistory(p, _viewYear, m);
-      yearTotal += mData.values.fold(0, (s, v) => s + v);
-      yearTrainDays += mData.length;
-    }
-
-    // 叠加本周当前完成数（可能还没归档）
-    final now = DateTime.now();
-    final curDone = p.getString('recomp_done_v6');
-    if (curDone != null) {
-      try {
-        final done = jsonDecode(curDone) as Map<String, dynamic>;
-        if (now.year == _viewYear && now.month == _viewMonth) {
-          final currentWeek =
-              p.getInt('recomp_done_v6_week') ?? isoWeekNumber(now);
-          final currentYear =
-              p.getInt('recomp_done_v6_year') ?? isoWeekYear(now);
-          final dateCounts = countByActualDate(done, currentYear, currentWeek);
-          for (final entry in dateCounts.entries) {
-            if (entry.key.year == _viewYear &&
-                entry.key.month == _viewMonth &&
-                entry.value > 0) {
-              data[entry.key.day] = entry.value;
-            }
-          }
-        }
-        if (now.year == _viewYear) {
-          yearTotal += done.length;
-        }
-      } catch (_) {}
-    }
-
-    if (mounted) {
+    final summary = await loadRecordSummary(p, year, month);
+    if (mounted && generation == _loadGeneration) {
       setState(() {
-        _monthData = data;
-        _yearTotal = yearTotal;
-        _yearTrainDays = yearTrainDays;
+        _monthData = summary.monthData;
+        _yearTotal = summary.yearTotal;
+        _yearTrainDays = summary.yearTrainDays;
         _loading = false;
       });
     }
@@ -3867,7 +4152,7 @@ class TrendChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant TrendChartPainter oldDelegate) =>
-      data != oldDelegate.data;
+      data != oldDelegate.data || theme != oldDelegate.theme;
 }
 
 class MiniTrendChart extends StatelessWidget {
@@ -3901,6 +4186,7 @@ class _SettingsPageState extends State<SettingsPage> {
   List<WeightEntry> _weightHistory = [];
   List<BodyMeasurement> _measurements = [];
   String _trendTab = 'weight'; // weight or measurements
+  bool _autoRestTimer = true;
 
   @override
   void initState() {
@@ -3912,11 +4198,13 @@ class _SettingsPageState extends State<SettingsPage> {
     final profile = await loadProfile();
     final weights = await loadWeightHistory();
     final measurements = await loadMeasurements();
+    final autoRestTimer = await loadAutoRestTimer();
     if (mounted)
       setState(() {
         _profile = profile;
         _weightHistory = weights;
         _measurements = measurements;
+        _autoRestTimer = autoRestTimer;
       });
   }
 
@@ -3924,6 +4212,45 @@ class _SettingsPageState extends State<SettingsPage> {
     await saveProfile(p);
     if (mounted) setState(() => _profile = p);
     widget.onProfileChanged();
+  }
+
+  Widget _trainingPreferencesCard(WorkoutTheme t) {
+    return Container(
+      decoration: BoxDecoration(
+        color: t.card,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: SwitchListTile.adaptive(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        secondary: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: t.accent.withOpacity(0.09),
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: Icon(Icons.timer_rounded, color: t.accent, size: 21),
+        ),
+        title: Text(
+          '完成动作后自动计时',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: t.text1,
+          ),
+        ),
+        subtitle: Text(
+          '按训练计划中的休息时间启动，可随时加 30 秒或结束',
+          style: TextStyle(fontSize: 11, color: t.text3),
+        ),
+        value: _autoRestTimer,
+        activeThumbColor: t.primary,
+        onChanged: (value) async {
+          setState(() => _autoRestTimer = value);
+          await saveAutoRestTimer(value);
+        },
+      ),
+    );
   }
 
   Widget _workoutPlanCard(WorkoutTheme t) {
@@ -4015,15 +4342,18 @@ class _SettingsPageState extends State<SettingsPage> {
               // ── 训练计划 ──
               FadeScaleEntry(index: 2, child: _workoutPlanCard(t)),
               const SizedBox(height: 12),
+              // ── 训练偏好 ──
+              FadeScaleEntry(index: 3, child: _trainingPreferencesCard(t)),
+              const SizedBox(height: 12),
               // ── 数据管理 ──
-              FadeScaleEntry(index: 3, child: _dataCard(t)),
+              FadeScaleEntry(index: 4, child: _dataCard(t)),
               const SizedBox(height: 12),
               // ── 主题设置 ──
-              FadeScaleEntry(index: 4, child: _themeCard(t)),
+              FadeScaleEntry(index: 5, child: _themeCard(t)),
               const SizedBox(height: 12),
               // ── 关于 ──
               FadeScaleEntry(
-                index: 5,
+                index: 6,
                 child: Container(
                   decoration: BoxDecoration(
                     color: t.card,
@@ -4044,7 +4374,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'Body Recomp v6.8.0',
+                          'Body Recomp v$appVersion',
                           style: TextStyle(
                             fontSize: 13,
                             color: t.text2,
