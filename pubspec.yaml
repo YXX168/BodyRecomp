@@ -1,7 +1,7 @@
 name: body_recomp
 description: Body Recomposition workout tracker with animations and glassmorphism UI.
 publish_to: 'none'
-version: 6.8.0+74
+version: 6.8.1+75
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -19,6 +19,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   fonts:
-    - family: NotoSansSC
+    - family: Inter
       fonts:
-        - asset: assets/fonts/NotoSansSC-VariableFont_wght.ttf
+        - asset: assets/fonts/Inter-VariableFont_opsz,wght.ttf

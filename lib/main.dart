@@ -591,9 +591,9 @@ class _FadeScaleEntryState extends State<FadeScaleEntry>
 
   @override
   Widget build(BuildContext context) => FadeTransition(
-        opacity: _fade,
-        child: ScaleTransition(scale: _scale, child: widget.child),
-      );
+    opacity: _fade,
+    child: ScaleTransition(scale: _scale, child: widget.child),
+  );
 }
 
 class PressScale extends StatefulWidget {
@@ -706,7 +706,6 @@ class _AnimatedNoteState extends State<AnimatedNote>
               child: Text(
                 widget.note,
                 style: TextStyle(
-                  fontFamily: 'NotoSansSC',
                   fontSize: 10.5,
                   color: widget.color,
                   height: 1.5,
@@ -836,7 +835,6 @@ class GradientTitle extends StatelessWidget {
       child: Text(
         text,
         style: TextStyle(
-          fontFamily: 'NotoSansSC',
           fontSize: fontSize,
           fontWeight: FontWeight.w900,
           letterSpacing: -0.5,
@@ -898,11 +896,11 @@ class _ThemeStateState extends State<ThemeState> {
 
   @override
   Widget build(BuildContext context) => ThemeInherited(
-        current: _mode,
-        theme: themes[_mode]!,
-        setTheme: setTheme,
-        child: widget.child,
-      );
+    current: _mode,
+    theme: themes[_mode]!,
+    setTheme: setTheme,
+    child: widget.child,
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -959,12 +957,13 @@ class RecompApp extends StatelessWidget {
               ),
             ),
             useMaterial3: true,
-            fontFamily: 'NotoSansSC',
-            fontFamilyFallback: const ['Noto Sans CJK SC', 'sans-serif'],
-            textTheme: (dark
-                    ? ThemeData.dark().textTheme
-                    : ThemeData.light().textTheme)
-                .apply(fontFamily: 'NotoSansSC'),
+            fontFamily: 'Inter',
+            fontFamilyFallback: const ['sans-serif'],
+            textTheme:
+                (dark
+                        ? ThemeData.dark().textTheme
+                        : ThemeData.light().textTheme)
+                    .apply(fontFamily: 'Inter'),
           ),
           home: const MainPage(),
         );
@@ -1000,11 +999,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     final p = _profile;
     final bmi = p != null && p.heightCm > 0
         ? (p.weightKg / ((p.heightCm / 100) * (p.heightCm / 100)))
-            .toStringAsFixed(1)
+              .toStringAsFixed(1)
         : '--';
     final ageStr = (p != null && p.age > 0) ? '${p.age}岁' : '--';
-    final heightStr =
-        (p != null && p.heightCm > 0) ? '${p.heightCm.toInt()}cm' : '--';
+    final heightStr = (p != null && p.heightCm > 0)
+        ? '${p.heightCm.toInt()}cm'
+        : '--';
     final weightStr = (p != null && p.weightKg > 0) ? '${p.weightKg}kg' : '--';
     final statusText = '$ageStr · $heightStr · $weightStr · BMI $bmi';
     final pages = [
@@ -1045,7 +1045,6 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                           Text(
                             statusText,
                             style: TextStyle(
-                              fontFamily: 'NotoSansSC',
                               fontSize: 11,
                               color: t.text3,
                               fontWeight: FontWeight.w500,
@@ -1096,15 +1095,16 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                 transitionBuilder: (child, anim) => FadeTransition(
                   opacity: anim,
                   child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0.02, 0),
-                      end: Offset.zero,
-                    ).animate(
-                      CurvedAnimation(
-                        parent: anim,
-                        curve: Curves.easeOutCubic,
-                      ),
-                    ),
+                    position:
+                        Tween<Offset>(
+                          begin: const Offset(0.02, 0),
+                          end: Offset.zero,
+                        ).animate(
+                          CurvedAnimation(
+                            parent: anim,
+                            curve: Curves.easeOutCubic,
+                          ),
+                        ),
                     child: child,
                   ),
                 ),
@@ -1225,7 +1225,6 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 220),
                 style: TextStyle(
-                  fontFamily: 'NotoSansSC',
                   fontSize: 10,
                   fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
                   color: sel ? t.primary : t.text4,
@@ -1266,7 +1265,6 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                       Text(
                         '主题选择',
                         style: TextStyle(
-                          fontFamily: 'NotoSansSC',
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
                           color: t.text1,
@@ -1304,8 +1302,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                             },
                             child: Container(
                               decoration: BoxDecoration(
-                                color:
-                                    sel ? mt.primary.withOpacity(0.06) : null,
+                                color: sel
+                                    ? mt.primary.withOpacity(0.06)
+                                    : null,
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
                                   color: sel ? mt.primary : t.border,
@@ -1345,7 +1344,6 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                           Text(
                                             mt.name,
                                             style: TextStyle(
-                                              fontFamily: 'NotoSansSC',
                                               fontSize: 14,
                                               fontWeight: FontWeight.w700,
                                               color: sel ? mt.primary : t.text1,
@@ -1354,7 +1352,6 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                           Text(
                                             sel ? '当前使用中' : '点击切换',
                                             style: TextStyle(
-                                              fontFamily: 'NotoSansSC',
                                               fontSize: 10,
                                               color: sel
                                                   ? mt.primary.withOpacity(0.7)
@@ -1466,10 +1463,10 @@ class _DaySegmentedNav extends StatelessWidget {
                             AnimatedDefaultTextStyle(
                               duration: const Duration(milliseconds: 220),
                               style: TextStyle(
-                                fontFamily: 'NotoSansSC',
                                 fontSize: 11,
-                                fontWeight:
-                                    sel ? FontWeight.w900 : FontWeight.w700,
+                                fontWeight: sel
+                                    ? FontWeight.w900
+                                    : FontWeight.w700,
                                 color: sel ? Colors.white : t.text2,
                                 letterSpacing: -0.2,
                               ),
@@ -1479,10 +1476,10 @@ class _DaySegmentedNav extends StatelessWidget {
                             AnimatedDefaultTextStyle(
                               duration: const Duration(milliseconds: 220),
                               style: TextStyle(
-                                fontFamily: 'NotoSansSC',
                                 fontSize: 7.5,
-                                fontWeight:
-                                    sel ? FontWeight.w700 : FontWeight.w500,
+                                fontWeight: sel
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
                                 color: sel
                                     ? Colors.white.withOpacity(0.86)
                                     : t.text4,
@@ -1688,7 +1685,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
                       child: Text(
                         '休息日',
                         style: TextStyle(
-                          fontFamily: 'NotoSansSC',
                           fontSize: 24,
                           fontWeight: FontWeight.w900,
                           letterSpacing: -0.5,
@@ -1699,7 +1695,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
                     Text(
                       '肌肉在休息时生长',
                       style: TextStyle(
-                        fontFamily: 'NotoSansSC',
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                         color: t.text2,
@@ -1758,7 +1753,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
                       child: Text(
                         day.optionalDesc!,
                         style: TextStyle(
-                          fontFamily: 'NotoSansSC',
                           fontSize: 12,
                           color: t.text3,
                           height: 1.5,
@@ -1772,47 +1766,46 @@ class _WorkoutPageState extends State<WorkoutPage> {
             ),
             const SizedBox(height: 8),
             ...day.recoveryOptions!.asMap().entries.map(
-                  (e) => FadeScaleEntry(
-                    index: e.key + 2,
-                    child: Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: t.primary,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: t.primary.withOpacity(0.4),
-                                    blurRadius: 6,
-                                  ),
-                                ],
+              (e) => FadeScaleEntry(
+                index: e.key + 2,
+                child: Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: t.primary,
+                            boxShadow: [
+                              BoxShadow(
+                                color: t.primary.withOpacity(0.4),
+                                blurRadius: 6,
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              e.value,
-                              style: TextStyle(
-                                fontFamily: 'NotoSansSC',
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: t.text2,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        Text(
+                          e.value,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: t.text2,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
+              ),
+            ),
           ],
         ),
       );
@@ -1855,7 +1848,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
                         Text(
                           '训练进度',
                           style: TextStyle(
-                            fontFamily: 'NotoSansSC',
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                             color: t.text3,
@@ -1866,7 +1858,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
                     Text(
                       '$done/$total',
                       style: TextStyle(
-                        fontFamily: 'NotoSansSC',
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
                         color: t.success,
@@ -1897,17 +1888,16 @@ class _WorkoutPageState extends State<WorkoutPage> {
           ),
           const SizedBox(height: 14),
           ...day.exercises.asMap().entries.map(
-                (e) => FadeScaleEntry(
-                  index: e.key + 2,
-                  child: _exCard(
-                    e.value,
-                    e.key + 1,
-                    _done.containsKey('${_day}_${e.key}'),
-                    t,
-                    () => _toggle(_day, e.key),
-                  ),
-                ),
+            (e) => RepaintBoundary(
+              child: _exCard(
+                e.value,
+                e.key + 1,
+                _done.containsKey('${_day}_${e.key}'),
+                t,
+                () => _toggle(_day, e.key),
               ),
+            ),
+          ),
           if (day.circuitNote != null)
             FadeScaleEntry(
               index: day.exercises.length + 2,
@@ -1920,7 +1910,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
                     child: Text(
                       day.circuitNote!,
                       style: TextStyle(
-                        fontFamily: 'NotoSansSC',
                         fontSize: 11,
                         color: t.text3,
                         height: 1.6,
@@ -1949,7 +1938,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
                 Text(
                   '${d.dayName} ${d.subtitle}',
                   style: TextStyle(
-                    fontFamily: 'NotoSansSC',
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: t.text1,
@@ -1969,7 +1957,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
                   child: Text(
                     d.badge,
                     style: TextStyle(
-                      fontFamily: 'NotoSansSC',
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                       color: t.primary,
@@ -1982,8 +1969,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
               const SizedBox(height: 4),
               Text(
                 d.description,
-                style: TextStyle(
-                    fontFamily: 'NotoSansSC', fontSize: 12, color: t.text3),
+                style: TextStyle(fontSize: 12, color: t.text3),
               ),
             ],
           ],
@@ -2007,7 +1993,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
           Text(
             txt,
             style: TextStyle(
-              fontFamily: 'NotoSansSC',
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: t.text2,
@@ -2039,17 +2024,22 @@ class _WorkoutPageState extends State<WorkoutPage> {
             side: done
                 ? BorderSide(color: t.success.withOpacity(0.22), width: 1)
                 : (ex.isStar
-                    ? BorderSide(
-                        color: t.primary.withOpacity(0.26),
-                        width: 1.2,
-                      )
-                    : BorderSide(
-                        color: t.border.withOpacity(0.9),
-                        width: 0.8,
-                      )),
+                      ? BorderSide(
+                          color: t.primary.withOpacity(0.26),
+                          width: 1.2,
+                        )
+                      : BorderSide(
+                          color: t.border.withOpacity(0.9),
+                          width: 0.8,
+                        )),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
+          child: AnimatedPadding(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            padding: EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: done ? 11 : 14,
+            ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -2081,10 +2071,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
                       opacity: a,
                       child: ScaleTransition(
                         scale: Tween<double>(begin: 0.8, end: 1.0).animate(
-                          CurvedAnimation(
-                            parent: a,
-                            curve: Curves.easeOutBack,
-                          ),
+                          CurvedAnimation(parent: a, curve: Curves.easeOutBack),
                         ),
                         child: c,
                       ),
@@ -2100,7 +2087,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
                             child: Text(
                               '$num',
                               style: TextStyle(
-                                fontFamily: 'NotoSansSC',
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
                                 color: t.text4,
@@ -2118,7 +2104,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
                       Text(
                         ex.name,
                         style: TextStyle(
-                          fontFamily: 'NotoSansSC',
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: done ? t.text4 : t.text1,
@@ -2126,68 +2111,101 @@ class _WorkoutPageState extends State<WorkoutPage> {
                           decorationColor: t.text4,
                         ),
                       ),
-                      const SizedBox(height: 3),
-                      Wrap(
-                        spacing: 4,
-                        runSpacing: 2,
-                        children: [
-                          ...ex.muscles.map(
-                            (m) => Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 1,
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.topCenter,
+                        child: done
+                            ? const SizedBox.shrink()
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 3),
+                                  Wrap(
+                                    spacing: 4,
+                                    runSpacing: 2,
+                                    children: [
+                                      ...ex.muscles.map(
+                                        (m) => Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 1,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: t.primary.withOpacity(0.06),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            m,
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w600,
+                                              color: t.text3,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      if (ex.muscleTarget.isNotEmpty)
+                                        Text(
+                                          ex.muscleTarget,
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            color: t.text3,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  if (ex.note != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 6),
+                                      child: Text(
+                                        ex.note!,
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          color: t.text3,
+                                          height: 1.5,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
-                              decoration: BoxDecoration(
-                                color: t.primary.withOpacity(0.06),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                m,
-                                style: TextStyle(
-                                  fontFamily: 'NotoSansSC',
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w600,
-                                  color: t.text3,
-                                ),
-                              ),
-                            ),
-                          ),
-                          if (ex.muscleTarget.isNotEmpty)
-                            Text(
-                              ex.muscleTarget,
-                              style: TextStyle(
-                                fontFamily: 'NotoSansSC',
-                                fontSize: 9,
-                                color: t.text3,
-                              ),
-                            ),
-                        ],
                       ),
-                      if (ex.note != null)
-                        AnimatedNote(
-                          note: ex.note!,
-                          visible: !done,
-                          color: t.text3,
-                        ),
                     ],
                   ),
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      '${ex.sets}\u00D7',
-                      style: TextStyle(
-                        fontFamily: 'NotoSansSC',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: t.primary,
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: '${ex.sets}',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: done ? t.text4 : t.primary,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                          TextSpan(
+                            text: ' ×',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: done ? t.text4 : t.primary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     Text(
                       ex.reps,
                       style: TextStyle(
-                        fontFamily: 'NotoSansSC',
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                         color: t.text2,
@@ -2197,7 +2215,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
                     Text(
                       ex.rest,
                       style: TextStyle(
-                        fontFamily: 'NotoSansSC',
                         fontSize: 9,
                         fontWeight: FontWeight.w500,
                         color: t.text4,
@@ -2399,7 +2416,6 @@ class _RecordPageState extends State<RecordPage> {
                       Text(
                         '$_viewYear年 ${monthNames[_viewMonth - 1]}',
                         style: TextStyle(
-                          fontFamily: 'NotoSansSC',
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
                           color: t.text1,
@@ -2409,7 +2425,6 @@ class _RecordPageState extends State<RecordPage> {
                         Text(
                           '当前月',
                           style: TextStyle(
-                            fontFamily: 'NotoSansSC',
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
                             color: t.primary,
@@ -2482,7 +2497,6 @@ class _RecordPageState extends State<RecordPage> {
                                 child: Text(
                                   weekLabels[i],
                                   style: TextStyle(
-                                    fontFamily: 'NotoSansSC',
                                     fontSize: 10,
                                     fontWeight: FontWeight.w700,
                                     color: i >= 5 ? t.text4 : t.text3,
@@ -2506,11 +2520,7 @@ class _RecordPageState extends State<RecordPage> {
                         children: [
                           Text(
                             '少',
-                            style: TextStyle(
-                              fontFamily: 'NotoSansSC',
-                              fontSize: 9,
-                              color: t.text4,
-                            ),
+                            style: TextStyle(fontSize: 9, color: t.text4),
                           ),
                           const SizedBox(width: 4),
                           _legendDot(t, 0),
@@ -2525,11 +2535,7 @@ class _RecordPageState extends State<RecordPage> {
                           const SizedBox(width: 4),
                           Text(
                             '多',
-                            style: TextStyle(
-                              fontFamily: 'NotoSansSC',
-                              fontSize: 9,
-                              color: t.text4,
-                            ),
+                            style: TextStyle(fontSize: 9, color: t.text4),
                           ),
                         ],
                       ),
@@ -2552,7 +2558,6 @@ class _RecordPageState extends State<RecordPage> {
                   Text(
                     '$_viewYear 年度统计',
                     style: TextStyle(
-                      fontFamily: 'NotoSansSC',
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
                       color: t.text1,
@@ -2586,7 +2591,6 @@ class _RecordPageState extends State<RecordPage> {
                 Text(
                   '全年概览',
                   style: TextStyle(
-                    fontFamily: 'NotoSansSC',
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
                     color: t.text1,
@@ -2609,7 +2613,6 @@ class _RecordPageState extends State<RecordPage> {
         Text(
           label,
           style: TextStyle(
-            fontFamily: 'NotoSansSC',
             fontSize: 9,
             fontWeight: FontWeight.w700,
             color: t.text4,
@@ -2620,15 +2623,12 @@ class _RecordPageState extends State<RecordPage> {
         Text(
           value,
           style: TextStyle(
-            fontFamily: 'NotoSansSC',
             fontSize: 20,
             fontWeight: FontWeight.w800,
             color: t.primary,
           ),
         ),
-        Text(unit,
-            style: TextStyle(
-                fontFamily: 'NotoSansSC', fontSize: 9, color: t.text4)),
+        Text(unit, style: TextStyle(fontSize: 9, color: t.text4)),
       ],
     );
   }
@@ -2683,10 +2683,10 @@ class _RecordPageState extends State<RecordPage> {
                       child: Text(
                         '$day',
                         style: TextStyle(
-                          fontFamily: 'NotoSansSC',
                           fontSize: 10,
-                          fontWeight:
-                              isToday ? FontWeight.w800 : FontWeight.w600,
+                          fontWeight: isToday
+                              ? FontWeight.w800
+                              : FontWeight.w600,
                           color: count == 0
                               ? (isToday ? t.primary : t.text4)
                               : (intensity > 0.62 ? Colors.white : t.text1),
@@ -2798,7 +2798,6 @@ class _RecordPageState extends State<RecordPage> {
               Text(
                 '$label月',
                 style: TextStyle(
-                  fontFamily: 'NotoSansSC',
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                   color: isCurrent ? t.primary : t.text3,
@@ -2808,7 +2807,6 @@ class _RecordPageState extends State<RecordPage> {
                 Text(
                   '$total',
                   style: TextStyle(
-                    fontFamily: 'NotoSansSC',
                     fontSize: 9,
                     fontWeight: FontWeight.w700,
                     color: t.success,
@@ -2841,8 +2839,9 @@ class _RecordPageState extends State<RecordPage> {
           cells.add(SizedBox(width: 4, height: 4));
         } else {
           final rawCount = history[day.toString()];
-          final count =
-              rawCount is int ? rawCount : int.tryParse('$rawCount') ?? 0;
+          final count = rawCount is int
+              ? rawCount
+              : int.tryParse('$rawCount') ?? 0;
           final intensity = count > 0 ? (count / 8).clamp(0.0, 1.0) : 0.0;
           cells.add(
             Container(
@@ -2990,7 +2989,6 @@ class NutritionPage extends StatelessWidget {
                 child: Text(
                   '饮食建议',
                   style: TextStyle(
-                    fontFamily: 'NotoSansSC',
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: t.text1,
@@ -2999,45 +2997,43 @@ class NutritionPage extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               ...nutritionTips.asMap().entries.map(
-                    (e) => FadeScaleEntry(
-                      index: e.key + 5,
-                      child: Card(
-                        margin: const EdgeInsets.only(bottom: 6),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 12,
+                (e) => FadeScaleEntry(
+                  index: e.key + 5,
+                  child: Card(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 3,
+                            height: 14,
+                            margin: const EdgeInsets.only(right: 10, top: 2),
+                            decoration: BoxDecoration(
+                              color: t.primary,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
                           ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 3,
-                                height: 14,
-                                margin:
-                                    const EdgeInsets.only(right: 10, top: 2),
-                                decoration: BoxDecoration(
-                                  color: t.primary,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
+                          Expanded(
+                            child: Text(
+                              nutritionTips[e.key],
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: t.text2,
+                                height: 1.6,
                               ),
-                              Expanded(
-                                child: Text(
-                                  nutritionTips[e.key],
-                                  style: TextStyle(
-                                    fontFamily: 'NotoSansSC',
-                                    fontSize: 12,
-                                    color: t.text2,
-                                    height: 1.6,
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
                   ),
+                ),
+              ),
               const SizedBox(height: 8),
             ]),
           ),
@@ -3076,7 +3072,6 @@ class NutritionPage extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontFamily: 'NotoSansSC',
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                     color: t.text3,
@@ -3095,7 +3090,6 @@ class NutritionPage extends StatelessWidget {
                 Text(
                   value,
                   style: TextStyle(
-                    fontFamily: 'NotoSansSC',
                     fontSize: 19,
                     fontWeight: FontWeight.w900,
                     color: color,
@@ -3108,7 +3102,6 @@ class NutritionPage extends StatelessWidget {
                   child: Text(
                     unit,
                     style: TextStyle(
-                      fontFamily: 'NotoSansSC',
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                       color: t.text4,
@@ -3123,14 +3116,7 @@ class NutritionPage extends StatelessWidget {
     );
   }
 
-  Widget _mc(
-    String l,
-    String v,
-    String p,
-    String f,
-    Color c,
-    WorkoutTheme t,
-  ) =>
+  Widget _mc(String l, String v, String p, String f, Color c, WorkoutTheme t) =>
       Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -3151,7 +3137,6 @@ class NutritionPage extends StatelessWidget {
                   Text(
                     l,
                     style: TextStyle(
-                      fontFamily: 'NotoSansSC',
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                       color: t.text4,
@@ -3159,18 +3144,13 @@ class NutritionPage extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  Text(p,
-                      style: TextStyle(
-                          fontFamily: 'NotoSansSC',
-                          fontSize: 10,
-                          color: t.text3)),
+                  Text(p, style: TextStyle(fontSize: 10, color: t.text3)),
                 ],
               ),
               const SizedBox(height: 10),
               Text(
                 v,
                 style: TextStyle(
-                  fontFamily: 'NotoSansSC',
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
                   color: c,
@@ -3179,11 +3159,7 @@ class NutritionPage extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 f,
-                style: TextStyle(
-                    fontFamily: 'NotoSansSC',
-                    fontSize: 11,
-                    color: t.text3,
-                    height: 1.5),
+                style: TextStyle(fontSize: 11, color: t.text3, height: 1.5),
               ),
             ],
           ),
@@ -3226,7 +3202,6 @@ class ProgressionPage extends StatelessWidget {
                     child: Text(
                       '渐进超负荷是增肌的核心原则：在动作稳定、恢复充足的前提下，逐步增加重量、次数或组数，让身体持续适应。每 1-2 周尝试一次小幅进步，并记录训练表现。',
                       style: TextStyle(
-                        fontFamily: 'NotoSansSC',
                         fontSize: 12,
                         color: t.text2,
                         height: 1.7,
@@ -3241,7 +3216,6 @@ class ProgressionPage extends StatelessWidget {
                 child: Text(
                   '四阶段计划',
                   style: TextStyle(
-                    fontFamily: 'NotoSansSC',
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: t.text1,
@@ -3272,7 +3246,6 @@ class ProgressionPage extends StatelessWidget {
                                 child: Text(
                                   '${e.key + 1}',
                                   style: TextStyle(
-                                    fontFamily: 'NotoSansSC',
                                     fontSize: 16,
                                     fontWeight: FontWeight.w800,
                                     color: t.primary,
@@ -3290,7 +3263,6 @@ class ProgressionPage extends StatelessWidget {
                                       Text(
                                         ti,
                                         style: TextStyle(
-                                          fontFamily: 'NotoSansSC',
                                           fontSize: 15,
                                           fontWeight: FontWeight.w800,
                                           color: t.text1,
@@ -3311,7 +3283,6 @@ class ProgressionPage extends StatelessWidget {
                                         child: Text(
                                           w,
                                           style: TextStyle(
-                                            fontFamily: 'NotoSansSC',
                                             fontSize: 9,
                                             fontWeight: FontWeight.w700,
                                             color: t.primary,
@@ -3324,7 +3295,6 @@ class ProgressionPage extends StatelessWidget {
                                   Text(
                                     d,
                                     style: TextStyle(
-                                      fontFamily: 'NotoSansSC',
                                       fontSize: 12,
                                       color: t.text3,
                                       height: 1.6,
@@ -3346,7 +3316,6 @@ class ProgressionPage extends StatelessWidget {
                 child: Text(
                   '加重策略',
                   style: TextStyle(
-                    fontFamily: 'NotoSansSC',
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: t.text1,
@@ -3360,34 +3329,32 @@ class ProgressionPage extends StatelessWidget {
                 ('孤立动作', '侧平举 / 弯举 / 下压：每次 +0.5-1kg 或 +1-2次'),
                 ('遇到瓶颈', '减重 10% 重新开始，或更换动作变式刺激新角度'),
               ].asMap().entries.map(
-                    (i) => FadeScaleEntry(
-                      index: i.key + 8,
-                      child: Card(
-                        margin: const EdgeInsets.only(bottom: 6),
-                        child: ListTile(
-                          dense: true,
-                          title: Text(
-                            i.value.$1,
-                            style: TextStyle(
-                              fontFamily: 'NotoSansSC',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: t.text1,
-                            ),
-                          ),
-                          subtitle: Text(
-                            i.value.$2,
-                            style: TextStyle(
-                              fontFamily: 'NotoSansSC',
-                              fontSize: 11,
-                              color: t.text3,
-                              height: 1.5,
-                            ),
-                          ),
+                (i) => FadeScaleEntry(
+                  index: i.key + 8,
+                  child: Card(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    child: ListTile(
+                      dense: true,
+                      title: Text(
+                        i.value.$1,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: t.text1,
+                        ),
+                      ),
+                      subtitle: Text(
+                        i.value.$2,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: t.text3,
+                          height: 1.5,
                         ),
                       ),
                     ),
                   ),
+                ),
+              ),
               const SizedBox(height: 8),
             ]),
           ),
@@ -3456,13 +3423,13 @@ class ThemePage extends StatelessWidget {
                                 ),
                               ]
                             : sel
-                                ? [
-                                    BoxShadow(
-                                      color: mt.primary.withOpacity(0.3),
-                                      blurRadius: 10,
-                                    ),
-                                  ]
-                                : null,
+                            ? [
+                                BoxShadow(
+                                  color: mt.primary.withOpacity(0.3),
+                                  blurRadius: 10,
+                                ),
+                              ]
+                            : null,
                       ),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
@@ -3492,14 +3459,13 @@ class ThemePage extends StatelessWidget {
                                         ),
                                       ]
                                     : sel
-                                        ? [
-                                            BoxShadow(
-                                              color:
-                                                  mt.primary.withOpacity(0.3),
-                                              blurRadius: 10,
-                                            ),
-                                          ]
-                                        : null,
+                                    ? [
+                                        BoxShadow(
+                                          color: mt.primary.withOpacity(0.3),
+                                          blurRadius: 10,
+                                        ),
+                                      ]
+                                    : null,
                               ),
                               child: AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 200),
@@ -3521,7 +3487,6 @@ class ThemePage extends StatelessWidget {
                                   Text(
                                     mt.name,
                                     style: TextStyle(
-                                      fontFamily: 'NotoSansSC',
                                       fontSize: 15,
                                       fontWeight: FontWeight.w700,
                                       color: sel ? mt.primary : t.text1,
@@ -3530,7 +3495,6 @@ class ThemePage extends StatelessWidget {
                                   Text(
                                     sel ? '当前使用中' : '点击切换',
                                     style: TextStyle(
-                                      fontFamily: 'NotoSansSC',
                                       fontSize: 11,
                                       color: sel
                                           ? mt.primary.withOpacity(0.7)
@@ -3558,7 +3522,6 @@ class ThemePage extends StatelessWidget {
                               child: AnimatedDefaultTextStyle(
                                 duration: const Duration(milliseconds: 250),
                                 style: TextStyle(
-                                  fontFamily: 'NotoSansSC',
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
                                   color: sel ? mt.primary : Colors.transparent,
@@ -3719,9 +3682,7 @@ class _WorkoutPlanEditorPageState extends State<WorkoutPlanEditorPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('训练计划'),
-        actions: [
-          TextButton(onPressed: _reset, child: const Text('恢复默认')),
-        ],
+        actions: [TextButton(onPressed: _reset, child: const Text('恢复默认'))],
       ),
       body: plan == null
           ? const Center(child: CircularProgressIndicator())
@@ -3737,17 +3698,13 @@ class _WorkoutPlanEditorPageState extends State<WorkoutPlanEditorPage> {
                     title: Text(
                       '${day.dayName} · ${day.subtitle}',
                       style: TextStyle(
-                        fontFamily: 'NotoSansSC',
                         fontWeight: FontWeight.w700,
                         color: t.text1,
                       ),
                     ),
                     subtitle: Text(
                       day.isRest ? '休息日' : '${day.exercises.length} 个动作',
-                      style: TextStyle(
-                        fontFamily: 'NotoSansSC',
-                        color: t.text3,
-                      ),
+                      style: TextStyle(color: t.text3),
                     ),
                     children: [
                       if (day.exercises.isEmpty)
@@ -3755,10 +3712,7 @@ class _WorkoutPlanEditorPageState extends State<WorkoutPlanEditorPage> {
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                           child: Text(
                             day.recoveryOptions == null ? '无训练动作' : '恢复日项目保持默认',
-                            style: TextStyle(
-                              fontFamily: 'NotoSansSC',
-                              color: t.text3,
-                            ),
+                            style: TextStyle(color: t.text3),
                           ),
                         )
                       else
@@ -3771,7 +3725,6 @@ class _WorkoutPlanEditorPageState extends State<WorkoutPlanEditorPage> {
                               child: Text(
                                 '${i + 1}',
                                 style: TextStyle(
-                                  fontFamily: 'NotoSansSC',
                                   color: t.primary,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
@@ -3839,7 +3792,8 @@ class TrendChartPainter extends CustomPainter {
     final fillPath = Path();
     final points = <Offset>[];
     for (int i = 0; i < data.length; i++) {
-      final x = padding.left +
+      final x =
+          padding.left +
           (data.length == 1 ? chartW / 2 : (i / (data.length - 1)) * chartW);
       final y = padding.top + chartH - ((data[i].$2 - minV) / range) * chartH;
       points.add(Offset(x, y));
@@ -3868,7 +3822,6 @@ class TrendChartPainter extends CustomPainter {
       textPainter.text = TextSpan(
         text: data[i].$2.toStringAsFixed(1),
         style: TextStyle(
-          fontFamily: 'NotoSansSC',
           fontSize: 9,
           color: theme.text3,
           fontWeight: FontWeight.w600,
@@ -3881,8 +3834,7 @@ class TrendChartPainter extends CustomPainter {
       );
       textPainter.text = TextSpan(
         text: data[i].$1,
-        style: TextStyle(
-            fontFamily: 'NotoSansSC', fontSize: 8, color: theme.text4),
+        style: TextStyle(fontSize: 8, color: theme.text4),
       );
       textPainter.layout();
       textPainter.paint(
@@ -3990,7 +3942,6 @@ class _SettingsPageState extends State<SettingsPage> {
                     Text(
                       '训练计划',
                       style: TextStyle(
-                        fontFamily: 'NotoSansSC',
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: t.text1,
@@ -3999,11 +3950,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     const SizedBox(height: 3),
                     Text(
                       '修改动作、组数、次数和休息时间',
-                      style: TextStyle(
-                        fontFamily: 'NotoSansSC',
-                        fontSize: 11,
-                        color: t.text3,
-                      ),
+                      style: TextStyle(fontSize: 11, color: t.text3),
                     ),
                   ],
                 ),
@@ -4069,7 +4016,6 @@ class _SettingsPageState extends State<SettingsPage> {
                         Text(
                           '关于',
                           style: TextStyle(
-                            fontFamily: 'NotoSansSC',
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: t.text3,
@@ -4079,7 +4025,6 @@ class _SettingsPageState extends State<SettingsPage> {
                         Text(
                           'Body Recomp v6.8.0',
                           style: TextStyle(
-                            fontFamily: 'NotoSansSC',
                             fontSize: 13,
                             color: t.text2,
                             fontWeight: FontWeight.w600,
@@ -4088,20 +4033,12 @@ class _SettingsPageState extends State<SettingsPage> {
                         const SizedBox(height: 4),
                         Text(
                           '健身追踪 · 趋势分析 · 数据备份',
-                          style: TextStyle(
-                            fontFamily: 'NotoSansSC',
-                            fontSize: 11,
-                            color: t.text4,
-                          ),
+                          style: TextStyle(fontSize: 11, color: t.text4),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'GitHub: YXX168/BodyRecomp',
-                          style: TextStyle(
-                            fontFamily: 'NotoSansSC',
-                            fontSize: 10,
-                            color: t.text4,
-                          ),
+                          style: TextStyle(fontSize: 10, color: t.text4),
                         ),
                       ],
                     ),
@@ -4136,7 +4073,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 Text(
                   '主题选择',
                   style: TextStyle(
-                    fontFamily: 'NotoSansSC',
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: t.text1,
@@ -4196,7 +4132,6 @@ class _SettingsPageState extends State<SettingsPage> {
             Text(
               themes[cur]!.name,
               style: TextStyle(
-                fontFamily: 'NotoSansSC',
                 fontSize: 12,
                 color: t.text3,
                 fontWeight: FontWeight.w600,
@@ -4226,7 +4161,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 Text(
                   '个人资料',
                   style: TextStyle(
-                    fontFamily: 'NotoSansSC',
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: t.text1,
@@ -4291,16 +4225,11 @@ class _SettingsPageState extends State<SettingsPage> {
                       children: [
                         Text(
                           'BMI',
-                          style: TextStyle(
-                            fontFamily: 'NotoSansSC',
-                            fontSize: 11,
-                            color: t.text3,
-                          ),
+                          style: TextStyle(fontSize: 11, color: t.text3),
                         ),
                         Text(
                           _bmiDisplay(p),
                           style: TextStyle(
-                            fontFamily: 'NotoSansSC',
                             fontSize: 24,
                             fontWeight: FontWeight.w900,
                             color: t.primary,
@@ -4315,18 +4244,13 @@ class _SettingsPageState extends State<SettingsPage> {
                       children: [
                         Text(
                           '状态',
-                          style: TextStyle(
-                            fontFamily: 'NotoSansSC',
-                            fontSize: 11,
-                            color: t.text3,
-                          ),
+                          style: TextStyle(fontSize: 11, color: t.text3),
                         ),
                         Text(
                           _bmiCategory(
                             double.tryParse(_bmiDisplay(p).split(' ')[0]),
                           ),
                           style: TextStyle(
-                            fontFamily: 'NotoSansSC',
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: t.accent,
@@ -4341,16 +4265,11 @@ class _SettingsPageState extends State<SettingsPage> {
                       children: [
                         Text(
                           '年龄',
-                          style: TextStyle(
-                            fontFamily: 'NotoSansSC',
-                            fontSize: 11,
-                            color: t.text3,
-                          ),
+                          style: TextStyle(fontSize: 11, color: t.text3),
                         ),
                         Text(
                           p.age > 0 ? '${p.age} 岁' : '--',
                           style: TextStyle(
-                            fontFamily: 'NotoSansSC',
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: t.text1,
@@ -4397,14 +4316,11 @@ class _SettingsPageState extends State<SettingsPage> {
           children: [
             Icon(icon, size: 18, color: t.text3),
             const SizedBox(width: 10),
-            Text(label,
-                style: TextStyle(
-                    fontFamily: 'NotoSansSC', fontSize: 13, color: t.text2)),
+            Text(label, style: TextStyle(fontSize: 13, color: t.text2)),
             const Spacer(),
             Text(
               value,
               style: TextStyle(
-                fontFamily: 'NotoSansSC',
                 fontSize: 13,
                 color: t.text1,
                 fontWeight: FontWeight.w600,
@@ -4582,7 +4498,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 Text(
                   '身体数据',
                   style: TextStyle(
-                    fontFamily: 'NotoSansSC',
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: t.text1,
@@ -4606,7 +4521,6 @@ class _SettingsPageState extends State<SettingsPage> {
                         Text(
                           '记录',
                           style: TextStyle(
-                            fontFamily: 'NotoSansSC',
                             fontSize: 11,
                             color: t.primary,
                             fontWeight: FontWeight.w600,
@@ -4668,7 +4582,6 @@ class _SettingsPageState extends State<SettingsPage> {
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontFamily: 'NotoSansSC',
               fontSize: 11,
               fontWeight: FontWeight.w700,
               color: selected ? t.primary : t.text4,
@@ -4690,8 +4603,7 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Center(
               child: Text(
                 '至少记录 2 次体重后显示趋势图',
-                style: TextStyle(
-                    fontFamily: 'NotoSansSC', fontSize: 12, color: t.text4),
+                style: TextStyle(fontSize: 12, color: t.text4),
               ),
             ),
           )
@@ -4699,12 +4611,12 @@ class _SettingsPageState extends State<SettingsPage> {
           MiniTrendChart(
             data: weights.length > 30
                 ? weights
-                    .sublist(weights.length - 30)
-                    .map((e) => ('${e.date.month}/${e.date.day}', e.weightKg))
-                    .toList()
+                      .sublist(weights.length - 30)
+                      .map((e) => ('${e.date.month}/${e.date.day}', e.weightKg))
+                      .toList()
                 : weights
-                    .map((e) => ('${e.date.month}/${e.date.day}', e.weightKg))
-                    .toList(),
+                      .map((e) => ('${e.date.month}/${e.date.day}', e.weightKg))
+                      .toList(),
             theme: t,
           ),
         if (weights.isNotEmpty) ...[
@@ -4712,8 +4624,7 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               Text(
                 '最新: ${weights.last.weightKg.toStringAsFixed(1)}kg',
-                style: TextStyle(
-                    fontFamily: 'NotoSansSC', fontSize: 11, color: t.text3),
+                style: TextStyle(fontSize: 11, color: t.text3),
               ),
               if (weights.length >= 2)
                 Padding(
@@ -4721,9 +4632,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   child: Text(
                     '变化: ${weights.last.weightKg > weights[weights.length - 2].weightKg ? "+" : ""}${(weights.last.weightKg - weights[weights.length - 2].weightKg).toStringAsFixed(1)}kg',
                     style: TextStyle(
-                      fontFamily: 'NotoSansSC',
                       fontSize: 11,
-                      color: weights.last.weightKg >
+                      color:
+                          weights.last.weightKg >
                               weights[weights.length - 2].weightKg
                           ? t.warning
                           : t.success,
@@ -4747,14 +4658,12 @@ class _SettingsPageState extends State<SettingsPage> {
           Expanded(
             child: Text(
               '${entry.date.year}-${entry.date.month.toString().padLeft(2, '0')}-${entry.date.day.toString().padLeft(2, '0')}',
-              style: TextStyle(
-                  fontFamily: 'NotoSansSC', fontSize: 11, color: t.text3),
+              style: TextStyle(fontSize: 11, color: t.text3),
             ),
           ),
           Text(
             '${entry.weightKg.toStringAsFixed(1)} kg',
             style: TextStyle(
-              fontFamily: 'NotoSansSC',
               fontSize: 11,
               color: t.text1,
               fontWeight: FontWeight.w700,
@@ -4806,8 +4715,7 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Center(
               child: Text(
                 '记录至少 2 次腰围后显示围度趋势',
-                style: TextStyle(
-                    fontFamily: 'NotoSansSC', fontSize: 12, color: t.text4),
+                style: TextStyle(fontSize: 12, color: t.text4),
               ),
             ),
           )
@@ -4818,7 +4726,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 : waistData,
             theme: t,
           ),
-        ...entries.reversed.take(8).map(
+        ...entries.reversed
+            .take(8)
+            .map(
               (entry) => Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Row(
@@ -4828,10 +4738,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       width: 76,
                       child: Text(
                         '${entry.date.month}/${entry.date.day}',
-                        style: TextStyle(
-                            fontFamily: 'NotoSansSC',
-                            fontSize: 11,
-                            color: t.text3),
+                        style: TextStyle(fontSize: 11, color: t.text3),
                       ),
                     ),
                     Expanded(
@@ -4843,7 +4750,6 @@ class _SettingsPageState extends State<SettingsPage> {
                             )
                             .join(' · '),
                         style: TextStyle(
-                          fontFamily: 'NotoSansSC',
                           fontSize: 10.5,
                           color: t.text1,
                           height: 1.5,
@@ -5062,7 +4968,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 Text(
                   '数据管理',
                   style: TextStyle(
-                    fontFamily: 'NotoSansSC',
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: t.text1,
@@ -5093,7 +4998,6 @@ class _SettingsPageState extends State<SettingsPage> {
                           Text(
                             '导出备份',
                             style: TextStyle(
-                              fontFamily: 'NotoSansSC',
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
                               color: t.primary,
@@ -5121,7 +5025,6 @@ class _SettingsPageState extends State<SettingsPage> {
                           Text(
                             '导入恢复',
                             style: TextStyle(
-                              fontFamily: 'NotoSansSC',
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
                               color: t.accent,
@@ -5137,8 +5040,7 @@ class _SettingsPageState extends State<SettingsPage> {
             const SizedBox(height: 8),
             Text(
               'JSON 格式 · 含资料、训练、体重与围度 · 导入前自动备份',
-              style: TextStyle(
-                  fontFamily: 'NotoSansSC', fontSize: 10, color: t.text4),
+              style: TextStyle(fontSize: 10, color: t.text4),
             ),
           ],
         ),
@@ -5157,10 +5059,7 @@ class _SettingsPageState extends State<SettingsPage> {
             content: SizedBox(
               width: double.maxFinite,
               child: SingleChildScrollView(
-                child: SelectableText(
-                  json,
-                  style: TextStyle(fontFamily: 'NotoSansSC', fontSize: 10),
-                ),
+                child: SelectableText(json, style: TextStyle(fontSize: 10)),
               ),
             ),
             actions: [

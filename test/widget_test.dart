@@ -44,6 +44,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('1/$exerciseTotal'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: firstCard,
+        matching: find.text(workoutDays[activeDayIndex].exercises.first.note!),
+      ),
+      findsNothing,
+    );
     final preferences = await SharedPreferences.getInstance();
     expect(
       preferences.getString('recomp_done_v6'),
