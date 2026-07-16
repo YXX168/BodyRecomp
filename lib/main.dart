@@ -4244,7 +4244,7 @@ class _SettingsPageState extends State<SettingsPage> {
           style: TextStyle(fontSize: 11, color: t.text3),
         ),
         value: _autoRestTimer,
-        activeColor: t.primary,
+        activeThumbColor: t.primary,
         onChanged: (value) async {
           setState(() => _autoRestTimer = value);
           await saveAutoRestTimer(value);

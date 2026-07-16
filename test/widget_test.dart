@@ -95,11 +95,15 @@ void main() {
     expect(find.byKey(const Key('rest-timer-panel')), findsOneWidget);
     expect(find.text('1:30'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('rest-timer-add')));
+    tester
+        .widget<IconButton>(find.byKey(const Key('rest-timer-add')))
+        .onPressed!();
     await tester.pump();
     expect(find.text('2:00'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('rest-timer-dismiss')));
+    tester
+        .widget<IconButton>(find.byKey(const Key('rest-timer-dismiss')))
+        .onPressed!();
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('rest-timer-panel')), findsNothing);
   });
