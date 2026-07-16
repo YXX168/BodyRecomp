@@ -33,8 +33,9 @@ void main() {
       await tester.tap(mondayTab);
       await tester.pumpAndSettle();
     }
-    final activeDayIndex =
-        workoutDays[dayIndex].exercises.isEmpty ? 0 : dayIndex;
+    final activeDayIndex = workoutDays[dayIndex].exercises.isEmpty
+        ? 0
+        : dayIndex;
     final exerciseTotal = workoutDays[activeDayIndex].exercises.length;
     final firstCard = find.byKey(ValueKey('exercise_card_${activeDayIndex}_0'));
     expect(firstCard, findsOneWidget);
@@ -62,19 +63,45 @@ void main() {
     expect(find.text('0/$exerciseTotal'), findsOneWidget);
   });
 
-  testWidgets('switching workout day uses a page transition and staged entries',
-      (WidgetTester tester) async {
+  testWidgets(
+    'switching workout day uses a page transition and staged entries',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(const ThemeState(child: RecompApp()));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AnimatedSwitcher), findsWidgets);
+      expect(find.byType(FadeScaleEntry), findsWidgets);
+
+      final currentDay = DateTime.now().weekday - 1;
+      final nextDay = (currentDay + 1) % workoutDays.length;
+      await tester.tap(find.text(['一', '二', '三', '四', '五', '六', '日'][nextDay]));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byType(SlideTransition), findsWidgets);
+    },
+  );
+
+  testWidgets('workout rest timer starts, extends and dismisses', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(const ThemeState(child: RecompApp()));
     await tester.pumpAndSettle();
 
-    expect(find.byType(AnimatedSwitcher), findsWidgets);
-    expect(find.byType(FadeScaleEntry), findsWidgets);
+    await tester.tap(find.text('一'));
+    await tester.pumpAndSettle();
+    final firstCard = find.byKey(const ValueKey('exercise_card_0_0'));
+    await tester.tap(firstCard);
+    await tester.pump(const Duration(milliseconds: 250));
 
-    final currentDay = DateTime.now().weekday - 1;
-    final nextDay = (currentDay + 1) % workoutDays.length;
-    await tester.tap(find.text(['一', '二', '三', '四', '五', '六', '日'][nextDay]));
-    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byKey(const Key('rest-timer-panel')), findsOneWidget);
+    expect(find.text('1:30'), findsOneWidget);
 
-    expect(find.byType(SlideTransition), findsWidgets);
+    await tester.tap(find.byKey(const Key('rest-timer-add')));
+    await tester.pump();
+    expect(find.text('2:00'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('rest-timer-dismiss')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('rest-timer-panel')), findsNothing);
   });
 }
