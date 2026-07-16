@@ -1510,7 +1510,6 @@ class WorkoutPage extends StatefulWidget {
 
 class _WorkoutPageState extends State<WorkoutPage> {
   int _day = 0;
-  int _dayDirection = 1;
   Map<String, dynamic> _done = {};
   List<WorkoutDay> _plan = List<WorkoutDay>.from(workoutDays);
 
@@ -1572,15 +1571,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
   void _selectDay(int day) {
     final next = (day + workoutDays.length) % workoutDays.length;
     if (_day == next) return;
-    final forwardDistance =
-        (next - _day + workoutDays.length) % workoutDays.length;
-    final backwardDistance =
-        (_day - next + workoutDays.length) % workoutDays.length;
     HapticFeedback.selectionClick();
-    setState(() {
-      _dayDirection = forwardDistance <= backwardDistance ? 1 : -1;
-      _day = next;
-    });
+    setState(() => _day = next);
   }
 
   Future<void> _toggle(int di, int ei) async {
@@ -1631,42 +1623,28 @@ class _WorkoutPageState extends State<WorkoutPage> {
           child: HorizontalDaySwipe(
             onPrevious: () => _selectDay(_day - 1),
             onNext: () => _selectDay(_day + 1),
-            child: ClipRect(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 320),
-                reverseDuration: const Duration(milliseconds: 260),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
-                layoutBuilder: (currentChild, previousChildren) => Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    ...previousChildren,
-                    if (currentChild != null) currentChild,
-                  ],
-                ),
-                transitionBuilder: (child, animation) {
-                  final isIncoming = child.key == ValueKey('day_$_day');
-                  final direction = isIncoming ? _dayDirection : -_dayDirection;
-                  final curved = CurvedAnimation(
-                    parent: animation,
-                    curve: Curves.easeOutCubic,
-                    reverseCurve: Curves.easeInCubic,
-                  );
-                  return FadeTransition(
-                    opacity: curved,
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: Offset(0.075 * direction, 0),
-                        end: Offset.zero,
-                      ).animate(curved),
-                      child: child,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.02, 0),
+                    end: Offset.zero,
+                  ).animate(
+                    CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
                     ),
-                  );
-                },
-                child: KeyedSubtree(
-                  key: ValueKey('day_$_day'),
-                  child: _buildContent(wd, t),
+                  ),
+                  child: child,
                 ),
+              ),
+              child: KeyedSubtree(
+                key: ValueKey('day_$_day'),
+                child: _buildContent(wd, t),
               ),
             ),
           ),
@@ -1930,7 +1908,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
                 (e) => FadeScaleEntry(
                   key: ValueKey('entry_${_day}_${e.key}'),
                   index: e.key,
-                  delay: const Duration(milliseconds: 24),
+                  delay: const Duration(milliseconds: 38),
                   child: RepaintBoundary(
                     child: _exCard(
                       e.value,
