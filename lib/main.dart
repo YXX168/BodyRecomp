@@ -598,9 +598,9 @@ class _FadeScaleEntryState extends State<FadeScaleEntry>
 
   @override
   Widget build(BuildContext context) => FadeTransition(
-    opacity: _fade,
-    child: ScaleTransition(scale: _scale, child: widget.child),
-  );
+        opacity: _fade,
+        child: ScaleTransition(scale: _scale, child: widget.child),
+      );
 }
 
 class PressScale extends StatefulWidget {
@@ -904,11 +904,11 @@ class _ThemeStateState extends State<ThemeState> {
 
   @override
   Widget build(BuildContext context) => ThemeInherited(
-    current: _mode,
-    theme: themes[_mode]!,
-    setTheme: setTheme,
-    child: widget.child,
-  );
+        current: _mode,
+        theme: themes[_mode]!,
+        setTheme: setTheme,
+        child: widget.child,
+      );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -967,11 +967,10 @@ class RecompApp extends StatelessWidget {
             useMaterial3: true,
             fontFamily: 'Inter',
             fontFamilyFallback: const ['sans-serif'],
-            textTheme:
-                (dark
-                        ? ThemeData.dark().textTheme
-                        : ThemeData.light().textTheme)
-                    .apply(fontFamily: 'Inter'),
+            textTheme: (dark
+                    ? ThemeData.dark().textTheme
+                    : ThemeData.light().textTheme)
+                .apply(fontFamily: 'Inter'),
           ),
           home: const MainPage(),
         );
@@ -1009,12 +1008,11 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     final p = _profile;
     final bmi = p != null && p.heightCm > 0
         ? (p.weightKg / ((p.heightCm / 100) * (p.heightCm / 100)))
-              .toStringAsFixed(1)
+            .toStringAsFixed(1)
         : '--';
     final ageStr = (p != null && p.age > 0) ? '${p.age}岁' : '--';
-    final heightStr = (p != null && p.heightCm > 0)
-        ? '${p.heightCm.toInt()}cm'
-        : '--';
+    final heightStr =
+        (p != null && p.heightCm > 0) ? '${p.heightCm.toInt()}cm' : '--';
     final weightStr = (p != null && p.weightKg > 0) ? '${p.weightKg}kg' : '--';
     final statusText = '$ageStr · $heightStr · $weightStr · BMI $bmi';
     final pages = [
@@ -1106,16 +1104,15 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                 transitionBuilder: (child, anim) => FadeTransition(
                   opacity: anim,
                   child: SlideTransition(
-                    position:
-                        Tween<Offset>(
-                          begin: const Offset(0.02, 0),
-                          end: Offset.zero,
-                        ).animate(
-                          CurvedAnimation(
-                            parent: anim,
-                            curve: Curves.easeOutCubic,
-                          ),
-                        ),
+                    position: Tween<Offset>(
+                      begin: const Offset(0.02, 0),
+                      end: Offset.zero,
+                    ).animate(
+                      CurvedAnimation(
+                        parent: anim,
+                        curve: Curves.easeOutCubic,
+                      ),
+                    ),
                     child: child,
                   ),
                 ),
@@ -1313,9 +1310,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                             },
                             child: Container(
                               decoration: BoxDecoration(
-                                color: sel
-                                    ? mt.primary.withOpacity(0.06)
-                                    : null,
+                                color:
+                                    sel ? mt.primary.withOpacity(0.06) : null,
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
                                   color: sel ? mt.primary : t.border,
@@ -1475,9 +1471,8 @@ class _DaySegmentedNav extends StatelessWidget {
                               duration: const Duration(milliseconds: 220),
                               style: TextStyle(
                                 fontSize: 11,
-                                fontWeight: sel
-                                    ? FontWeight.w900
-                                    : FontWeight.w700,
+                                fontWeight:
+                                    sel ? FontWeight.w900 : FontWeight.w700,
                                 color: sel ? Colors.white : t.text2,
                                 letterSpacing: -0.2,
                               ),
@@ -1488,9 +1483,8 @@ class _DaySegmentedNav extends StatelessWidget {
                               duration: const Duration(milliseconds: 220),
                               style: TextStyle(
                                 fontSize: 7.5,
-                                fontWeight: sel
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
+                                fontWeight:
+                                    sel ? FontWeight.w700 : FontWeight.w500,
                                 color: sel
                                     ? Colors.white.withOpacity(0.86)
                                     : t.text4,
@@ -1719,16 +1713,15 @@ class _WorkoutPageState extends State<WorkoutPage> {
               transitionBuilder: (child, animation) => FadeTransition(
                 opacity: animation,
                 child: SlideTransition(
-                  position:
-                      Tween<Offset>(
-                        begin: const Offset(0.02, 0),
-                        end: Offset.zero,
-                      ).animate(
-                        CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOutCubic,
-                        ),
-                      ),
+                  position: Tween<Offset>(
+                    begin: const Offset(0.02, 0),
+                    end: Offset.zero,
+                  ).animate(
+                    CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    ),
+                  ),
                   child: child,
                 ),
               ),
@@ -1873,46 +1866,46 @@ class _WorkoutPageState extends State<WorkoutPage> {
             ),
             const SizedBox(height: 8),
             ...day.recoveryOptions!.asMap().entries.map(
-              (e) => FadeScaleEntry(
-                index: e.key + 2,
-                child: Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: t.primary,
-                            boxShadow: [
-                              BoxShadow(
-                                color: t.primary.withOpacity(0.4),
-                                blurRadius: 6,
+                  (e) => FadeScaleEntry(
+                    index: e.key + 2,
+                    child: Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: t.primary,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: t.primary.withOpacity(0.4),
+                                    blurRadius: 6,
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              e.value,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: t.text2,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        Text(
-                          e.value,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: t.text2,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
           ],
         ),
       );
@@ -2034,24 +2027,24 @@ class _WorkoutPageState extends State<WorkoutPage> {
           ),
           const SizedBox(height: 14),
           ...day.exercises.asMap().entries.map(
-            (e) => FadeScaleEntry(
-              key: ValueKey('entry_${_day}_${e.key}'),
-              index: e.key,
-              delay: const Duration(milliseconds: 38),
-              child: RepaintBoundary(
-                child: _exCard(
-                  e.value,
-                  e.key + 1,
-                  _done.containsKey('${_day}_${e.key}'),
-                  t,
-                  () => _toggle(_day, e.key),
-                  parseRestSeconds(e.value.rest) == null
-                      ? null
-                      : () => _startRestTimer(e.value),
+                (e) => FadeScaleEntry(
+                  key: ValueKey('entry_${_day}_${e.key}'),
+                  index: e.key,
+                  delay: const Duration(milliseconds: 38),
+                  child: RepaintBoundary(
+                    child: _exCard(
+                      e.value,
+                      e.key + 1,
+                      _done.containsKey('${_day}_${e.key}'),
+                      t,
+                      () => _toggle(_day, e.key),
+                      parseRestSeconds(e.value.rest) == null
+                          ? null
+                          : () => _startRestTimer(e.value),
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
           if (day.circuitNote != null)
             FadeScaleEntry(
               index: day.exercises.length + 2,
@@ -2338,14 +2331,14 @@ class _WorkoutPageState extends State<WorkoutPage> {
             side: done
                 ? BorderSide(color: t.success.withOpacity(0.22), width: 1)
                 : (ex.isStar
-                      ? BorderSide(
-                          color: t.primary.withOpacity(0.26),
-                          width: 1.2,
-                        )
-                      : BorderSide(
-                          color: t.border.withOpacity(0.9),
-                          width: 0.8,
-                        )),
+                    ? BorderSide(
+                        color: t.primary.withOpacity(0.26),
+                        width: 1.2,
+                      )
+                    : BorderSide(
+                        color: t.border.withOpacity(0.9),
+                        width: 0.8,
+                      )),
           ),
           child: AnimatedPadding(
             duration: const Duration(milliseconds: 220),
@@ -2998,9 +2991,8 @@ class _RecordPageState extends State<RecordPage> {
                         '$day',
                         style: TextStyle(
                           fontSize: 10,
-                          fontWeight: isToday
-                              ? FontWeight.w800
-                              : FontWeight.w600,
+                          fontWeight:
+                              isToday ? FontWeight.w800 : FontWeight.w600,
                           color: count == 0
                               ? (isToday ? t.primary : t.text4)
                               : (intensity > 0.62 ? Colors.white : t.text1),
@@ -3153,9 +3145,8 @@ class _RecordPageState extends State<RecordPage> {
           cells.add(SizedBox(width: 4, height: 4));
         } else {
           final rawCount = history[day.toString()];
-          final count = rawCount is int
-              ? rawCount
-              : int.tryParse('$rawCount') ?? 0;
+          final count =
+              rawCount is int ? rawCount : int.tryParse('$rawCount') ?? 0;
           final intensity = count > 0 ? (count / 8).clamp(0.0, 1.0) : 0.0;
           cells.add(
             Container(
@@ -3311,43 +3302,44 @@ class NutritionPage extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               ...nutritionTips.asMap().entries.map(
-                (e) => FadeScaleEntry(
-                  index: e.key + 5,
-                  child: Card(
-                    margin: const EdgeInsets.only(bottom: 6),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 3,
-                            height: 14,
-                            margin: const EdgeInsets.only(right: 10, top: 2),
-                            decoration: BoxDecoration(
-                              color: t.primary,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
+                    (e) => FadeScaleEntry(
+                      index: e.key + 5,
+                      child: Card(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
                           ),
-                          Expanded(
-                            child: Text(
-                              nutritionTips[e.key],
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: t.text2,
-                                height: 1.6,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: 3,
+                                height: 14,
+                                margin:
+                                    const EdgeInsets.only(right: 10, top: 2),
+                                decoration: BoxDecoration(
+                                  color: t.primary,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
                               ),
-                            ),
+                              Expanded(
+                                child: Text(
+                                  nutritionTips[e.key],
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: t.text2,
+                                    height: 1.6,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
               const SizedBox(height: 8),
             ]),
           ),
@@ -3643,32 +3635,32 @@ class ProgressionPage extends StatelessWidget {
                 ('孤立动作', '侧平举 / 弯举 / 下压：每次 +0.5-1kg 或 +1-2次'),
                 ('遇到瓶颈', '减重 10% 重新开始，或更换动作变式刺激新角度'),
               ].asMap().entries.map(
-                (i) => FadeScaleEntry(
-                  index: i.key + 8,
-                  child: Card(
-                    margin: const EdgeInsets.only(bottom: 6),
-                    child: ListTile(
-                      dense: true,
-                      title: Text(
-                        i.value.$1,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: t.text1,
-                        ),
-                      ),
-                      subtitle: Text(
-                        i.value.$2,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: t.text3,
-                          height: 1.5,
+                    (i) => FadeScaleEntry(
+                      index: i.key + 8,
+                      child: Card(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        child: ListTile(
+                          dense: true,
+                          title: Text(
+                            i.value.$1,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: t.text1,
+                            ),
+                          ),
+                          subtitle: Text(
+                            i.value.$2,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: t.text3,
+                              height: 1.5,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ),
               const SizedBox(height: 8),
             ]),
           ),
@@ -3737,13 +3729,13 @@ class ThemePage extends StatelessWidget {
                                 ),
                               ]
                             : sel
-                            ? [
-                                BoxShadow(
-                                  color: mt.primary.withOpacity(0.3),
-                                  blurRadius: 10,
-                                ),
-                              ]
-                            : null,
+                                ? [
+                                    BoxShadow(
+                                      color: mt.primary.withOpacity(0.3),
+                                      blurRadius: 10,
+                                    ),
+                                  ]
+                                : null,
                       ),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
@@ -3773,13 +3765,14 @@ class ThemePage extends StatelessWidget {
                                         ),
                                       ]
                                     : sel
-                                    ? [
-                                        BoxShadow(
-                                          color: mt.primary.withOpacity(0.3),
-                                          blurRadius: 10,
-                                        ),
-                                      ]
-                                    : null,
+                                        ? [
+                                            BoxShadow(
+                                              color:
+                                                  mt.primary.withOpacity(0.3),
+                                              blurRadius: 10,
+                                            ),
+                                          ]
+                                        : null,
                               ),
                               child: AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 200),
@@ -4106,8 +4099,7 @@ class TrendChartPainter extends CustomPainter {
     final fillPath = Path();
     final points = <Offset>[];
     for (int i = 0; i < data.length; i++) {
-      final x =
-          padding.left +
+      final x = padding.left +
           (data.length == 1 ? chartW / 2 : (i / (data.length - 1)) * chartW);
       final y = padding.top + chartH - ((data[i].$2 - minV) / range) * chartH;
       points.add(Offset(x, y));
@@ -4970,12 +4962,12 @@ class _SettingsPageState extends State<SettingsPage> {
           MiniTrendChart(
             data: weights.length > 30
                 ? weights
-                      .sublist(weights.length - 30)
-                      .map((e) => ('${e.date.month}/${e.date.day}', e.weightKg))
-                      .toList()
+                    .sublist(weights.length - 30)
+                    .map((e) => ('${e.date.month}/${e.date.day}', e.weightKg))
+                    .toList()
                 : weights
-                      .map((e) => ('${e.date.month}/${e.date.day}', e.weightKg))
-                      .toList(),
+                    .map((e) => ('${e.date.month}/${e.date.day}', e.weightKg))
+                    .toList(),
             theme: t,
           ),
         if (weights.isNotEmpty) ...[
@@ -4992,8 +4984,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     '变化: ${weights.last.weightKg > weights[weights.length - 2].weightKg ? "+" : ""}${(weights.last.weightKg - weights[weights.length - 2].weightKg).toStringAsFixed(1)}kg',
                     style: TextStyle(
                       fontSize: 11,
-                      color:
-                          weights.last.weightKg >
+                      color: weights.last.weightKg >
                               weights[weights.length - 2].weightKg
                           ? t.warning
                           : t.success,
@@ -5085,9 +5076,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 : waistData,
             theme: t,
           ),
-        ...entries.reversed
-            .take(8)
-            .map(
+        ...entries.reversed.take(8).map(
               (entry) => Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Row(
