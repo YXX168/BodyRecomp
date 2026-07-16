@@ -61,4 +61,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('0/$exerciseTotal'), findsOneWidget);
   });
+
+  testWidgets('switching workout day uses a page transition and staged entries',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(const ThemeState(child: RecompApp()));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AnimatedSwitcher), findsWidgets);
+    expect(find.byType(FadeScaleEntry), findsWidgets);
+
+    final currentDay = DateTime.now().weekday - 1;
+    final nextDay = (currentDay + 1) % workoutDays.length;
+    await tester.tap(find.text(['一', '二', '三', '四', '五', '六', '日'][nextDay]));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byType(SlideTransition), findsWidgets);
+  });
 }

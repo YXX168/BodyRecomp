@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -563,6 +564,7 @@ class _FadeScaleEntryState extends State<FadeScaleEntry>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c;
   late final Animation<double> _fade, _scale;
+  Timer? _startTimer;
   @override
   void initState() {
     super.initState();
@@ -578,13 +580,14 @@ class _FadeScaleEntryState extends State<FadeScaleEntry>
       begin: 0.96,
       end: 1,
     ).animate(CurvedAnimation(parent: _c, curve: Curves.easeOutCubic));
-    Future.delayed(widget.delay * widget.index, () {
+    _startTimer = Timer(widget.delay * widget.index, () {
       if (mounted) _c.forward();
     });
   }
 
   @override
   void dispose() {
+    _startTimer?.cancel();
     _c.dispose();
     super.dispose();
   }
@@ -1507,6 +1510,7 @@ class WorkoutPage extends StatefulWidget {
 
 class _WorkoutPageState extends State<WorkoutPage> {
   int _day = 0;
+  int _dayDirection = 1;
   Map<String, dynamic> _done = {};
   List<WorkoutDay> _plan = List<WorkoutDay>.from(workoutDays);
 
@@ -1568,8 +1572,15 @@ class _WorkoutPageState extends State<WorkoutPage> {
   void _selectDay(int day) {
     final next = (day + workoutDays.length) % workoutDays.length;
     if (_day == next) return;
+    final forwardDistance =
+        (next - _day + workoutDays.length) % workoutDays.length;
+    final backwardDistance =
+        (_day - next + workoutDays.length) % workoutDays.length;
     HapticFeedback.selectionClick();
-    setState(() => _day = next);
+    setState(() {
+      _dayDirection = forwardDistance <= backwardDistance ? 1 : -1;
+      _day = next;
+    });
   }
 
   Future<void> _toggle(int di, int ei) async {
@@ -1620,9 +1631,43 @@ class _WorkoutPageState extends State<WorkoutPage> {
           child: HorizontalDaySwipe(
             onPrevious: () => _selectDay(_day - 1),
             onNext: () => _selectDay(_day + 1),
-            child: KeyedSubtree(
-              key: ValueKey('day_$_day'),
-              child: _buildContent(wd, t),
+            child: ClipRect(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 320),
+                reverseDuration: const Duration(milliseconds: 260),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                layoutBuilder: (currentChild, previousChildren) => Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ...previousChildren,
+                    if (currentChild != null) currentChild,
+                  ],
+                ),
+                transitionBuilder: (child, animation) {
+                  final isIncoming = child.key == ValueKey('day_$_day');
+                  final direction = isIncoming ? _dayDirection : -_dayDirection;
+                  final curved = CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                    reverseCurve: Curves.easeInCubic,
+                  );
+                  return FadeTransition(
+                    opacity: curved,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: Offset(0.075 * direction, 0),
+                        end: Offset.zero,
+                      ).animate(curved),
+                      child: child,
+                    ),
+                  );
+                },
+                child: KeyedSubtree(
+                  key: ValueKey('day_$_day'),
+                  child: _buildContent(wd, t),
+                ),
+              ),
             ),
           ),
         ),
@@ -1882,13 +1927,18 @@ class _WorkoutPageState extends State<WorkoutPage> {
           ),
           const SizedBox(height: 14),
           ...day.exercises.asMap().entries.map(
-                (e) => RepaintBoundary(
-                  child: _exCard(
-                    e.value,
-                    e.key + 1,
-                    _done.containsKey('${_day}_${e.key}'),
-                    t,
-                    () => _toggle(_day, e.key),
+                (e) => FadeScaleEntry(
+                  key: ValueKey('entry_${_day}_${e.key}'),
+                  index: e.key,
+                  delay: const Duration(milliseconds: 24),
+                  child: RepaintBoundary(
+                    child: _exCard(
+                      e.value,
+                      e.key + 1,
+                      _done.containsKey('${_day}_${e.key}'),
+                      t,
+                      () => _toggle(_day, e.key),
+                    ),
                   ),
                 ),
               ),
@@ -2202,7 +2252,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
-                        color: t.text2,
+                        color: done ? t.text4 : t.text2,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -2211,7 +2261,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w500,
-                        color: t.text4,
+                        color: done ? t.text4.withOpacity(0.72) : t.text4,
                       ),
                     ),
                   ],
