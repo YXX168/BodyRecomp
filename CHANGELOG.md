@@ -1,4 +1,5 @@
-# BodyRecomp CHANGELOG
+# BodyRecomp 更新日志
+
 ## v6.9.0 (2026-07-17)
 
 ### 训练效率

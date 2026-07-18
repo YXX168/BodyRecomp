@@ -1,5 +1,5 @@
 name: body_recomp
-description: Body Recomposition workout tracker with animations and glassmorphism UI.
+description: 一款本地优先的健身训练计划、打卡与身体数据追踪应用。
 publish_to: 'none'
 version: 6.9.0+78
 
