@@ -1,5 +1,7 @@
 # BodyRecomp
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 一个基于 Flutter 的本地健身训练追踪应用。
 
 ## 功能
