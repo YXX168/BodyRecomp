@@ -6,6 +6,15 @@ import 'package:body_recomp/main.dart';
 import 'package:body_recomp/services/history_service.dart';
 
 void main() {
+  Future<void> pumpApp(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(const ThemeState(child: RecompApp()));
+    await tester.pump(const Duration(milliseconds: 800));
+  }
+
   setUp(() {
     SharedPreferences.setMockInitialValues({
       'recomp_done_v6_week': isoWeekNumber(DateTime.now()),
@@ -15,16 +24,14 @@ void main() {
   });
 
   testWidgets('App smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(const ThemeState(child: RecompApp()));
-    await tester.pumpAndSettle();
+    await pumpApp(tester);
     expect(find.byType(MaterialApp), findsOneWidget);
   });
 
   testWidgets('tapping an exercise card toggles its completed state', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const ThemeState(child: RecompApp()));
-    await tester.pumpAndSettle();
+    await pumpApp(tester);
 
     final dayIndex = DateTime.now().weekday - 1;
     if (workoutDays[dayIndex].exercises.isEmpty) {
@@ -65,8 +72,7 @@ void main() {
   testWidgets(
     'switching workout day uses a page transition and staged entries',
     (WidgetTester tester) async {
-      await tester.pumpWidget(const ThemeState(child: RecompApp()));
-      await tester.pumpAndSettle();
+      await pumpApp(tester);
 
       expect(find.byType(AnimatedSwitcher), findsWidgets);
       expect(find.byType(FadeScaleEntry), findsWidgets);
@@ -83,8 +89,7 @@ void main() {
   testWidgets('workout rest timer starts, extends and dismisses', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const ThemeState(child: RecompApp()));
-    await tester.pumpAndSettle();
+    await pumpApp(tester);
 
     await tester.tap(find.text('一'));
     await tester.pumpAndSettle();
