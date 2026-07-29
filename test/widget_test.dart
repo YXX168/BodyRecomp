@@ -28,7 +28,7 @@ void main() {
     expect(find.byType(MaterialApp), findsOneWidget);
   });
 
-  testWidgets('tapping an exercise card toggles its completed state', (
+  testWidgets('tapping an exercise card advances one set at a time', (
     WidgetTester tester,
   ) async {
     await pumpApp(tester);
@@ -50,13 +50,18 @@ void main() {
     await tester.tap(firstCard);
     await tester.pumpAndSettle();
 
-    expect(find.text('1/$exerciseTotal'), findsOneWidget);
+    final firstExercise = workoutDays[activeDayIndex].exercises.first;
+    expect(find.text('0/$exerciseTotal'), findsOneWidget);
+    expect(
+      find.text('已完成 1/${firstExercise.sets} 组 · 点击完成下一组'),
+      findsOneWidget,
+    );
     expect(
       find.descendant(
         of: firstCard,
         matching: find.text(workoutDays[activeDayIndex].exercises.first.note!),
       ),
-      findsNothing,
+      findsOneWidget,
     );
     final preferences = await SharedPreferences.getInstance();
     expect(
@@ -64,7 +69,13 @@ void main() {
       contains('${activeDayIndex}_0'),
     );
 
-    await tester.tap(find.byIcon(Icons.check).first);
+    for (var set = 1; set < firstExercise.sets; set++) {
+      await tester.tap(firstCard);
+      await tester.pumpAndSettle();
+    }
+    expect(find.text('1/$exerciseTotal'), findsOneWidget);
+
+    await tester.tap(firstCard);
     await tester.pumpAndSettle();
     expect(find.text('0/$exerciseTotal'), findsOneWidget);
   });
@@ -86,7 +97,7 @@ void main() {
     },
   );
 
-  testWidgets('workout rest timer starts, extends and dismisses', (
+  testWidgets('workout rest timer starts after a set, extends and dismisses', (
     WidgetTester tester,
   ) async {
     await pumpApp(tester);
@@ -111,5 +122,31 @@ void main() {
         .onPressed!();
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('rest-timer-panel')), findsNothing);
+  });
+
+  testWidgets('finishing the last set does not start another rest timer', (
+    WidgetTester tester,
+  ) async {
+    await pumpApp(tester);
+
+    await tester.tap(find.text('一'));
+    await tester.pumpAndSettle();
+    final firstCard = find.byKey(const ValueKey('exercise_card_0_0'));
+    final sets = workoutDays.first.exercises.first.sets;
+
+    for (var set = 0; set < sets; set++) {
+      await tester.tap(firstCard);
+      await tester.pump(const Duration(milliseconds: 250));
+      if (set < sets - 1) {
+        expect(find.byKey(const Key('rest-timer-panel')), findsOneWidget);
+        tester
+            .widget<IconButton>(find.byKey(const Key('rest-timer-dismiss')))
+            .onPressed!();
+        await tester.pumpAndSettle();
+      }
+    }
+
+    expect(find.byKey(const Key('rest-timer-panel')), findsNothing);
+    expect(find.text('1/${workoutDays.first.exercises.length}'), findsOneWidget);
   });
 }
