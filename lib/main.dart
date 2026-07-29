@@ -611,6 +611,67 @@ class PressScale extends StatefulWidget {
   State<PressScale> createState() => _PressScaleState();
 }
 
+class CompletionPulse extends StatefulWidget {
+  final bool active;
+  final Widget child;
+
+  const CompletionPulse({
+    super.key,
+    required this.active,
+    required this.child,
+  });
+
+  @override
+  State<CompletionPulse> createState() => _CompletionPulseState();
+}
+
+class _CompletionPulseState extends State<CompletionPulse>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    );
+    _scale = Tween<double>(begin: 1, end: 1.018).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _syncAnimation();
+  }
+
+  @override
+  void didUpdateWidget(covariant CompletionPulse oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.active != widget.active) _syncAnimation();
+  }
+
+  void _syncAnimation() {
+    if (widget.active) {
+      _controller.repeat(reverse: true);
+    } else {
+      _controller.stop();
+      _controller.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ScaleTransition(
+        key: const Key('exercise-completion-pulse'),
+        scale: _scale,
+        child: widget.child,
+      );
+}
+
 class _PressScaleState extends State<PressScale>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c;
@@ -2333,9 +2394,11 @@ class _WorkoutPageState extends State<WorkoutPage> {
     final done = completedSets >= ex.sets;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: PressScale(
-        onTap: tap,
-        child: Card(
+      child: CompletionPulse(
+        active: done,
+        child: PressScale(
+          onTap: tap,
+          child: Card(
           key: ValueKey('exercise_card_${_day}_${num - 1}'),
           color: done
               ? t.success.withOpacity(t.isDark ? 0.045 : 0.035)
@@ -2506,6 +2569,30 @@ class _WorkoutPageState extends State<WorkoutPage> {
                             color: t.success,
                           ),
                         ),
+                      ] else if (done) ...[
+                        const SizedBox(height: 7),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.refresh_rounded,
+                              size: 13,
+                              color: t.success,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '已完成 · 再点一次重置',
+                              key: ValueKey(
+                                'exercise_reset_hint_${_day}_${num - 1}',
+                              ),
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                color: t.success,
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ],
                   ),
@@ -2591,6 +2678,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
                 ),
               ],
             ),
+          ),
           ),
         ),
       ),
