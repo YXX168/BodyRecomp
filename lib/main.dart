@@ -1595,18 +1595,23 @@ class _WorkoutPageState extends State<WorkoutPage> {
 
   Future<void> _toggle(int di, int ei) async {
     final k = '${di}_$ei';
-    final completing = !_done.containsKey(k);
+    final exercise = _plan[di].exercises[ei];
+    final completedSets = _completedSets(di, ei);
+    final resetting = completedSets >= exercise.sets;
+    final nextCompletedSets = resetting ? 0 : completedSets + 1;
     setState(() {
-      if (!completing) {
+      if (resetting) {
         _done.remove(k);
         HapticFeedback.lightImpact();
       } else {
-        _done[k] = true;
+        _done[k] = nextCompletedSets;
         HapticFeedback.mediumImpact();
       }
     });
-    if (completing && _autoRestTimer) {
-      _startRestTimer(_plan[di].exercises[ei]);
+    if (!resetting &&
+        nextCompletedSets < exercise.sets &&
+        _autoRestTimer) {
+      _startRestTimer(exercise);
     }
     final snapshot = Map<String, dynamic>.from(_done);
     final previous = _saveQueue;
@@ -1683,9 +1688,17 @@ class _WorkoutPageState extends State<WorkoutPage> {
   int _cnt(int d) {
     int c = 0;
     for (int i = 0; i < _plan[d].exercises.length; i++) {
-      if (_done.containsKey('${d}_$i')) c++;
+      if (_completedSets(d, i) >= _plan[d].exercises[i].sets) c++;
     }
     return c;
+  }
+
+  int _completedSets(int dayIndex, int exerciseIndex) {
+    final value = _done['${dayIndex}_$exerciseIndex'];
+    final totalSets = _plan[dayIndex].exercises[exerciseIndex].sets;
+    if (value == true) return totalSets;
+    if (value is num) return value.toInt().clamp(0, totalSets) as int;
+    return 0;
   }
 
   @override
@@ -2035,7 +2048,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
                     child: _exCard(
                       e.value,
                       e.key + 1,
-                      _done.containsKey('${_day}_${e.key}'),
+                      _completedSets(_day, e.key),
                       t,
                       () => _toggle(_day, e.key),
                       parseRestSeconds(e.value.rest) == null
@@ -2312,11 +2325,12 @@ class _WorkoutPageState extends State<WorkoutPage> {
   Widget _exCard(
     Exercise ex,
     int num,
-    bool done,
+    int completedSets,
     WorkoutTheme t,
     VoidCallback tap,
     VoidCallback? startTimer,
   ) {
+    final done = completedSets >= ex.sets;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: PressScale(
@@ -2479,6 +2493,20 @@ class _WorkoutPageState extends State<WorkoutPage> {
                                 ],
                               ),
                       ),
+                      if (!done && completedSets > 0) ...[
+                        const SizedBox(height: 7),
+                        Text(
+                          '已完成 $completedSets/${ex.sets} 组 · 点击完成下一组',
+                          key: ValueKey(
+                            'exercise_set_progress_${_day}_${num - 1}',
+                          ),
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: t.success,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
