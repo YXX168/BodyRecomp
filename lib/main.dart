@@ -1759,7 +1759,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
     final value = _done['${dayIndex}_$exerciseIndex'];
     final totalSets = _plan[dayIndex].exercises[exerciseIndex].sets;
     if (value == true) return totalSets;
-    if (value is num) return value.toInt().clamp(0, totalSets) as int;
+    if (value is num) return value.toInt().clamp(0, totalSets);
     return 0;
   }
 
