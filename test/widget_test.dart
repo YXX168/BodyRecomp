@@ -72,7 +72,7 @@ void main() {
 
     for (var set = 1; set < firstExercise.sets; set++) {
       await tester.tap(firstCard);
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 350));
     }
     expect(find.text('1/$exerciseTotal'), findsOneWidget);
     expect(find.text('已完成 · 再点一次重置'), findsOneWidget);
