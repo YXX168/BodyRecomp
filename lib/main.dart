@@ -611,6 +611,64 @@ class PressScale extends StatefulWidget {
   State<PressScale> createState() => _PressScaleState();
 }
 
+class CompletionPulse extends StatefulWidget {
+  final bool active;
+  final Widget child;
+
+  const CompletionPulse({super.key, required this.active, required this.child});
+
+  @override
+  State<CompletionPulse> createState() => _CompletionPulseState();
+}
+
+class _CompletionPulseState extends State<CompletionPulse>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    );
+    _scale = Tween<double>(
+      begin: 1,
+      end: 1.018,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _syncAnimation();
+  }
+
+  @override
+  void didUpdateWidget(covariant CompletionPulse oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.active != widget.active) _syncAnimation();
+  }
+
+  void _syncAnimation() {
+    if (widget.active) {
+      _controller.repeat(reverse: true);
+    } else {
+      _controller.stop();
+      _controller.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ScaleTransition(
+        key: const Key('exercise-completion-pulse'),
+        scale: _scale,
+        child: widget.child,
+      );
+}
+
 class _PressScaleState extends State<PressScale>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c;
@@ -1595,18 +1653,21 @@ class _WorkoutPageState extends State<WorkoutPage> {
 
   Future<void> _toggle(int di, int ei) async {
     final k = '${di}_$ei';
-    final completing = !_done.containsKey(k);
+    final exercise = _plan[di].exercises[ei];
+    final completedSets = _completedSets(di, ei);
+    final resetting = completedSets >= exercise.sets;
+    final nextCompletedSets = resetting ? 0 : completedSets + 1;
     setState(() {
-      if (!completing) {
+      if (resetting) {
         _done.remove(k);
         HapticFeedback.lightImpact();
       } else {
-        _done[k] = true;
+        _done[k] = nextCompletedSets;
         HapticFeedback.mediumImpact();
       }
     });
-    if (completing && _autoRestTimer) {
-      _startRestTimer(_plan[di].exercises[ei]);
+    if (!resetting && nextCompletedSets < exercise.sets && _autoRestTimer) {
+      _startRestTimer(exercise);
     }
     final snapshot = Map<String, dynamic>.from(_done);
     final previous = _saveQueue;
@@ -1683,9 +1744,17 @@ class _WorkoutPageState extends State<WorkoutPage> {
   int _cnt(int d) {
     int c = 0;
     for (int i = 0; i < _plan[d].exercises.length; i++) {
-      if (_done.containsKey('${d}_$i')) c++;
+      if (_completedSets(d, i) >= _plan[d].exercises[i].sets) c++;
     }
     return c;
+  }
+
+  int _completedSets(int dayIndex, int exerciseIndex) {
+    final value = _done['${dayIndex}_$exerciseIndex'];
+    final totalSets = _plan[dayIndex].exercises[exerciseIndex].sets;
+    if (value == true) return totalSets;
+    if (value is num) return value.toInt().clamp(0, totalSets);
+    return 0;
   }
 
   @override
@@ -2035,7 +2104,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
                     child: _exCard(
                       e.value,
                       e.key + 1,
-                      _done.containsKey('${_day}_${e.key}'),
+                      _completedSets(_day, e.key),
                       t,
                       () => _toggle(_day, e.key),
                       parseRestSeconds(e.value.rest) == null
@@ -2312,256 +2381,303 @@ class _WorkoutPageState extends State<WorkoutPage> {
   Widget _exCard(
     Exercise ex,
     int num,
-    bool done,
+    int completedSets,
     WorkoutTheme t,
     VoidCallback tap,
     VoidCallback? startTimer,
   ) {
+    final done = completedSets >= ex.sets;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: PressScale(
-        onTap: tap,
-        child: Card(
-          key: ValueKey('exercise_card_${_day}_${num - 1}'),
-          color: done
-              ? t.success.withOpacity(t.isDark ? 0.045 : 0.035)
-              : (ex.isStar ? t.primary.withOpacity(0.025) : null),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-            side: done
-                ? BorderSide(color: t.success.withOpacity(0.22), width: 1)
-                : (ex.isStar
-                    ? BorderSide(
-                        color: t.primary.withOpacity(0.26),
-                        width: 1.2,
-                      )
-                    : BorderSide(
-                        color: t.border.withOpacity(0.9),
-                        width: 0.8,
-                      )),
-          ),
-          child: AnimatedPadding(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            padding: EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: done ? 11 : 14,
+      child: CompletionPulse(
+        active: done,
+        child: PressScale(
+          onTap: tap,
+          child: Card(
+            key: ValueKey('exercise_card_${_day}_${num - 1}'),
+            color: done
+                ? t.success.withOpacity(t.isDark ? 0.045 : 0.035)
+                : (ex.isStar ? t.primary.withOpacity(0.025) : null),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+              side: done
+                  ? BorderSide(color: t.success.withOpacity(0.22), width: 1)
+                  : (ex.isStar
+                      ? BorderSide(
+                          color: t.primary.withOpacity(0.26),
+                          width: 1.2,
+                        )
+                      : BorderSide(
+                          color: t.border.withOpacity(0.9),
+                          width: 0.8,
+                        )),
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOutCubic,
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: done ? t.success : t.card,
-                    border: Border.all(
-                      color: done ? t.success : t.border,
-                      width: 1.4,
-                    ),
-                    boxShadow: done
-                        ? [
-                            BoxShadow(
-                              color: t.success.withOpacity(0.28),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    transitionBuilder: (c, a) => FadeTransition(
-                      opacity: a,
-                      child: ScaleTransition(
-                        scale: Tween<double>(begin: 0.8, end: 1.0).animate(
-                          CurvedAnimation(parent: a, curve: Curves.easeOutBack),
-                        ),
-                        child: c,
+            child: AnimatedPadding(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              padding: EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: done ? 11 : 14,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: done ? t.success : t.card,
+                      border: Border.all(
+                        color: done ? t.success : t.border,
+                        width: 1.4,
                       ),
-                    ),
-                    child: done
-                        ? const Icon(
-                            Icons.check,
-                            color: Colors.white,
-                            size: 14,
-                            key: ValueKey('d'),
-                          )
-                        : Center(
-                            child: Text(
-                              '$num',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: t.text4,
+                      boxShadow: done
+                          ? [
+                              BoxShadow(
+                                color: t.success.withOpacity(0.28),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
                               ),
-                              key: ValueKey('n$num'),
+                            ]
+                          : null,
+                    ),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      transitionBuilder: (c, a) => FadeTransition(
+                        opacity: a,
+                        child: ScaleTransition(
+                          scale: Tween<double>(begin: 0.8, end: 1.0).animate(
+                            CurvedAnimation(
+                              parent: a,
+                              curve: Curves.easeOutBack,
                             ),
                           ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        ex.name,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: done ? t.text4 : t.text1,
-                          decoration: done ? TextDecoration.lineThrough : null,
-                          decorationColor: t.text4,
+                          child: c,
                         ),
                       ),
-                      AnimatedSize(
-                        duration: const Duration(milliseconds: 220),
-                        curve: Curves.easeOutCubic,
-                        alignment: Alignment.topCenter,
-                        child: done
-                            ? const SizedBox.shrink()
-                            : Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const SizedBox(height: 3),
-                                  Wrap(
-                                    spacing: 4,
-                                    runSpacing: 2,
-                                    children: [
-                                      ...ex.muscles.map(
-                                        (m) => Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 6,
-                                            vertical: 1,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: t.primary.withOpacity(0.06),
-                                            borderRadius: BorderRadius.circular(
-                                              4,
+                      child: done
+                          ? const Icon(
+                              Icons.check,
+                              color: Colors.white,
+                              size: 14,
+                              key: ValueKey('d'),
+                            )
+                          : Center(
+                              child: Text(
+                                '$num',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: t.text4,
+                                ),
+                                key: ValueKey('n$num'),
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          ex.name,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: done ? t.text4 : t.text1,
+                            decoration:
+                                done ? TextDecoration.lineThrough : null,
+                            decorationColor: t.text4,
+                          ),
+                        ),
+                        AnimatedSize(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutCubic,
+                          alignment: Alignment.topCenter,
+                          child: done
+                              ? const SizedBox.shrink()
+                              : Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const SizedBox(height: 3),
+                                    Wrap(
+                                      spacing: 4,
+                                      runSpacing: 2,
+                                      children: [
+                                        ...ex.muscles.map(
+                                          (m) => Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 1,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: t.primary.withOpacity(
+                                                0.06,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              m,
+                                              style: TextStyle(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w600,
+                                                color: t.text3,
+                                              ),
                                             ),
                                           ),
-                                          child: Text(
-                                            m,
+                                        ),
+                                        if (ex.muscleTarget.isNotEmpty)
+                                          Text(
+                                            ex.muscleTarget,
                                             style: TextStyle(
                                               fontSize: 9,
-                                              fontWeight: FontWeight.w600,
                                               color: t.text3,
                                             ),
                                           ),
-                                        ),
-                                      ),
-                                      if (ex.muscleTarget.isNotEmpty)
-                                        Text(
-                                          ex.muscleTarget,
+                                      ],
+                                    ),
+                                    if (ex.note != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 6),
+                                        child: Text(
+                                          ex.note!,
                                           style: TextStyle(
-                                            fontSize: 9,
+                                            fontSize: 10.5,
                                             color: t.text3,
+                                            height: 1.5,
                                           ),
                                         ),
-                                    ],
-                                  ),
-                                  if (ex.note != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 6),
-                                      child: Text(
-                                        ex.note!,
-                                        style: TextStyle(
-                                          fontSize: 10.5,
-                                          color: t.text3,
-                                          height: 1.5,
-                                        ),
                                       ),
-                                    ),
-                                ],
-                              ),
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(
-                            text: '${ex.sets}',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
-                              color: done ? t.text4 : t.primary,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
-                            ),
-                          ),
-                          TextSpan(
-                            text: ' ×',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: done ? t.text4 : t.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      ex.reps,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: done ? t.text4 : t.text2,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    if (startTimer == null)
-                      Text(
-                        ex.rest,
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w500,
-                          color: done ? t.text4.withOpacity(0.72) : t.text4,
+                                  ],
+                                ),
                         ),
-                      )
-                    else
-                      GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: startTimer,
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 2, bottom: 2),
-                          child: Row(
+                        if (!done && completedSets > 0) ...[
+                          const SizedBox(height: 7),
+                          Text(
+                            '已完成 $completedSets/${ex.sets} 组 · 点击完成下一组',
+                            key: ValueKey(
+                              'exercise_set_progress_${_day}_${num - 1}',
+                            ),
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: t.success,
+                            ),
+                          ),
+                        ] else if (done) ...[
+                          const SizedBox(height: 7),
+                          Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                Icons.timer_outlined,
-                                size: 10,
-                                color: done
-                                    ? t.text4.withOpacity(0.72)
-                                    : t.primary,
+                                Icons.refresh_rounded,
+                                size: 13,
+                                color: t.success,
                               ),
-                              const SizedBox(width: 2),
+                              const SizedBox(width: 4),
                               Text(
-                                ex.rest,
+                                '已完成 · 再点一次重置',
+                                key: ValueKey(
+                                  'exercise_reset_hint_${_day}_${num - 1}',
+                                ),
                                 style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w600,
-                                  color: done
-                                      ? t.text4.withOpacity(0.72)
-                                      : t.primary,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: t.success,
                                 ),
                               ),
                             ],
                           ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: '${ex.sets}',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                color: done ? t.text4 : t.primary,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
+                            ),
+                            TextSpan(
+                              text: ' ×',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: done ? t.text4 : t.primary,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                  ],
-                ),
-              ],
+                      Text(
+                        ex.reps,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: done ? t.text4 : t.text2,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      if (startTimer == null)
+                        Text(
+                          ex.rest,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w500,
+                            color: done ? t.text4.withOpacity(0.72) : t.text4,
+                          ),
+                        )
+                      else
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: startTimer,
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 2, bottom: 2),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.timer_outlined,
+                                  size: 10,
+                                  color: done
+                                      ? t.text4.withOpacity(0.72)
+                                      : t.primary,
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  ex.rest,
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w600,
+                                    color: done
+                                        ? t.text4.withOpacity(0.72)
+                                        : t.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
