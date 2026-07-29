@@ -40,8 +40,9 @@ void main() {
       await tester.tap(mondayTab);
       await tester.pumpAndSettle();
     }
-    final activeDayIndex =
-        workoutDays[dayIndex].exercises.isEmpty ? 0 : dayIndex;
+    final activeDayIndex = workoutDays[dayIndex].exercises.isEmpty
+        ? 0
+        : dayIndex;
     final exerciseTotal = workoutDays[activeDayIndex].exercises.length;
     final firstCard = find.byKey(ValueKey('exercise_card_${activeDayIndex}_0'));
     expect(firstCard, findsOneWidget);
@@ -149,6 +150,9 @@ void main() {
     }
 
     expect(find.byKey(const Key('rest-timer-panel')), findsNothing);
-    expect(find.text('1/${workoutDays.first.exercises.length}'), findsOneWidget);
+    expect(
+      find.text('1/${workoutDays.first.exercises.length}'),
+      findsOneWidget,
+    );
   });
 }
