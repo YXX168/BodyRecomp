@@ -74,6 +74,8 @@ void main() {
       await tester.pumpAndSettle();
     }
     expect(find.text('1/$exerciseTotal'), findsOneWidget);
+    expect(find.text('已完成 · 再点一次重置'), findsOneWidget);
+    expect(find.byKey(const Key('exercise-completion-pulse')), findsWidgets);
 
     await tester.tap(firstCard);
     await tester.pumpAndSettle();
