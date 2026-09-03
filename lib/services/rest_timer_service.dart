@@ -2,6 +2,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const String autoRestTimerKey = 'recomp_auto_rest_timer_v1';
 
+int restSecondsUntil(DateTime deadline, {DateTime? now}) {
+  final milliseconds =
+      deadline.difference(now ?? DateTime.now()).inMilliseconds;
+  if (milliseconds <= 0) return 0;
+  return (milliseconds / Duration.millisecondsPerSecond).ceil();
+}
+
 int? parseRestSeconds(String value) {
   final normalized = value.trim().toLowerCase();
   if (normalized.isEmpty || normalized.contains('循环')) return null;

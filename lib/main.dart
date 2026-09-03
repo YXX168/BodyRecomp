@@ -13,7 +13,7 @@ import 'services/rest_timer_service.dart';
 import 'services/workout_plan_service.dart';
 import 'widgets/horizontal_day_swipe.dart';
 
-const appVersion = '6.9.0';
+const appVersion = '6.10.0';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // THEME SYSTEM — v6.6: profile + chart + settings support
@@ -526,6 +526,9 @@ const workoutDays = [
 ];
 
 final workoutPlanRevision = ValueNotifier<int>(0);
+final restTimerPreferenceRevision = ValueNotifier<int>(0);
+final workoutDataRevision = ValueNotifier<int>(0);
+final workoutHistoryRevision = ValueNotifier<int>(0);
 
 const nutritionTips = [
   '热量缺口 300-500 大卡，减脂靠饮食缺口，少吃半碗饭 > 跑 20 分钟',
@@ -611,64 +614,6 @@ class PressScale extends StatefulWidget {
   State<PressScale> createState() => _PressScaleState();
 }
 
-class CompletionPulse extends StatefulWidget {
-  final bool active;
-  final Widget child;
-
-  const CompletionPulse({super.key, required this.active, required this.child});
-
-  @override
-  State<CompletionPulse> createState() => _CompletionPulseState();
-}
-
-class _CompletionPulseState extends State<CompletionPulse>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1100),
-    );
-    _scale = Tween<double>(
-      begin: 1,
-      end: 1.018,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
-    _syncAnimation();
-  }
-
-  @override
-  void didUpdateWidget(covariant CompletionPulse oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.active != widget.active) _syncAnimation();
-  }
-
-  void _syncAnimation() {
-    if (widget.active) {
-      _controller.repeat(reverse: true);
-    } else {
-      _controller.stop();
-      _controller.value = 0;
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => ScaleTransition(
-        key: const Key('exercise-completion-pulse'),
-        scale: _scale,
-        child: widget.child,
-      );
-}
-
 class _PressScaleState extends State<PressScale>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c;
@@ -695,14 +640,17 @@ class _PressScaleState extends State<PressScale>
 
   @override
   Widget build(BuildContext context) {
+    final enabled = widget.onTap != null;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => _c.forward(),
-      onTapUp: (_) {
-        _c.reverse();
-        widget.onTap?.call();
-      },
-      onTapCancel: () => _c.reverse(),
+      onTapDown: enabled ? (_) => _c.forward() : null,
+      onTapUp: enabled
+          ? (_) {
+              _c.reverse();
+              widget.onTap?.call();
+            }
+          : null,
+      onTapCancel: enabled ? () => _c.reverse() : null,
       child: ScaleTransition(scale: _s, child: widget.child),
     );
   }
@@ -1050,13 +998,24 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   int _tab = 0;
   UserProfile? _profile;
+  late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
-    loadProfile().then((p) {
-      if (mounted) setState(() => _profile = p);
-    });
+    _pages = [
+      const WorkoutPage(),
+      const NutritionPage(),
+      const ProgressionPage(),
+      const RecordPage(),
+      SettingsPage(onProfileChanged: _reloadProfile),
+    ];
+    _reloadProfile();
+  }
+
+  Future<void> _reloadProfile() async {
+    final profile = await loadProfile();
+    if (mounted) setState(() => _profile = profile);
   }
 
   @override
@@ -1073,17 +1032,6 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
         (p != null && p.heightCm > 0) ? '${p.heightCm.toInt()}cm' : '--';
     final weightStr = (p != null && p.weightKg > 0) ? '${p.weightKg}kg' : '--';
     final statusText = '$ageStr · $heightStr · $weightStr · BMI $bmi';
-    final pages = [
-      WorkoutPage(),
-      NutritionPage(),
-      ProgressionPage(),
-      RecordPage(),
-      SettingsPage(
-        onProfileChanged: () => loadProfile().then((profile) {
-          if (mounted) setState(() => _profile = profile);
-        }),
-      ),
-    ];
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -1124,8 +1072,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                     PressScale(
                       onTap: _showThemeSheet,
                       child: Container(
-                        width: 42,
-                        height: 42,
+                        width: 48,
+                        height: 48,
                         decoration: BoxDecoration(
                           color: t.card.withOpacity(t.isDark ? 0.92 : 0.86),
                           borderRadius: BorderRadius.circular(16),
@@ -1155,26 +1103,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
               ),
             ),
             Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
-                transitionBuilder: (child, anim) => FadeTransition(
-                  opacity: anim,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0.02, 0),
-                      end: Offset.zero,
-                    ).animate(
-                      CurvedAnimation(
-                        parent: anim,
-                        curve: Curves.easeOutCubic,
-                      ),
-                    ),
-                    child: child,
-                  ),
-                ),
-                child: KeyedSubtree(key: ValueKey(_tab), child: pages[_tab]),
+              child: IndexedStack(
+                index: _tab,
+                sizing: StackFit.expand,
+                children: _pages,
               ),
             ),
           ],
@@ -1259,45 +1191,50 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   ) {
     final sel = idx == _tab;
     return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          if (_tab != idx) {
-            HapticFeedback.selectionClick();
-            setState(() => _tab = idx);
-          }
-        },
-        child: SizedBox(
-          height: 52,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                transform: Matrix4.diagonal3Values(
-                  sel ? 1.10 : 1.0,
-                  sel ? 1.10 : 1.0,
-                  1.0,
+      child: Semantics(
+        button: true,
+        selected: sel,
+        label: '$label页',
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            if (_tab != idx) {
+              HapticFeedback.selectionClick();
+              setState(() => _tab = idx);
+            }
+          },
+          child: SizedBox(
+            height: 52,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  transform: Matrix4.diagonal3Values(
+                    sel ? 1.10 : 1.0,
+                    sel ? 1.10 : 1.0,
+                    1.0,
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 22,
+                    color: Color.lerp(t.text4, t.primary, sel ? 1.0 : 0.0),
+                  ),
                 ),
-                child: Icon(
-                  icon,
-                  size: 22,
-                  color: Color.lerp(t.text4, t.primary, sel ? 1.0 : 0.0),
+                const SizedBox(height: 3),
+                AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 220),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                    color: sel ? t.primary : t.text4,
+                  ),
+                  child: Text(label),
                 ),
-              ),
-              const SizedBox(height: 3),
-              AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 220),
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                  color: sel ? t.primary : t.text4,
-                ),
-                child: Text(label),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1517,43 +1454,48 @@ class _DaySegmentedNav extends StatelessWidget {
                   final d = workoutDays[i];
                   final sel = i == selected;
                   return Expanded(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => onSelect(i),
-                      child: SizedBox(
-                        height: 46,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            AnimatedDefaultTextStyle(
-                              duration: const Duration(milliseconds: 220),
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight:
-                                    sel ? FontWeight.w900 : FontWeight.w700,
-                                color: sel ? Colors.white : t.text2,
-                                letterSpacing: -0.2,
+                    child: Semantics(
+                      button: true,
+                      selected: sel,
+                      label: '${d.dayName}，${d.subtitle}',
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => onSelect(i),
+                        child: SizedBox(
+                          height: 46,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              AnimatedDefaultTextStyle(
+                                duration: const Duration(milliseconds: 220),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight:
+                                      sel ? FontWeight.w900 : FontWeight.w700,
+                                  color: sel ? Colors.white : t.text2,
+                                  letterSpacing: -0.2,
+                                ),
+                                child: Text(d.dayName.replaceFirst('周', '')),
                               ),
-                              child: Text(d.dayName.replaceFirst('周', '')),
-                            ),
-                            const SizedBox(height: 2),
-                            AnimatedDefaultTextStyle(
-                              duration: const Duration(milliseconds: 220),
-                              style: TextStyle(
-                                fontSize: 7.5,
-                                fontWeight:
-                                    sel ? FontWeight.w700 : FontWeight.w500,
-                                color: sel
-                                    ? Colors.white.withOpacity(0.86)
-                                    : t.text4,
+                              const SizedBox(height: 2),
+                              AnimatedDefaultTextStyle(
+                                duration: const Duration(milliseconds: 220),
+                                style: TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight:
+                                      sel ? FontWeight.w700 : FontWeight.w500,
+                                  color: sel
+                                      ? Colors.white.withOpacity(0.86)
+                                      : t.text4,
+                                ),
+                                child: Text(
+                                  d.subtitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                              child: Text(
-                                d.subtitle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -1574,7 +1516,7 @@ class WorkoutPage extends StatefulWidget {
   State<WorkoutPage> createState() => _WorkoutPageState();
 }
 
-class _WorkoutPageState extends State<WorkoutPage> {
+class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
   int _day = 0;
   Map<String, dynamic> _done = {};
   List<WorkoutDay> _plan = List<WorkoutDay>.from(workoutDays);
@@ -1582,53 +1524,68 @@ class _WorkoutPageState extends State<WorkoutPage> {
   int _restTotal = 0;
   int _restRemaining = 0;
   String _restExercise = '';
-  bool _autoRestTimer = true;
+  DateTime? _restDeadline;
+  bool _autoRestTimer = false;
+  bool _workoutReady = false;
   Future<void> _saveQueue = Future<void>.value();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     workoutPlanRevision.addListener(_reloadPlan);
+    restTimerPreferenceRevision.addListener(_reloadRestTimerPreference);
+    workoutDataRevision.addListener(_loadInitialState);
     final d = DateTime.now().weekday;
     if (d >= 1 && d <= 7) _day = d - 1;
-    SharedPreferences.getInstance().then((p) async {
-      final now = DateTime.now();
-      final currentWeek = isoWeekNumber(now);
-      final currentYear = isoWeekYear(now);
-      final storedWeek = p.getInt('recomp_done_v6_week');
-      final storedYear = p.getInt('recomp_done_v6_year');
+    _loadInitialState();
+  }
 
-      if (storedWeek == null ||
-          storedYear == null ||
-          storedYear != currentYear ||
-          storedWeek != currentWeek) {
-        // 新的一周：先将旧数据按真实日期归档，再清空。
-        final oldRaw = p.getString('recomp_done_v6');
-        if (oldRaw != null && oldRaw != '{}') {
-          try {
-            final oldDone = jsonDecode(oldRaw) as Map<String, dynamic>;
-            final archiveYear = storedYear ?? currentYear;
-            final archiveWeek = storedWeek ?? currentWeek;
-            await saveWeekDoneToHistory(p, oldDone, archiveYear, archiveWeek);
-          } catch (_) {}
-        }
-        await p.setString('recomp_done_v6', jsonEncode({}));
-        await p.setInt('recomp_done_v6_week', currentWeek);
-        await p.setInt('recomp_done_v6_year', currentYear);
-        _done = {};
-      } else {
-        final r = p.getString('recomp_done_v6');
-        if (r != null) {
-          try {
-            _done = jsonDecode(r) as Map<String, dynamic>;
-          } catch (_) {}
-        }
+  Future<void> _loadInitialState() async {
+    final preferences = await SharedPreferences.getInstance();
+    final now = DateTime.now();
+    final currentWeek = isoWeekNumber(now);
+    final currentYear = isoWeekYear(now);
+    final storedWeek = preferences.getInt('recomp_done_v6_week');
+    final storedYear = preferences.getInt('recomp_done_v6_year');
+    var loadedDone = <String, dynamic>{};
+
+    if (storedWeek == null ||
+        storedYear == null ||
+        storedYear != currentYear ||
+        storedWeek != currentWeek) {
+      final oldRaw = preferences.getString('recomp_done_v6');
+      if (oldRaw != null && oldRaw != '{}') {
+        try {
+          final oldDone = jsonDecode(oldRaw) as Map<String, dynamic>;
+          await saveWeekDoneToHistory(
+            preferences,
+            oldDone,
+            storedYear ?? currentYear,
+            storedWeek ?? currentWeek,
+          );
+        } catch (_) {}
       }
-      if (mounted) setState(() {});
-    });
-    _reloadPlan();
-    loadAutoRestTimer().then((enabled) {
-      if (mounted) setState(() => _autoRestTimer = enabled);
+      await preferences.setString('recomp_done_v6', jsonEncode(loadedDone));
+      await preferences.setInt('recomp_done_v6_week', currentWeek);
+      await preferences.setInt('recomp_done_v6_year', currentYear);
+    } else {
+      final raw = preferences.getString('recomp_done_v6');
+      if (raw != null) {
+        try {
+          loadedDone = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+        } catch (_) {}
+      }
+    }
+
+    final plan = await loadWorkoutPlan(workoutDays, preferences: preferences);
+    final autoRest = await loadAutoRestTimer(preferences: preferences);
+    if (!mounted) return;
+    setState(() {
+      _done = loadedDone;
+      _plan = plan;
+      _autoRestTimer = autoRest;
+      _workoutReady = true;
     });
   }
 
@@ -1637,11 +1594,24 @@ class _WorkoutPageState extends State<WorkoutPage> {
     if (mounted) setState(() => _plan = plan);
   }
 
+  Future<void> _reloadRestTimerPreference() async {
+    final autoRest = await loadAutoRestTimer();
+    if (mounted) setState(() => _autoRestTimer = autoRest);
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     workoutPlanRevision.removeListener(_reloadPlan);
+    restTimerPreferenceRevision.removeListener(_reloadRestTimerPreference);
+    workoutDataRevision.removeListener(_loadInitialState);
     _restTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _syncRestCountdown();
   }
 
   void _selectDay(int day) {
@@ -1652,23 +1622,60 @@ class _WorkoutPageState extends State<WorkoutPage> {
   }
 
   Future<void> _toggle(int di, int ei) async {
+    if (!_workoutReady) return;
     final k = '${di}_$ei';
     final exercise = _plan[di].exercises[ei];
     final completedSets = _completedSets(di, ei);
-    final resetting = completedSets >= exercise.sets;
-    final nextCompletedSets = resetting ? 0 : completedSets + 1;
+    if (completedSets >= exercise.sets) return;
+    final nextCompletedSets = completedSets + 1;
     setState(() {
-      if (resetting) {
-        _done.remove(k);
-        HapticFeedback.lightImpact();
-      } else {
-        _done[k] = nextCompletedSets;
-        HapticFeedback.mediumImpact();
-      }
+      _done[k] = nextCompletedSets >= exercise.sets ? true : nextCompletedSets;
+      HapticFeedback.mediumImpact();
     });
-    if (!resetting && nextCompletedSets < exercise.sets && _autoRestTimer) {
+    if (nextCompletedSets < exercise.sets && _autoRestTimer) {
       _startRestTimer(exercise);
     }
+    if (_cnt(di) == _plan[di].exercises.length && mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('${_plan[di].dayName}训练已完成，做得漂亮！'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+    }
+    await _queueDoneSave();
+  }
+
+  Future<void> _resetExercise(int di, int ei) async {
+    if (!_workoutReady) return;
+    final key = '${di}_$ei';
+    final previousValue = _done[key];
+    if (previousValue == null) return;
+    setState(() => _done.remove(key));
+    HapticFeedback.lightImpact();
+    await _queueDoneSave();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('${_plan[di].exercises[ei].name}已重置'),
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: '撤销',
+            onPressed: () {
+              if (!mounted) return;
+              setState(() => _done[key] = previousValue);
+              _queueDoneSave();
+            },
+          ),
+        ),
+      );
+  }
+
+  Future<void> _queueDoneSave() async {
     final snapshot = Map<String, dynamic>.from(_done);
     final previous = _saveQueue;
     _saveQueue = () async {
@@ -1692,6 +1699,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
     await p.setInt('recomp_done_v6_week', currentWeek);
     await p.setInt('recomp_done_v6_year', currentYear);
     await saveWeekDoneToHistory(p, done, currentYear, currentWeek);
+    workoutHistoryRevision.value++;
   }
 
   void _startRestTimer(Exercise exercise) {
@@ -1702,29 +1710,43 @@ class _WorkoutPageState extends State<WorkoutPage> {
       _restTotal = seconds;
       _restRemaining = seconds;
       _restExercise = exercise.name;
+      _restDeadline = DateTime.now().add(Duration(seconds: seconds));
     });
     _runRestTicker();
   }
 
   void _runRestTicker() {
     _restTimer?.cancel();
-    _restTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+    _restTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
       if (!mounted) return;
-      if (_restRemaining <= 1) {
-        _restTimer?.cancel();
-        setState(() => _restRemaining = 0);
-        HapticFeedback.heavyImpact();
-        SystemSound.play(SystemSoundType.click);
-      } else {
-        setState(() => _restRemaining--);
-      }
+      _syncRestCountdown();
     });
+  }
+
+  void _syncRestCountdown() {
+    final deadline = _restDeadline;
+    if (!mounted || deadline == null || _restTotal == 0) return;
+    final remaining = restSecondsUntil(deadline);
+    if (remaining == _restRemaining) return;
+    if (remaining == 0) {
+      _restTimer?.cancel();
+      setState(() => _restRemaining = 0);
+      HapticFeedback.heavyImpact();
+      SystemSound.play(SystemSoundType.click);
+    } else {
+      setState(() => _restRemaining = remaining);
+    }
   }
 
   void _addRestTime() {
     if (_restTotal == 0) return;
+    final now = DateTime.now();
+    final base = _restDeadline != null && _restDeadline!.isAfter(now)
+        ? _restDeadline!
+        : now;
+    _restDeadline = base.add(const Duration(seconds: 30));
     setState(() {
-      _restRemaining += 30;
+      _restRemaining = restSecondsUntil(_restDeadline!, now: now);
       if (_restRemaining > _restTotal) _restTotal = _restRemaining;
     });
     if (_restTimer?.isActive != true) {
@@ -1738,6 +1760,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
       _restTotal = 0;
       _restRemaining = 0;
       _restExercise = '';
+      _restDeadline = null;
     });
   }
 
@@ -1765,40 +1788,69 @@ class _WorkoutPageState extends State<WorkoutPage> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
-          child: _DaySegmentedNav(
-            selected: _day,
-            theme: t,
-            onSelect: _selectDay,
-          ),
-        ),
-        Expanded(
           child: HorizontalDaySwipe(
             onPrevious: () => _selectDay(_day - 1),
             onNext: () => _selectDay(_day + 1),
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (child, animation) => FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0.02, 0),
-                    end: Offset.zero,
-                  ).animate(
-                    CurvedAnimation(
-                      parent: animation,
-                      curve: Curves.easeOutCubic,
+            child: _DaySegmentedNav(
+              selected: _day,
+              theme: t,
+              onSelect: _selectDay,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0.02, 0),
+                        end: Offset.zero,
+                      ).animate(
+                        CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
+                        ),
+                      ),
+                      child: child,
                     ),
                   ),
-                  child: child,
+                  child: KeyedSubtree(
+                    key: ValueKey('day_$_day'),
+                    child: _buildContent(wd, t),
+                  ),
                 ),
               ),
-              child: KeyedSubtree(
-                key: ValueKey('day_$_day'),
-                child: _buildContent(wd, t),
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 12,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.35),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    ),
+                  ),
+                  child: _restTotal > 0
+                      ? _restTimerPanel(t)
+                      : const SizedBox.shrink(
+                          key: ValueKey('rest-timer-hidden'),
+                        ),
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ],
@@ -1983,31 +2035,12 @@ class _WorkoutPageState extends State<WorkoutPage> {
     final done = _cnt(_day);
     final total = day.exercises.length;
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+      key: PageStorageKey('workout-scroll-$_day'),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 116),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           FadeScaleEntry(child: _dayHdr(day, t), index: 0),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 280),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            transitionBuilder: (child, animation) => FadeTransition(
-              opacity: animation,
-              child: SizeTransition(
-                sizeFactor: animation,
-                axisAlignment: -1,
-                child: child,
-              ),
-            ),
-            child: _restTotal > 0
-                ? Padding(
-                    key: const ValueKey('rest-timer-visible'),
-                    padding: const EdgeInsets.only(top: 10),
-                    child: _restTimerPanel(t),
-                  )
-                : const SizedBox.shrink(key: ValueKey('rest-timer-hidden')),
-          ),
           const SizedBox(height: 12),
           FadeScaleEntry(
             index: 1,
@@ -2075,25 +2108,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
               ],
             ),
           ),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 320),
-            transitionBuilder: (child, animation) => FadeTransition(
-              opacity: animation,
-              child: ScaleTransition(
-                scale: Tween<double>(begin: 0.97, end: 1).animate(
-                  CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
-                ),
-                child: child,
-              ),
-            ),
-            child: total > 0 && done == total
-                ? Padding(
-                    key: ValueKey('workout-complete-$_day'),
-                    padding: const EdgeInsets.only(top: 12),
-                    child: _workoutCompletePanel(day, t),
-                  )
-                : const SizedBox.shrink(key: ValueKey('workout-incomplete')),
-          ),
           const SizedBox(height: 14),
           ...day.exercises.asMap().entries.map(
                 (e) => FadeScaleEntry(
@@ -2107,6 +2121,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
                       _completedSets(_day, e.key),
                       t,
                       () => _toggle(_day, e.key),
+                      () => _resetExercise(_day, e.key),
                       parseRestSeconds(e.value.rest) == null
                           ? null
                           : () => _startRestTimer(e.value),
@@ -2251,56 +2266,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
     );
   }
 
-  Widget _workoutCompletePanel(WorkoutDay day, WorkoutTheme t) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            t.success.withOpacity(t.isDark ? 0.14 : 0.09),
-            t.primary.withOpacity(t.isDark ? 0.08 : 0.04),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: t.success.withOpacity(0.24)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: t.success.withOpacity(0.13),
-            ),
-            child: Icon(Icons.emoji_events_rounded, color: t.success, size: 20),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${day.dayName}训练已完成',
-                  style: TextStyle(
-                    color: t.text1,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '漂亮收尾，记得补水、拉伸并保证恢复。',
-                  style: TextStyle(color: t.text3, fontSize: 10.5),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _dayHdr(WorkoutDay d, WorkoutTheme t) {
     return Card(
       child: Padding(
@@ -2310,34 +2275,44 @@ class _WorkoutPageState extends State<WorkoutPage> {
           children: [
             Row(
               children: [
-                Text(
-                  '${d.dayName} ${d.subtitle}',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: t.text1,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: t.primary.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
+                Expanded(
                   child: Text(
-                    d.badge,
+                    '${d.dayName} ${d.subtitle}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: t.primary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: t.text1,
+                      letterSpacing: -0.3,
                     ),
                   ),
                 ),
+                if (d.badge.isNotEmpty) ...[
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: t.primary.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      child: Text(
+                        d.badge,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: t.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
             if (d.description.isNotEmpty) ...[
@@ -2384,15 +2359,23 @@ class _WorkoutPageState extends State<WorkoutPage> {
     int completedSets,
     WorkoutTheme t,
     VoidCallback tap,
+    VoidCallback reset,
     VoidCallback? startTimer,
   ) {
     final done = completedSets >= ex.sets;
+    final status = completedSets == 0
+        ? '点击卡片完成第 1 组'
+        : done
+            ? '${ex.sets}/${ex.sets} 组已完成'
+            : '$completedSets/${ex.sets} 组完成 · 点击继续';
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: CompletionPulse(
-        active: done,
+      child: Semantics(
+        button: !done,
+        enabled: _workoutReady && !done,
+        label: '${ex.name}，$status',
         child: PressScale(
-          onTap: tap,
+          onTap: _workoutReady && !done ? tap : null,
           child: Card(
             key: ValueKey('exercise_card_${_day}_${num - 1}'),
             color: done
@@ -2412,13 +2395,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
                           width: 0.8,
                         )),
             ),
-            child: AnimatedPadding(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              padding: EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: done ? 11 : 14,
-              ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -2485,6 +2463,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
                       children: [
                         Text(
                           ex.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
@@ -2494,106 +2474,71 @@ class _WorkoutPageState extends State<WorkoutPage> {
                             decorationColor: t.text4,
                           ),
                         ),
-                        AnimatedSize(
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeOutCubic,
-                          alignment: Alignment.topCenter,
-                          child: done
-                              ? const SizedBox.shrink()
-                              : Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const SizedBox(height: 3),
-                                    Wrap(
-                                      spacing: 4,
-                                      runSpacing: 2,
-                                      children: [
-                                        ...ex.muscles.map(
-                                          (m) => Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 6,
-                                              vertical: 1,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: t.primary.withOpacity(
-                                                0.06,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              m,
-                                              style: TextStyle(
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.w600,
-                                                color: t.text3,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        if (ex.muscleTarget.isNotEmpty)
-                                          Text(
-                                            ex.muscleTarget,
-                                            style: TextStyle(
-                                              fontSize: 9,
-                                              color: t.text3,
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                    if (ex.note != null)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 6),
-                                        child: Text(
-                                          ex.note!,
-                                          style: TextStyle(
-                                            fontSize: 10.5,
-                                            color: t.text3,
-                                            height: 1.5,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 5,
+                          runSpacing: 3,
+                          children: [
+                            ...ex.muscles.map(
+                              (m) => Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 2,
                                 ),
-                        ),
-                        if (!done && completedSets > 0) ...[
-                          const SizedBox(height: 7),
-                          Text(
-                            '已完成 $completedSets/${ex.sets} 组 · 点击完成下一组',
-                            key: ValueKey(
-                              'exercise_set_progress_${_day}_${num - 1}',
-                            ),
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              color: t.success,
-                            ),
-                          ),
-                        ] else if (done) ...[
-                          const SizedBox(height: 7),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.refresh_rounded,
-                                size: 13,
-                                color: t.success,
+                                decoration: BoxDecoration(
+                                  color: t.primary.withOpacity(0.07),
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                                child: Text(
+                                  m,
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: t.text3,
+                                  ),
+                                ),
                               ),
-                              const SizedBox(width: 4),
+                            ),
+                            if (ex.muscleTarget.isNotEmpty)
                               Text(
-                                '已完成 · 再点一次重置',
-                                key: ValueKey(
-                                  'exercise_reset_hint_${_day}_${num - 1}',
-                                ),
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: t.success,
-                                ),
+                                ex.muscleTarget,
+                                style:
+                                    TextStyle(fontSize: 10.5, color: t.text3),
                               ),
-                            ],
+                          ],
+                        ),
+                        if (ex.note != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 7),
+                            child: Text(
+                              ex.note!,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: t.text3,
+                                height: 1.45,
+                              ),
+                            ),
                           ),
-                        ],
+                        const SizedBox(height: 7),
+                        SizedBox(
+                          height: 18,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              status,
+                              key: ValueKey(
+                                'exercise_set_progress_${_day}_${num - 1}',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: done ? t.success : t.text3,
+                              ),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -2633,47 +2578,67 @@ class _WorkoutPageState extends State<WorkoutPage> {
                           color: done ? t.text4 : t.text2,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      if (startTimer == null)
-                        Text(
-                          ex.rest,
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w500,
-                            color: done ? t.text4.withOpacity(0.72) : t.text4,
-                          ),
-                        )
-                      else
-                        GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: startTimer,
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 2, bottom: 2),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.timer_outlined,
-                                  size: 10,
-                                  color: done
-                                      ? t.text4.withOpacity(0.72)
-                                      : t.primary,
+                      const SizedBox(height: 6),
+                      SizedBox.square(
+                        dimension: 48,
+                        child: done
+                            ? TextButton(
+                                key: ValueKey(
+                                  'exercise_reset_${_day}_${num - 1}',
                                 ),
-                                const SizedBox(width: 2),
-                                Text(
-                                  ex.rest,
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w600,
-                                    color: done
-                                        ? t.text4.withOpacity(0.72)
-                                        : t.primary,
+                                onPressed: reset,
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  foregroundColor: t.success,
+                                ),
+                                child: const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.undo_rounded, size: 18),
+                                    Text('撤销', style: TextStyle(fontSize: 10)),
+                                  ],
+                                ),
+                              )
+                            : startTimer == null
+                                ? Center(
+                                    child: Text(
+                                      ex.rest,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: t.text3,
+                                      ),
+                                    ),
+                                  )
+                                : TextButton(
+                                    key: ValueKey(
+                                      'exercise_timer_${_day}_${num - 1}',
+                                    ),
+                                    onPressed: startTimer,
+                                    style: TextButton.styleFrom(
+                                      padding: EdgeInsets.zero,
+                                      foregroundColor: t.primary,
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(
+                                          Icons.timer_outlined,
+                                          size: 18,
+                                        ),
+                                        Text(
+                                          ex.rest,
+                                          maxLines: 1,
+                                          softWrap: false,
+                                          overflow: TextOverflow.fade,
+                                          style: const TextStyle(fontSize: 10),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -2708,7 +2673,14 @@ class _RecordPageState extends State<RecordPage> {
   @override
   void initState() {
     super.initState();
+    workoutHistoryRevision.addListener(_loadData);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    workoutHistoryRevision.removeListener(_loadData);
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -3032,6 +3004,7 @@ class _RecordPageState extends State<RecordPage> {
 
   Widget _statBlock(String label, String value, String unit, WorkoutTheme t) {
     return Column(
+      key: ValueKey('record-stat-$label'),
       children: [
         Text(
           label,
@@ -4364,6 +4337,7 @@ class _SettingsPageState extends State<SettingsPage> {
         onChanged: (value) async {
           setState(() => _autoRestTimer = value);
           await saveAutoRestTimer(value);
+          restTimerPreferenceRevision.value++;
         },
       ),
     );
@@ -5613,6 +5587,8 @@ class _SettingsPageState extends State<SettingsPage> {
         await _loadAll();
         if (!mounted) return;
         widget.onProfileChanged();
+        workoutDataRevision.value++;
+        workoutHistoryRevision.value++;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(

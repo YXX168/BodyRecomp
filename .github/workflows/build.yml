@@ -8,11 +8,18 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   validate-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.41.6'
@@ -20,32 +27,102 @@ jobs:
           cache: true
       - name: Get dependencies
         run: flutter pub get
+      - name: Keep dependency lock stable
+        run: git diff --exit-code -- pubspec.lock
       - name: Check formatting
         run: dart format --output=none --set-exit-if-changed lib test
       - name: Analyze
         run: flutter analyze --no-fatal-infos
       - name: Test
         run: flutter test
-      - name: Configure release signing
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Build debug APK
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        run: flutter build apk --debug --target-platform android-arm64
+      - name: Upload debug APK
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: BodyRecomp-debug-${{ github.run_number }}-${{ github.sha }}
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: validate-build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.6'
+          channel: stable
+          cache: true
+      - name: Get dependencies
+        run: flutter pub get
+      - name: Validate tag, version and signing inputs
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          VERSION_VALUE=$(awk '/^version:/ {print $2}' pubspec.yaml)
+          VERSION_NAME=${VERSION_VALUE%%+*}
+          VERSION_CODE=${VERSION_VALUE##*+}
+          test "v${VERSION_NAME}" = "$GITHUB_REF_NAME"
           test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_STORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+      - name: Configure release signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/bodyrecomp-release.jks
-          cat > android/key.properties <<PROPS
-          storePassword=$ANDROID_STORE_PASSWORD
-          keyPassword=$ANDROID_KEY_PASSWORD
-          keyAlias=$ANDROID_KEY_ALIAS
-          storeFile=bodyrecomp-release.jks
-          PROPS
-      - name: Build release APK
+          printf '%s\n' \
+            "storePassword=$ANDROID_STORE_PASSWORD" \
+            "keyPassword=$ANDROID_KEY_PASSWORD" \
+            "keyAlias=$ANDROID_KEY_ALIAS" \
+            "storeFile=bodyrecomp-release.jks" \
+            > android/key.properties
+      - name: Build signed arm64 APK
         run: flutter build apk --release --target-platform android-arm64
-      - uses: actions/upload-artifact@v4
-        with:
-          name: BodyRecomp-${{ github.run_number }}-arm64
-          path: build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 30
+      - name: Verify package, version and signing certificate
+        run: |
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          BUILD_TOOLS=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          "$BUILD_TOOLS/apksigner" verify --print-certs "$APK" | tee signing.txt
+          grep -qi '03e4c0c74ff9977f580980db27ba59150f3bfc01d894e7c71d7dac1658c81c38' signing.txt
+          "$BUILD_TOOLS/aapt" dump badging "$APK" | tee badging.txt
+          grep -q "package: name='com.body.recomp' versionCode='$VERSION_CODE' versionName='$VERSION_NAME'" badging.txt
+      - name: Prepare release files
+        run: |
+          mkdir -p dist
+          APK_NAME="BodyRecomp-${GITHUB_REF_NAME}-arm64.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/$APK_NAME"
+          cd dist
+          sha256sum "$APK_NAME" > "$APK_NAME.sha256"
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* \
+              --verify-tag \
+              --title "BodyRecomp $GITHUB_REF_NAME" \
+              --generate-notes
+          fi
