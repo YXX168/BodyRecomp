@@ -18,18 +18,25 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+def isReleaseBuild = gradle.startParameter.taskNames.any {
+    it.toLowerCase().contains('release')
+}
+if (isReleaseBuild && !keystorePropertiesFile.exists()) {
+    throw new GradleException('Release signing configuration is required for release builds.')
+}
+
 android {
     namespace "com.body.recomp"
     compileSdk 36
     ndkVersion flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = '11'
+        jvmTarget = '17'
     }
 
     defaultConfig {
@@ -53,9 +60,9 @@ android {
 
     buildTypes {
         release {
-            signingConfig keystorePropertiesFile.exists()
-                ? signingConfigs.release
-                : signingConfigs.debug
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

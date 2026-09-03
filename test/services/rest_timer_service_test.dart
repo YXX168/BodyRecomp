@@ -14,6 +14,20 @@ void main() {
     expect(parseRestSeconds(''), isNull);
   });
 
+  test('deadline countdown is exact after pauses and rounds partial seconds up',
+      () {
+    final now = DateTime(2026, 9, 3, 12);
+    expect(
+      restSecondsUntil(
+        now.add(const Duration(milliseconds: 1501)),
+        now: now,
+      ),
+      2,
+    );
+    expect(restSecondsUntil(now.subtract(const Duration(seconds: 1)), now: now),
+        0);
+  });
+
   test('auto rest timer preference defaults on and persists', () async {
     final preferences = await SharedPreferences.getInstance();
     expect(await loadAutoRestTimer(preferences: preferences), isTrue);

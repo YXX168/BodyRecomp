@@ -6,7 +6,7 @@
 一款使用 Flutter 开发的 Android 健身应用，用于管理每周训练计划、记录完成进度并追踪身体变化。无需注册账号，数据默认只保存在本机。
 
 [![构建状态](https://github.com/YXX168/BodyRecomp/actions/workflows/build.yml/badge.svg)](https://github.com/YXX168/BodyRecomp/actions/workflows/build.yml)
-[![当前版本](https://img.shields.io/badge/源码版本-v6.9.0%2B78-2563EB)](CHANGELOG.md)
+[![当前版本](https://img.shields.io/badge/源码版本-v6.10.0%2B79-2563EB)](CHANGELOG.md)
 [![开源许可](https://img.shields.io/badge/许可-MIT-059669)](LICENSE)
 
 [下载 APK](https://github.com/YXX168/BodyRecomp/releases/latest) · [查看更新记录](CHANGELOG.md) · [反馈问题](https://github.com/YXX168/BodyRecomp/issues)
@@ -32,7 +32,7 @@ BodyRecomp 不要求账号，也不包含广告、统计 SDK 或云端同步功�
 
 前往 [GitHub Releases](https://github.com/YXX168/BodyRecomp/releases/latest) 下载 APK。目前发布页提供 Android arm64 安装包；安装第三方 APK 时，系统可能要求允许“安装未知应用”。
 
-仓库源码当前版本为 `v6.9.0+78`。若最新 Release 版本较低，表示新版仍在验证或尚未发布，请以发布页中的版本为准。
+仓库源码当前版本为 `v6.10.0+79`。若最新 Release 版本较低，表示新版仍在验证或尚未发布，请以发布页中的版本为准。
 
 ## 本地开发
 
@@ -55,7 +55,7 @@ flutter test
 flutter build apk --release --target-platform android-arm64
 ```
 
-无正式签名配置时，本地 release 构建会使用调试签名，仅用于开发验证。推送到 `main`、创建拉取请求或手动触发工作流时，GitHub Actions 会自动执行格式检查、静态分析、测试和 APK 构建。
+本地正式版构建必须提供正式签名配置，否则会直接停止，避免误把调试签名包当成正式版。推送到 `main` 或创建拉取请求时，GitHub Actions 会执行格式检查、静态分析、测试和调试 APK 构建；推送版本标签后会核验正式签名、包名和版本，并自动发布 APK 与 SHA-256 校验文件。
 
 ## 项目结构
 
