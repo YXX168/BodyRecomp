@@ -30,9 +30,11 @@ BodyRecomp 不要求账号，也不包含广告、统计 SDK 或云端同步功�
 
 ## 下载与安装
 
-前往 [GitHub Releases](https://github.com/YXX168/BodyRecomp/releases/latest) 下载 APK。目前发布页提供 Android arm64 安装包；安装第三方 APK 时，系统可能要求允许“安装未知应用”。
+正式版发布后，可前往 [GitHub Releases](https://github.com/YXX168/BodyRecomp/releases) 下载 Android arm64 APK 与 SHA-256 校验文件。安装第三方 APK 时，系统可能要求允许“安装未知应用”。
 
-仓库源码当前版本为 `v6.10.0+79`。若最新 Release 版本较低，表示新版仍在验证或尚未发布，请以发布页中的版本为准。
+仓库源码当前版本为 `v6.10.0+79`，源码版本不代表已发布。若发布页为空或最新 Release 版本较低，请以发布页中的正式版本为准。
+
+需要测试源码时，可登录 GitHub，在 [Actions](https://github.com/YXX168/BodyRecomp/actions/workflows/build.yml) 中选择对应提交的成功构建，下载 `BodyRecomp-debug-…` 附件。测试 APK 仅保留 14 天，使用调试签名，不能作为正式版覆盖更新；附件过期后需要重新构建。
 
 ## 本地开发
 

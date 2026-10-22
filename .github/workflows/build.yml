@@ -126,3 +126,6 @@ jobs:
               --title "BodyRecomp $GITHUB_REF_NAME" \
               --generate-notes
           fi
+      - name: Remove signing material
+        if: always()
+        run: rm -f android/app/bodyrecomp-release.jks android/key.properties
