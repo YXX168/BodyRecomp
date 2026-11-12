@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/recomp_models.dart';
+import 'daily_workout_service.dart';
+import 'nutrition_service.dart';
 
-const int currentSchemaVersion = 2;
-const String appDataVersion = '6.10.0';
+const int currentSchemaVersion = 3;
+const String appDataVersion = '7.0.0';
 const String profileKey = 'recomp_profile_v6';
 const String weightHistoryKey = 'recomp_weight_history_v6';
 const String measurementHistoryKey = 'recomp_measurements_v6';
@@ -312,6 +314,10 @@ Map<String, dynamic> _migrateLegacyBackup(Map<String, dynamic> legacy) {
 
 void _validateKnownPayloads(Map<String, dynamic> preferences) {
   try {
+    decodeDailyWorkouts(preferences[dailyWorkoutsKey] as String?);
+    decodeWorkoutTemplates(preferences[workoutTemplatesKey] as String?);
+    decodeWeeklySchedule(preferences[weeklyScheduleKey] as String?);
+    decodeMeals(preferences[mealsKey] as String?);
     final profile = preferences[profileKey];
     if (profile != null) {
       UserProfile.fromJson(
@@ -376,7 +382,24 @@ Future<ImportResult> importAllData(
   for (final entry in incoming.entries) {
     final key = entry.key;
     final value = entry.value;
-    if (mode == ImportMode.merge && key == weightHistoryKey) {
+    if (mode == ImportMode.merge && key == dailyWorkoutsKey) {
+      await prefs.setString(
+          key, mergeDailyWorkouts(prefs.getString(key), value as String));
+    } else if (mode == ImportMode.merge && key == mealsKey) {
+      final meals = {
+        ...decodeMeals(prefs.getString(key)),
+        ...decodeMeals(value as String)
+      };
+      await writeJson(
+          prefs, key, {for (final e in meals.entries) e.key: e.value.toJson()});
+    } else if (mode == ImportMode.merge && key == workoutTemplatesKey) {
+      final templates = {
+        for (final t in decodeWorkoutTemplates(prefs.getString(key))) t.id: t,
+        for (final t in decodeWorkoutTemplates(value as String)) t.id: t,
+      };
+      await writeJson(
+          prefs, key, templates.values.map((t) => t.toJson()).toList());
+    } else if (mode == ImportMode.merge && key == weightHistoryKey) {
       await _mergeWeightHistory(prefs, value);
     } else if (mode == ImportMode.merge && key == measurementHistoryKey) {
       await _mergeMeasurements(prefs, value);

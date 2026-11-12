@@ -3,16 +3,19 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'history_service.dart';
+import 'daily_workout_service.dart';
 
 class RecordSummary {
   final Map<int, int> monthData;
   final int yearTotal;
   final int yearTrainDays;
+  final Map<int, Map<int, int>> yearMonths;
 
   const RecordSummary({
     required this.monthData,
     required this.yearTotal,
     required this.yearTrainDays,
+    required this.yearMonths,
   });
 }
 
@@ -47,6 +50,18 @@ Future<RecordSummary> loadRecordSummary(
     }
   }
 
+  // Dated actual records take precedence over legacy positional progress.
+  final sessions = decodeDailyWorkouts(preferences.getString(dailyWorkoutsKey));
+  for (final session in sessions.values) {
+    final date = DateTime.parse(session.date);
+    if (date.year != year) continue;
+    if (session.trainedProjects > 0) {
+      months[date.month]![date.day] = session.trainedProjects;
+    } else {
+      months[date.month]!.remove(date.day);
+    }
+  }
+
   var yearTotal = 0;
   var yearTrainDays = 0;
   for (final data in months.values) {
@@ -58,5 +73,6 @@ Future<RecordSummary> loadRecordSummary(
     monthData: Map<int, int>.from(months[month]!),
     yearTotal: yearTotal,
     yearTrainDays: yearTrainDays,
+    yearMonths: months,
   );
 }

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,13 +6,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models/recomp_models.dart';
 import 'services/data_service.dart';
-import 'services/history_service.dart';
+import 'services/app_signals.dart';
 import 'services/record_summary_service.dart';
 import 'services/rest_timer_service.dart';
-import 'services/workout_plan_service.dart';
-import 'widgets/horizontal_day_swipe.dart';
+import 'pages/workout_page.dart';
+import 'pages/nutrition_page.dart';
+import 'pages/template_manager_page.dart';
+export 'services/app_signals.dart';
 
-const appVersion = '6.10.0';
+const appVersion = '7.0.0';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // THEME SYSTEM — v6.6: profile + chart + settings support
@@ -63,18 +64,18 @@ class WorkoutTheme {
 
 const themes = {
   AppTheme.blue: WorkoutTheme(
-    name: '极地冰川 · 冰霜蓝',
-    bg: Color(0xFFF0F4FF),
+    name: '原野 · 鼠尾草',
+    bg: Color(0xFFF6F7F3),
     card: Color(0xFFFFFFFF),
-    primary: Color(0xFF2563EB),
-    primaryLight: Color(0xFF60A5FA),
-    accent: Color(0xFF7C3AED),
+    primary: Color(0xFF287454),
+    primaryLight: Color(0xFFC9E59F),
+    accent: Color(0xFFB8D791),
     text1: Color(0xFF1E293B),
     text2: Color(0xFF334155),
     text3: Color(0xFF64748B),
     text4: Color(0xFF94A3B8),
-    success: Color(0xFF2563EB),
-    successLight: Color(0xFF93C5FD),
+    success: Color(0xFF287454),
+    successLight: Color(0xFFC9E59F),
     warning: Color(0xFFD97706),
     border: Color(0xFFE2E8F0),
     navbarBg: Color(0xFFFFFFFF),
@@ -148,21 +149,21 @@ const themes = {
     navbarBg: Color(0xFFFFFFFF),
   ),
   AppTheme.dark: WorkoutTheme(
-    name: '永夜星域 · 极夜黑',
-    bg: Color(0xFF0A0E1A),
-    card: Color(0xFF141A2E),
-    primary: Color(0xFF00F0FF),
-    primaryLight: Color(0xFF66F7FF),
-    accent: Color(0xFFFF0080),
-    text1: Color(0xFFE8ECF4),
-    text2: Color(0xFFB0B8C8),
-    text3: Color(0xFF6B7A90),
-    text4: Color(0xFF3D4A5C),
-    success: Color(0xFF00F0FF),
-    successLight: Color(0xFF66F7FF),
+    name: '夜色 · 深林',
+    bg: Color(0xFF121A16),
+    card: Color(0xFF1D2822),
+    primary: Color(0xFF99BFA2),
+    primaryLight: Color(0xFFD0E5BA),
+    accent: Color(0xFFC5B18C),
+    text1: Color(0xFFECF2EB),
+    text2: Color(0xFFB5C2B8),
+    text3: Color(0xFF879A8E),
+    text4: Color(0xFF6E8175),
+    success: Color(0xFF99BFA2),
+    successLight: Color(0xFFD0E5BA),
     warning: Color(0xFFFFB800),
-    border: Color(0xFF1E2740),
-    navbarBg: Color(0xFF0D1220),
+    border: Color(0xFF2B3B31),
+    navbarBg: Color(0xFF162019),
     isDark: true,
   ),
 };
@@ -174,369 +175,6 @@ const themes = {
 // ═══════════════════════════════════════════════════════════════════════════════
 // WORKOUT DATA
 // ═══════════════════════════════════════════════════════════════════════════════
-
-const workoutDays = [
-  WorkoutDay(
-    dayName: '周一',
-    subtitle: '上肢 A',
-    badge: '推力 + 后束',
-    description: '胸 / 肩（前束+中束+后束） / 肱三头',
-    exercises: [
-      Exercise(
-        name: '上斜哑铃卧推 30\u00B0',
-        muscles: ['胸大肌'],
-        muscleTarget: '上部',
-        sets: 4,
-        reps: '10-12',
-        rest: '90s',
-        isStar: true,
-        note: '上胸发力，肩胛后缩下沉，离心下放约 3 秒。',
-      ),
-      Exercise(
-        name: '平板杠铃卧推',
-        muscles: ['胸大肌'],
-        muscleTarget: '整体厚度',
-        sets: 4,
-        reps: '8-10',
-        rest: '90-120s',
-        note: '脚踩稳，肩胛后缩，全程控制，不要弹胸。',
-      ),
-      Exercise(
-        name: '坐姿器械推肩',
-        muscles: ['三角肌'],
-        muscleTarget: '前束 / 中束',
-        sets: 3,
-        reps: '12',
-        rest: '90s',
-        note: '背部贴紧靠垫，手肘略在身体前侧，推起不耸肩。',
-      ),
-      Exercise(
-        name: '哑铃侧平举',
-        muscles: ['三角肌'],
-        muscleTarget: '中束',
-        sets: 4,
-        reps: '15-20',
-        rest: '60s',
-        note: '小重量慢节奏，肘略弯，抬到肩高即可。',
-      ),
-      Exercise(
-        name: '面拉',
-        muscles: ['三角肌后束'],
-        muscleTarget: '上背',
-        sets: 3,
-        reps: '15-20',
-        rest: '60s',
-        note: '绳索拉向眉眼高度，外旋打开，重点找后束和上背。',
-      ),
-      Exercise(
-        name: '蝴蝶机夹胸',
-        muscles: ['胸大肌'],
-        muscleTarget: '中缝',
-        sets: 3,
-        reps: '15-20',
-        rest: '60s',
-        note: '胸肌主动夹紧，顶峰停 1-2 秒，手臂不锁死。',
-      ),
-      Exercise(
-        name: '绳索下压',
-        muscles: ['肱三头'],
-        muscleTarget: '外侧头',
-        sets: 3,
-        reps: '12-15',
-        rest: '60s',
-        note: '肘部固定贴近身体，只让前臂移动，底部充分收缩。',
-      ),
-      Exercise(
-        name: '坐姿哑铃颈后臂屈伸',
-        muscles: ['肱三头'],
-        muscleTarget: '长头',
-        sets: 3,
-        reps: '10-12',
-        rest: '60s',
-        note: '肘朝上并保持稳定，下放到舒适深度，避免肩部不适。',
-      ),
-    ],
-  ),
-  WorkoutDay(
-    dayName: '周二',
-    subtitle: '下肢 A',
-    badge: '股四头肌 / 前侧重点',
-    description: '股四头 / 内收 / 有氧 / 核心',
-    exercises: [
-      Exercise(
-        name: '倒蹬机',
-        muscles: ['股四头', '臀'],
-        muscleTarget: '',
-        sets: 4,
-        reps: '12-15',
-        rest: '90s',
-        isStar: true,
-        note: '脚位中低更偏股四头，膝盖对准脚尖，控制下放。',
-      ),
-      Exercise(
-        name: '坐姿腿屈伸',
-        muscles: ['股四头'],
-        muscleTarget: '孤立',
-        sets: 3,
-        reps: '15',
-        rest: '60s',
-        note: '顶峰停 1 秒，慢慢下放，专注股四头收缩。',
-      ),
-      Exercise(
-        name: '内收机',
-        muscles: ['大腿内收肌'],
-        muscleTarget: '',
-        sets: 3,
-        reps: '15',
-        rest: '60s',
-        note: '动作全程可控，不借力弹回，感受大腿内侧发力。',
-      ),
-      Exercise(
-        name: '坡度走',
-        muscles: ['心肺'],
-        muscleTarget: '',
-        sets: 1,
-        reps: '40min',
-        rest: '',
-        note: '保持能说短句的强度，心率约 125-130，稳定完成。',
-      ),
-      Exercise(
-        name: '卷腹',
-        muscles: ['腹直肌'],
-        muscleTarget: '',
-        sets: 5,
-        reps: '20',
-        rest: '60s',
-        note: '下背贴紧，吐气卷起，避免用脖子代偿。',
-      ),
-    ],
-  ),
-  WorkoutDay(
-    dayName: '周三',
-    subtitle: '上肢 B',
-    badge: '拉力 + 手臂',
-    description: '背 / 后束 / 肱二头',
-    exercises: [
-      Exercise(
-        name: '助力引体向上机',
-        muscles: ['背阔肌', '肱二头'],
-        muscleTarget: '',
-        sets: 4,
-        reps: '8-12',
-        rest: '90-120s',
-        isStar: true,
-        note: '逐步减少助力，胸口主动上提，肩膀不要耸。',
-      ),
-      Exercise(
-        name: '坐姿器械划船',
-        muscles: ['背阔肌', '菱形肌'],
-        muscleTarget: '',
-        sets: 4,
-        reps: '10-12',
-        rest: '90s',
-        note: '胸部贴垫，手肘向后拉，顶峰夹背 1 秒。',
-      ),
-      Exercise(
-        name: '高位下拉',
-        muscles: ['背阔肌'],
-        muscleTarget: '宽度',
-        sets: 3,
-        reps: '10-12',
-        rest: '90s',
-        note: '先沉肩再下拉，手肘向身体两侧下沉，身体不后仰。',
-      ),
-      Exercise(
-        name: '反向蝴蝶机夹胸',
-        muscles: ['三角肌后束'],
-        muscleTarget: '上背',
-        sets: 3,
-        reps: '15-20',
-        rest: '60s',
-        note: '手肘微弯，打开到身体两侧，重点找后束发力。',
-      ),
-      Exercise(
-        name: '直臂下压',
-        muscles: ['背阔肌'],
-        muscleTarget: '下部',
-        sets: 3,
-        reps: '12-15',
-        rest: '60s',
-        note: '手臂微弯固定，从头顶压到大腿前，感受背阔拉伸收缩。',
-      ),
-      Exercise(
-        name: '杠铃弯举',
-        muscles: ['肱二头'],
-        muscleTarget: '长头',
-        sets: 4,
-        reps: '12',
-        rest: '60s',
-        note: '身体不晃，手腕中立，离心慢放。',
-      ),
-      Exercise(
-        name: '锤式弯举',
-        muscles: ['肱肌', '肱桡肌'],
-        muscleTarget: '',
-        sets: 3,
-        reps: '12',
-        rest: '60s',
-        note: '掌心相对，手肘稳定，感受肱肌和前臂参与。',
-      ),
-    ],
-  ),
-  WorkoutDay(
-    dayName: '周四',
-    subtitle: '下肢 B',
-    badge: '臀腿后链 / 稳定重点',
-    description: '臀腿后链 / 稳定 / 有氧 / 核心',
-    exercises: [
-      Exercise(
-        name: '哈克深蹲',
-        muscles: ['股四头', '臀'],
-        muscleTarget: '',
-        sets: 4,
-        reps: '12',
-        rest: '90s',
-        isStar: true,
-        note: '脚踩稳，膝盖跟脚尖同向，控制下放后再发力站起。',
-      ),
-      Exercise(
-        name: '坐姿腿弯举',
-        muscles: ['腘绳肌'],
-        muscleTarget: '',
-        sets: 4,
-        reps: '12-15',
-        rest: '60s',
-        note: '顶峰夹紧腘绳肌，慢慢还原，不要甩重量。',
-      ),
-      Exercise(
-        name: '外展机',
-        muscles: ['臀中肌'],
-        muscleTarget: '',
-        sets: 3,
-        reps: '15',
-        rest: '60s',
-        note: '身体稳定，外展到顶峰停顿，重点找臀中肌。',
-      ),
-      Exercise(
-        name: '坡度走',
-        muscles: ['心肺'],
-        muscleTarget: '',
-        sets: 1,
-        reps: '40min',
-        rest: '',
-        note: '保持能说短句的强度，心率约 125-130，稳定完成。',
-      ),
-      Exercise(
-        name: '卷腹',
-        muscles: ['腹直肌'],
-        muscleTarget: '',
-        sets: 5,
-        reps: '20',
-        rest: '60s',
-        note: '下背贴紧，吐气卷起，避免用脖子代偿。',
-      ),
-    ],
-  ),
-  WorkoutDay(
-    dayName: '周五',
-    subtitle: '可选',
-    badge: '可选循环',
-    description: '有空就来，没空跳过',
-    isOptional: true,
-    exercises: [
-      Exercise(
-        name: '哑铃高脚杯深蹲',
-        muscles: ['股四头', '臀', '核心'],
-        muscleTarget: '',
-        sets: 3,
-        reps: '12',
-        rest: '循环',
-        note: '抱紧哑铃，躯干稳定，下蹲到可控深度。',
-      ),
-      Exercise(
-        name: '俯卧撑',
-        muscles: ['胸', '肩', '肱三头'],
-        muscleTarget: '',
-        sets: 3,
-        reps: '10-15',
-        rest: '循环',
-        note: '身体保持一条线，胸靠近地面，做不到可跪姿或扶高位。',
-      ),
-      Exercise(
-        name: '哑铃罗马尼亚硬拉',
-        muscles: ['腘绳', '臀'],
-        muscleTarget: '',
-        sets: 3,
-        reps: '12',
-        rest: '循环',
-        note: '髋部向后折叠，背部中立，感受腘绳肌拉伸。',
-      ),
-      Exercise(
-        name: '哑铃俯身划船',
-        muscles: ['背阔肌'],
-        muscleTarget: '',
-        sets: 3,
-        reps: '每侧10',
-        rest: '循环',
-        note: '背部保持平，手肘贴近身体向后拉。',
-      ),
-      Exercise(
-        name: '哑铃侧平举',
-        muscles: ['三角肌'],
-        muscleTarget: '中束',
-        sets: 3,
-        reps: '15',
-        rest: '循环',
-        note: '小重量慢节奏，肘略弯，抬到肩高即可。',
-      ),
-      Exercise(
-        name: '登山者',
-        muscles: ['核心', '心肺'],
-        muscleTarget: '',
-        sets: 3,
-        reps: '每侧15',
-        rest: '循环',
-        note: '核心收紧，节奏稳定，膝盖向胸口交替带动。',
-      ),
-    ],
-    circuitNote: '6 个动作依次做完 = 1 轮 \u2192 休息 90-120s \u2192 共 3 轮',
-  ),
-  WorkoutDay(
-    isRest: true,
-    dayName: '周六',
-    subtitle: '休息',
-    badge: '休息',
-    description: '',
-  ),
-  WorkoutDay(
-    dayName: '周日',
-    subtitle: '可选',
-    badge: '恢复日',
-    description: '目的是恢复，不是训练',
-    isOptional: true,
-    optionalDesc: '任选其一，30-40 分钟，心率 110-135：',
-    recoveryOptions: [
-      '快走 / 慢跑',
-      '游泳 \u2014 关节零冲击',
-      '椭圆机 / 划船机',
-      '瑜伽 / 普拉提',
-      '骑车散步',
-    ],
-  ),
-];
-
-final workoutPlanRevision = ValueNotifier<int>(0);
-final restTimerPreferenceRevision = ValueNotifier<int>(0);
-final workoutDataRevision = ValueNotifier<int>(0);
-final workoutHistoryRevision = ValueNotifier<int>(0);
-
-const nutritionTips = [
-  '热量缺口 300-500 大卡，减脂靠饮食缺口，少吃半碗饭 > 跑 20 分钟',
-  '蛋白质分 4-5 餐，每餐 30-40g',
-  '训练后 1-2 小时内补 20-30g 蛋白质',
-  '训练日碳水 +30-50g，放训练前 2h / 训练后 1h',
-  '每天 2.5-3L 水',
-];
 
 const progressionPhases = [
   ('1-2 周', '学习期', '60-70% 1RM，掌握动作模式，不急着加重'),
@@ -736,7 +374,7 @@ class _PulseIcon extends StatefulWidget {
   final IconData icon;
   final double size;
   final Color color;
-  const _PulseIcon({required this.icon, this.size = 56, required this.color});
+  const _PulseIcon({required this.icon, required this.color}) : size = 56;
   @override
   State<_PulseIcon> createState() => _PulseIconState();
 }
@@ -893,10 +531,11 @@ class _ThemeStateState extends State<ThemeState> {
     super.initState();
     SharedPreferences.getInstance().then((p) {
       final i = p.getInt('recomp_theme_v6') ?? 0;
-      if (mounted)
+      if (mounted) {
         setState(
           () => _mode = AppTheme.values[i.clamp(0, AppTheme.values.length - 1)],
         );
+      }
     });
   }
 
@@ -944,7 +583,7 @@ class RecompApp extends StatelessWidget {
             colorScheme: ColorScheme(
               brightness: dark ? Brightness.dark : Brightness.light,
               primary: t.primary,
-              onPrimary: Colors.white,
+              onPrimary: dark ? const Color(0xFF15251B) : Colors.white,
               secondary: t.accent,
               onSecondary: Colors.white,
               surface: t.card,
@@ -976,7 +615,42 @@ class RecompApp extends StatelessWidget {
             textTheme: (dark
                     ? ThemeData.dark().textTheme
                     : ThemeData.light().textTheme)
-                .apply(fontFamily: 'Inter'),
+                .apply(fontFamily: 'Inter')
+                .copyWith(
+                    bodyMedium: TextStyle(fontSize: 13, color: t.text1),
+                    bodySmall: TextStyle(fontSize: 11, color: t.text3),
+                    titleMedium: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: t.text1),
+                    titleLarge: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: t.text1)),
+            listTileTheme: const ListTileThemeData(dense: true),
+            dividerTheme: DividerThemeData(
+                color: t.border.withValues(alpha: .7), thickness: .5),
+            textButtonTheme: TextButtonThemeData(
+                style: TextButton.styleFrom(
+                    textStyle: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Inter',
+                        fontFamilyFallback: const ['sans-serif']))),
+            outlinedButtonTheme: OutlinedButtonThemeData(
+                style: OutlinedButton.styleFrom(
+                    textStyle: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Inter',
+                        fontFamilyFallback: const ['sans-serif']))),
+            filledButtonTheme: FilledButtonThemeData(
+                style: FilledButton.styleFrom(
+                    textStyle: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Inter',
+                        fontFamilyFallback: const ['sans-serif']))),
           ),
           home: const MainPage(),
         );
@@ -995,247 +669,108 @@ class MainPage extends StatefulWidget {
   State<MainPage> createState() => _MainPageState();
 }
 
-class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
+class _MainPageState extends State<MainPage> {
   int _tab = 0;
-  UserProfile? _profile;
-  late final List<Widget> _pages;
-
-  @override
-  void initState() {
-    super.initState();
-    _pages = [
-      const WorkoutPage(),
-      const NutritionPage(),
-      const ProgressionPage(),
-      const RecordPage(),
-      SettingsPage(onProfileChanged: _reloadProfile),
-    ];
-    _reloadProfile();
-  }
-
-  Future<void> _reloadProfile() async {
-    final profile = await loadProfile();
-    if (mounted) setState(() => _profile = profile);
-  }
+  late final List<Widget> _pages = [
+    const WorkoutPage(),
+    const NutritionPage(),
+    const RecordPage(),
+    SettingsPage(onProfileChanged: () {}),
+  ];
 
   @override
   Widget build(BuildContext context) {
     final t = ThemeInherited.of(context).theme;
-    final dark = t.isDark;
-    final p = _profile;
-    final bmi = p != null && p.heightCm > 0
-        ? (p.weightKg / ((p.heightCm / 100) * (p.heightCm / 100)))
-            .toStringAsFixed(1)
-        : '--';
-    final ageStr = (p != null && p.age > 0) ? '${p.age}岁' : '--';
-    final heightStr =
-        (p != null && p.heightCm > 0) ? '${p.heightCm.toInt()}cm' : '--';
-    final weightStr = (p != null && p.weightKg > 0) ? '${p.weightKg}kg' : '--';
-    final statusText = '$ageStr · $heightStr · $weightStr · BMI $bmi';
+    const labels = ['训练', '饮食', '趋势', '我的'];
+    const icons = [
+      Icons.grid_view_rounded,
+      Icons.restaurant_outlined,
+      Icons.insights_outlined,
+      Icons.person_outline_rounded
+    ];
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
-        statusBarBrightness: dark ? Brightness.dark : Brightness.light,
-      ),
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness:
+              t.isDark ? Brightness.light : Brightness.dark),
       child: Scaffold(
-        body: Column(
-          children: [
-            SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          GradientTitle(
-                            text: 'Body Recomp',
-                            primary: t.primary,
-                            accent: t.primaryLight,
-                            fontSize: 27,
-                          ),
-                          Text(
-                            statusText,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: t.text3,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    PressScale(
-                      onTap: _showThemeSheet,
-                      child: Container(
-                        width: 48,
-                        height: 48,
+        body: SafeArea(
+            bottom: false,
+            child: Column(children: [
+              Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 14, 16, 8),
+                  child: Row(children: [
+                    Container(
+                        width: 27,
+                        height: 27,
                         decoration: BoxDecoration(
-                          color: t.card.withOpacity(t.isDark ? 0.92 : 0.86),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: t.border.withOpacity(0.9),
-                            width: 0.8,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(
-                                t.isDark ? 0.24 : 0.05,
-                              ),
-                              blurRadius: 14,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          Icons.palette_rounded,
-                          size: 20,
-                          color: t.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Expanded(
-              child: IndexedStack(
-                index: _tab,
-                sizing: StackFit.expand,
-                children: _pages,
-              ),
-            ),
-          ],
-        ),
+                            color: t.primary,
+                            borderRadius: BorderRadius.circular(8)),
+                        child: Icon(Icons.fitness_center_rounded,
+                            size: 15, color: t.isDark ? t.bg : Colors.white)),
+                    const SizedBox(width: 9),
+                    Text('Bodyrecomp',
+                        style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -.6,
+                            color: t.text1)),
+                    const Spacer(),
+                    IconButton(
+                        tooltip: '切换主题',
+                        onPressed: _showThemeSheet,
+                        visualDensity: VisualDensity.compact,
+                        icon: Icon(Icons.palette_outlined,
+                            size: 20, color: t.text3)),
+                  ])),
+              Expanded(
+                  child: IndexedStack(
+                      index: _tab, sizing: StackFit.expand, children: _pages)),
+            ])),
         bottomNavigationBar: Container(
           decoration: BoxDecoration(
-            color: t.navbarBg.withOpacity(t.isDark ? 0.96 : 0.94),
-            border: Border(
-              top: BorderSide(color: t.border.withOpacity(0.8), width: 0.5),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(t.isDark ? 0.28 : 0.05),
-                blurRadius: 18,
-                offset: const Offset(0, -8),
-              ),
-            ],
-          ),
+              color: t.navbarBg,
+              border: Border(
+                  top: BorderSide(color: t.border.withValues(alpha: .65)))),
           child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(6, 6, 6, 4),
-              child: LayoutBuilder(
-                builder: (context, box) {
-                  final w = box.maxWidth / 5;
-                  return Stack(
-                    children: [
-                      AnimatedPositioned(
-                        duration: const Duration(milliseconds: 350),
-                        curve: Curves.easeOutCubic,
-                        left: w * _tab + 4,
-                        top: 0,
-                        bottom: 0,
-                        width: w - 8,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            color: t.primary.withOpacity(
-                              t.isDark ? 0.12 : 0.08,
-                            ),
-                            boxShadow: t.isDark
-                                ? [
-                                    BoxShadow(
-                                      color: t.primary.withOpacity(0.15),
-                                      blurRadius: 16,
-                                    ),
-                                  ]
-                                : [
-                                    BoxShadow(
-                                      color: t.primary.withOpacity(0.06),
-                                      blurRadius: 8,
-                                    ),
-                                  ],
-                          ),
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          _navItem(Icons.fitness_center, '训练', 0, t, w),
-                          _navItem(Icons.restaurant, '饮食', 1, t, w),
-                          _navItem(Icons.trending_up, '超负荷', 2, t, w),
-                          _navItem(Icons.bar_chart_rounded, '记录', 3, t, w),
-                          _navItem(Icons.settings_rounded, '设置', 4, t, w),
-                        ],
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _navItem(
-    IconData icon,
-    String label,
-    int idx,
-    WorkoutTheme t,
-    double w,
-  ) {
-    final sel = idx == _tab;
-    return Expanded(
-      child: Semantics(
-        button: true,
-        selected: sel,
-        label: '$label页',
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () {
-            if (_tab != idx) {
-              HapticFeedback.selectionClick();
-              setState(() => _tab = idx);
-            }
-          },
-          child: SizedBox(
-            height: 52,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOutCubic,
-                  transform: Matrix4.diagonal3Values(
-                    sel ? 1.10 : 1.0,
-                    sel ? 1.10 : 1.0,
-                    1.0,
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 22,
-                    color: Color.lerp(t.text4, t.primary, sel ? 1.0 : 0.0),
-                  ),
-                ),
-                const SizedBox(height: 3),
-                AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 220),
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                    color: sel ? t.primary : t.text4,
-                  ),
-                  child: Text(label),
-                ),
-              ],
-            ),
-          ),
+              top: false,
+              child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+                  child: Row(children: [
+                    for (var i = 0; i < labels.length; i++)
+                      Expanded(
+                          child: InkWell(
+                        key: ValueKey('nav-$i'),
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() => _tab = i);
+                        },
+                        child: SizedBox(
+                            height: 51,
+                            child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(icons[i],
+                                      size: 22,
+                                      color: i == _tab ? t.primary : t.text4),
+                                  const SizedBox(height: 4),
+                                  Text(labels[i],
+                                      style: TextStyle(
+                                          fontFamily: 'Inter',
+                                          fontFamilyFallback: const [
+                                            'sans-serif'
+                                          ],
+                                          fontSize: 10,
+                                          fontWeight: i == _tab
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                          color:
+                                              i == _tab ? t.text1 : t.text4)),
+                                ])),
+                      )),
+                  ]))),
         ),
       ),
     );
@@ -1383,1276 +918,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// WORKOUT PAGE — v6.5: 每周自动重置 + 滑动周选择器 + 历史记录同步
-// ═══════════════════════════════════════════════════════════════════════════════
-
-class _DaySegmentedNav extends StatelessWidget {
-  final int selected;
-  final WorkoutTheme theme;
-  final ValueChanged<int> onSelect;
-  const _DaySegmentedNav({
-    required this.selected,
-    required this.theme,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final t = theme;
-    return Container(
-      height: 54,
-      padding: const EdgeInsets.all(4),
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: t.navbarBg.withOpacity(t.isDark ? 0.92 : 0.78),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: t.border.withOpacity(t.isDark ? 0.8 : 0.72),
-          width: 0.8,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(t.isDark ? 0.16 : 0.025),
-            blurRadius: 12,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: LayoutBuilder(
-        builder: (context, box) {
-          final itemWidth = box.maxWidth / workoutDays.length;
-          final pillInset = 2.0;
-          return Stack(
-            children: [
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 340),
-                curve: Curves.easeOutCubic,
-                left: itemWidth * selected + pillInset,
-                top: pillInset,
-                bottom: pillInset,
-                width: itemWidth - pillInset * 2,
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(15),
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [t.primary, t.primaryLight],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: t.primary.withOpacity(t.isDark ? 0.20 : 0.14),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Row(
-                children: List.generate(workoutDays.length, (i) {
-                  final d = workoutDays[i];
-                  final sel = i == selected;
-                  return Expanded(
-                    child: Semantics(
-                      button: true,
-                      selected: sel,
-                      label: '${d.dayName}，${d.subtitle}',
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => onSelect(i),
-                        child: SizedBox(
-                          height: 46,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              AnimatedDefaultTextStyle(
-                                duration: const Duration(milliseconds: 220),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight:
-                                      sel ? FontWeight.w900 : FontWeight.w700,
-                                  color: sel ? Colors.white : t.text2,
-                                  letterSpacing: -0.2,
-                                ),
-                                child: Text(d.dayName.replaceFirst('周', '')),
-                              ),
-                              const SizedBox(height: 2),
-                              AnimatedDefaultTextStyle(
-                                duration: const Duration(milliseconds: 220),
-                                style: TextStyle(
-                                  fontSize: 8.5,
-                                  fontWeight:
-                                      sel ? FontWeight.w700 : FontWeight.w500,
-                                  color: sel
-                                      ? Colors.white.withOpacity(0.86)
-                                      : t.text4,
-                                ),
-                                child: Text(
-                                  d.subtitle,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class WorkoutPage extends StatefulWidget {
-  const WorkoutPage({super.key});
-  @override
-  State<WorkoutPage> createState() => _WorkoutPageState();
-}
-
-class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
-  int _day = 0;
-  Map<String, dynamic> _done = {};
-  List<WorkoutDay> _plan = List<WorkoutDay>.from(workoutDays);
-  Timer? _restTimer;
-  int _restTotal = 0;
-  int _restRemaining = 0;
-  String _restExercise = '';
-  DateTime? _restDeadline;
-  bool _autoRestTimer = false;
-  bool _workoutReady = false;
-  Future<void> _saveQueue = Future<void>.value();
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    workoutPlanRevision.addListener(_reloadPlan);
-    restTimerPreferenceRevision.addListener(_reloadRestTimerPreference);
-    workoutDataRevision.addListener(_loadInitialState);
-    final d = DateTime.now().weekday;
-    if (d >= 1 && d <= 7) _day = d - 1;
-    _loadInitialState();
-  }
-
-  Future<void> _loadInitialState() async {
-    final preferences = await SharedPreferences.getInstance();
-    final now = DateTime.now();
-    final currentWeek = isoWeekNumber(now);
-    final currentYear = isoWeekYear(now);
-    final storedWeek = preferences.getInt('recomp_done_v6_week');
-    final storedYear = preferences.getInt('recomp_done_v6_year');
-    var loadedDone = <String, dynamic>{};
-
-    if (storedWeek == null ||
-        storedYear == null ||
-        storedYear != currentYear ||
-        storedWeek != currentWeek) {
-      final oldRaw = preferences.getString('recomp_done_v6');
-      if (oldRaw != null && oldRaw != '{}') {
-        try {
-          final oldDone = jsonDecode(oldRaw) as Map<String, dynamic>;
-          await saveWeekDoneToHistory(
-            preferences,
-            oldDone,
-            storedYear ?? currentYear,
-            storedWeek ?? currentWeek,
-          );
-        } catch (_) {}
-      }
-      await preferences.setString('recomp_done_v6', jsonEncode(loadedDone));
-      await preferences.setInt('recomp_done_v6_week', currentWeek);
-      await preferences.setInt('recomp_done_v6_year', currentYear);
-    } else {
-      final raw = preferences.getString('recomp_done_v6');
-      if (raw != null) {
-        try {
-          loadedDone = Map<String, dynamic>.from(jsonDecode(raw) as Map);
-        } catch (_) {}
-      }
-    }
-
-    final plan = await loadWorkoutPlan(workoutDays, preferences: preferences);
-    final autoRest = await loadAutoRestTimer(preferences: preferences);
-    if (!mounted) return;
-    setState(() {
-      _done = loadedDone;
-      _plan = plan;
-      _autoRestTimer = autoRest;
-      _workoutReady = true;
-    });
-  }
-
-  Future<void> _reloadPlan() async {
-    final plan = await loadWorkoutPlan(workoutDays);
-    if (mounted) setState(() => _plan = plan);
-  }
-
-  Future<void> _reloadRestTimerPreference() async {
-    final autoRest = await loadAutoRestTimer();
-    if (mounted) setState(() => _autoRestTimer = autoRest);
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    workoutPlanRevision.removeListener(_reloadPlan);
-    restTimerPreferenceRevision.removeListener(_reloadRestTimerPreference);
-    workoutDataRevision.removeListener(_loadInitialState);
-    _restTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _syncRestCountdown();
-  }
-
-  void _selectDay(int day) {
-    final next = (day + workoutDays.length) % workoutDays.length;
-    if (_day == next) return;
-    HapticFeedback.selectionClick();
-    setState(() => _day = next);
-  }
-
-  Future<void> _toggle(int di, int ei) async {
-    if (!_workoutReady) return;
-    final k = '${di}_$ei';
-    final exercise = _plan[di].exercises[ei];
-    final completedSets = _completedSets(di, ei);
-    if (completedSets >= exercise.sets) return;
-    final nextCompletedSets = completedSets + 1;
-    setState(() {
-      _done[k] = nextCompletedSets >= exercise.sets ? true : nextCompletedSets;
-      HapticFeedback.mediumImpact();
-    });
-    if (nextCompletedSets < exercise.sets && _autoRestTimer) {
-      _startRestTimer(exercise);
-    }
-    if (_cnt(di) == _plan[di].exercises.length && mounted) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text('${_plan[di].dayName}训练已完成，做得漂亮！'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-    }
-    await _queueDoneSave();
-  }
-
-  Future<void> _resetExercise(int di, int ei) async {
-    if (!_workoutReady) return;
-    final key = '${di}_$ei';
-    final previousValue = _done[key];
-    if (previousValue == null) return;
-    setState(() => _done.remove(key));
-    HapticFeedback.lightImpact();
-    await _queueDoneSave();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('${_plan[di].exercises[ei].name}已重置'),
-          behavior: SnackBarBehavior.floating,
-          action: SnackBarAction(
-            label: '撤销',
-            onPressed: () {
-              if (!mounted) return;
-              setState(() => _done[key] = previousValue);
-              _queueDoneSave();
-            },
-          ),
-        ),
-      );
-  }
-
-  Future<void> _queueDoneSave() async {
-    final snapshot = Map<String, dynamic>.from(_done);
-    final previous = _saveQueue;
-    _saveQueue = () async {
-      try {
-        await previous;
-      } catch (_) {
-        // A later snapshot should still be persisted after a transient error.
-      }
-      await _persistDone(snapshot);
-    }();
-    await _saveQueue;
-  }
-
-  Future<void> _persistDone(Map<String, dynamic> done) async {
-    final p = await SharedPreferences.getInstance();
-    await p.setString('recomp_done_v6', jsonEncode(done));
-    // 同步写入本周真实日期历史；取消勾选时也会移除当天记录。
-    final now = DateTime.now();
-    final currentWeek = isoWeekNumber(now);
-    final currentYear = isoWeekYear(now);
-    await p.setInt('recomp_done_v6_week', currentWeek);
-    await p.setInt('recomp_done_v6_year', currentYear);
-    await saveWeekDoneToHistory(p, done, currentYear, currentWeek);
-    workoutHistoryRevision.value++;
-  }
-
-  void _startRestTimer(Exercise exercise) {
-    final seconds = parseRestSeconds(exercise.rest);
-    if (seconds == null) return;
-    _restTimer?.cancel();
-    setState(() {
-      _restTotal = seconds;
-      _restRemaining = seconds;
-      _restExercise = exercise.name;
-      _restDeadline = DateTime.now().add(Duration(seconds: seconds));
-    });
-    _runRestTicker();
-  }
-
-  void _runRestTicker() {
-    _restTimer?.cancel();
-    _restTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
-      if (!mounted) return;
-      _syncRestCountdown();
-    });
-  }
-
-  void _syncRestCountdown() {
-    final deadline = _restDeadline;
-    if (!mounted || deadline == null || _restTotal == 0) return;
-    final remaining = restSecondsUntil(deadline);
-    if (remaining == _restRemaining) return;
-    if (remaining == 0) {
-      _restTimer?.cancel();
-      setState(() => _restRemaining = 0);
-      HapticFeedback.heavyImpact();
-      SystemSound.play(SystemSoundType.click);
-    } else {
-      setState(() => _restRemaining = remaining);
-    }
-  }
-
-  void _addRestTime() {
-    if (_restTotal == 0) return;
-    final now = DateTime.now();
-    final base = _restDeadline != null && _restDeadline!.isAfter(now)
-        ? _restDeadline!
-        : now;
-    _restDeadline = base.add(const Duration(seconds: 30));
-    setState(() {
-      _restRemaining = restSecondsUntil(_restDeadline!, now: now);
-      if (_restRemaining > _restTotal) _restTotal = _restRemaining;
-    });
-    if (_restTimer?.isActive != true) {
-      _runRestTicker();
-    }
-  }
-
-  void _dismissRestTimer() {
-    _restTimer?.cancel();
-    setState(() {
-      _restTotal = 0;
-      _restRemaining = 0;
-      _restExercise = '';
-      _restDeadline = null;
-    });
-  }
-
-  int _cnt(int d) {
-    int c = 0;
-    for (int i = 0; i < _plan[d].exercises.length; i++) {
-      if (_completedSets(d, i) >= _plan[d].exercises[i].sets) c++;
-    }
-    return c;
-  }
-
-  int _completedSets(int dayIndex, int exerciseIndex) {
-    final value = _done['${dayIndex}_$exerciseIndex'];
-    final totalSets = _plan[dayIndex].exercises[exerciseIndex].sets;
-    if (value == true) return totalSets;
-    if (value is num) return value.toInt().clamp(0, totalSets);
-    return 0;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final t = ThemeInherited.of(context).theme;
-    final wd = _plan[_day];
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
-          child: HorizontalDaySwipe(
-            onPrevious: () => _selectDay(_day - 1),
-            onNext: () => _selectDay(_day + 1),
-            child: _DaySegmentedNav(
-              selected: _day,
-              theme: t,
-              onSelect: _selectDay,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  transitionBuilder: (child, animation) => FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0.02, 0),
-                        end: Offset.zero,
-                      ).animate(
-                        CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOutCubic,
-                        ),
-                      ),
-                      child: child,
-                    ),
-                  ),
-                  child: KeyedSubtree(
-                    key: ValueKey('day_$_day'),
-                    child: _buildContent(wd, t),
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 12,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  transitionBuilder: (child, animation) => FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0, 0.35),
-                        end: Offset.zero,
-                      ).animate(animation),
-                      child: child,
-                    ),
-                  ),
-                  child: _restTotal > 0
-                      ? _restTimerPanel(t)
-                      : const SizedBox.shrink(
-                          key: ValueKey('rest-timer-hidden'),
-                        ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildContent(WorkoutDay day, WorkoutTheme t) {
-    if (day.isRest) {
-      return Center(
-        child: FadeScaleEntry(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: t.isDark
-                      ? [t.card, t.primary.withOpacity(0.05)]
-                      : [t.card, t.primary.withOpacity(0.04)],
-                ),
-                border: Border.all(color: t.border, width: 1),
-                boxShadow: [
-                  BoxShadow(
-                    color: t.primary.withOpacity(t.isDark ? 0.15 : 0.08),
-                    blurRadius: 28,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 36,
-                  horizontal: 24,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _PulseIcon(
-                      icon: Icons.bedtime_rounded,
-                      size: 64,
-                      color: t.primary,
-                    ),
-                    const SizedBox(height: 20),
-                    ShaderMask(
-                      shaderCallback: (b) => LinearGradient(
-                        colors: [t.primary, t.primaryLight],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ).createShader(b),
-                      blendMode: BlendMode.srcIn,
-                      child: Text(
-                        '休息日',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      '肌肉在休息时生长',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: t.text2,
-                        height: 1.4,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    _restTip(
-                      Icons.dark_mode_rounded,
-                      '保证 7-9 小时睡眠',
-                      t.primary,
-                      t,
-                    ),
-                    const SizedBox(height: 8),
-                    _restTip(Icons.water_drop_rounded, '多喝水促进恢复', t.success, t),
-                    const SizedBox(height: 8),
-                    _restTip(Icons.spa_rounded, '拉伸放松缓解酸痛', t.accent, t),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (day.recoveryOptions != null) {
-      return SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            FadeScaleEntry(child: _dayHdr(day, t), index: 0),
-            const SizedBox(height: 8),
-            FadeScaleEntry(
-              index: 1,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: t.primary.withOpacity(0.06),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline_rounded,
-                      size: 14,
-                      color: t.primary,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        day.optionalDesc!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: t.text3,
-                          height: 1.5,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            ...day.recoveryOptions!.asMap().entries.map(
-                  (e) => FadeScaleEntry(
-                    index: e.key + 2,
-                    child: Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: t.primary,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: t.primary.withOpacity(0.4),
-                                    blurRadius: 6,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              e.value,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: t.text2,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-          ],
-        ),
-      );
-    }
-
-    final done = _cnt(_day);
-    final total = day.exercises.length;
-    return SingleChildScrollView(
-      key: PageStorageKey('workout-scroll-$_day'),
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 116),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          FadeScaleEntry(child: _dayHdr(day, t), index: 0),
-          const SizedBox(height: 12),
-          FadeScaleEntry(
-            index: 1,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: t.success,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: t.success.withOpacity(0.28),
-                                blurRadius: 8,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 7),
-                        Text(
-                          '训练进度',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: t.text3,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      '$done/$total',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: t.success,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween<double>(end: total > 0 ? done / total : 0),
-                    duration: const Duration(milliseconds: 400),
-                    curve: Curves.easeOutCubic,
-                    builder: (_, v, __) => LinearProgressIndicator(
-                      value: v,
-                      minHeight: 7,
-                      backgroundColor: t.border.withOpacity(
-                        t.isDark ? 0.7 : 0.9,
-                      ),
-                      valueColor: AlwaysStoppedAnimation(t.success),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          ...day.exercises.asMap().entries.map(
-                (e) => FadeScaleEntry(
-                  key: ValueKey('entry_${_day}_${e.key}'),
-                  index: e.key,
-                  delay: const Duration(milliseconds: 38),
-                  child: RepaintBoundary(
-                    child: _exCard(
-                      e.value,
-                      e.key + 1,
-                      _completedSets(_day, e.key),
-                      t,
-                      () => _toggle(_day, e.key),
-                      () => _resetExercise(_day, e.key),
-                      parseRestSeconds(e.value.rest) == null
-                          ? null
-                          : () => _startRestTimer(e.value),
-                    ),
-                  ),
-                ),
-              ),
-          if (day.circuitNote != null)
-            FadeScaleEntry(
-              index: day.exercises.length + 2,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Card(
-                  color: t.primary.withOpacity(0.04),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Text(
-                      day.circuitNote!,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: t.text3,
-                        height: 1.6,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
-  }
-
-  Widget _restTimerPanel(WorkoutTheme t) {
-    final finished = _restRemaining == 0;
-    final progress = _restTotal == 0 ? 0.0 : _restRemaining / _restTotal;
-    final minutes = _restRemaining ~/ 60;
-    final seconds = (_restRemaining % 60).toString().padLeft(2, '0');
-    return Container(
-      key: const Key('rest-timer-panel'),
-      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            t.primary.withOpacity(t.isDark ? 0.16 : 0.10),
-            t.accent.withOpacity(t.isDark ? 0.09 : 0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: t.primary.withOpacity(0.22)),
-        boxShadow: [
-          BoxShadow(
-            color: t.primary.withOpacity(t.isDark ? 0.13 : 0.07),
-            blurRadius: 18,
-            offset: const Offset(0, 7),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 52,
-            height: 52,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                TweenAnimationBuilder<double>(
-                  tween: Tween<double>(end: progress),
-                  duration: const Duration(milliseconds: 420),
-                  curve: Curves.easeOutCubic,
-                  builder: (_, value, __) => CircularProgressIndicator(
-                    value: value,
-                    strokeWidth: 4,
-                    backgroundColor: t.border.withOpacity(0.72),
-                    valueColor: AlwaysStoppedAnimation(
-                      finished ? t.success : t.primary,
-                    ),
-                  ),
-                ),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  child: finished
-                      ? Icon(
-                          Icons.check_rounded,
-                          key: const ValueKey('rest-complete'),
-                          color: t.success,
-                          size: 25,
-                        )
-                      : Text(
-                          '$minutes:$seconds',
-                          key: ValueKey(_restRemaining),
-                          style: TextStyle(
-                            color: t.text1,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  finished ? '休息完成，可以继续' : '组间休息',
-                  style: TextStyle(
-                    color: finished ? t.success : t.text1,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  _restExercise,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: t.text3, fontSize: 10.5),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            key: const Key('rest-timer-add'),
-            tooltip: '增加 30 秒',
-            onPressed: _addRestTime,
-            icon: Icon(Icons.add_alarm_rounded, color: t.primary, size: 20),
-          ),
-          IconButton(
-            key: const Key('rest-timer-dismiss'),
-            tooltip: '结束计时',
-            onPressed: _dismissRestTimer,
-            icon: Icon(Icons.close_rounded, color: t.text3, size: 19),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _dayHdr(WorkoutDay d, WorkoutTheme t) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${d.dayName} ${d.subtitle}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: t.text1,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                ),
-                if (d.badge.isNotEmpty) ...[
-                  const SizedBox(width: 10),
-                  Flexible(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: t.primary.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(7),
-                      ),
-                      child: Text(
-                        d.badge,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                          color: t.primary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            if (d.description.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                d.description,
-                style: TextStyle(fontSize: 12, color: t.text3),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _restTip(IconData ic, String txt, Color c, WorkoutTheme t) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: c.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: c.withOpacity(0.12), width: 0.5),
-      ),
-      child: Row(
-        children: [
-          Icon(ic, size: 18, color: c),
-          const SizedBox(width: 10),
-          Text(
-            txt,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: t.text2,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _exCard(
-    Exercise ex,
-    int num,
-    int completedSets,
-    WorkoutTheme t,
-    VoidCallback tap,
-    VoidCallback reset,
-    VoidCallback? startTimer,
-  ) {
-    final done = completedSets >= ex.sets;
-    final status = completedSets == 0
-        ? '点击卡片完成第 1 组'
-        : done
-            ? '${ex.sets}/${ex.sets} 组已完成'
-            : '$completedSets/${ex.sets} 组完成 · 点击继续';
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Semantics(
-        button: !done,
-        enabled: _workoutReady && !done,
-        label: '${ex.name}，$status',
-        child: PressScale(
-          onTap: _workoutReady && !done ? tap : null,
-          child: Card(
-            key: ValueKey('exercise_card_${_day}_${num - 1}'),
-            color: done
-                ? t.success.withOpacity(t.isDark ? 0.045 : 0.035)
-                : (ex.isStar ? t.primary.withOpacity(0.025) : null),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-              side: done
-                  ? BorderSide(color: t.success.withOpacity(0.22), width: 1)
-                  : (ex.isStar
-                      ? BorderSide(
-                          color: t.primary.withOpacity(0.26),
-                          width: 1.2,
-                        )
-                      : BorderSide(
-                          color: t.border.withOpacity(0.9),
-                          width: 0.8,
-                        )),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: done ? t.success : t.card,
-                      border: Border.all(
-                        color: done ? t.success : t.border,
-                        width: 1.4,
-                      ),
-                      boxShadow: done
-                          ? [
-                              BoxShadow(
-                                color: t.success.withOpacity(0.28),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 200),
-                      transitionBuilder: (c, a) => FadeTransition(
-                        opacity: a,
-                        child: ScaleTransition(
-                          scale: Tween<double>(begin: 0.8, end: 1.0).animate(
-                            CurvedAnimation(
-                              parent: a,
-                              curve: Curves.easeOutBack,
-                            ),
-                          ),
-                          child: c,
-                        ),
-                      ),
-                      child: done
-                          ? const Icon(
-                              Icons.check,
-                              color: Colors.white,
-                              size: 14,
-                              key: ValueKey('d'),
-                            )
-                          : Center(
-                              child: Text(
-                                '$num',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: t.text4,
-                                ),
-                                key: ValueKey('n$num'),
-                              ),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          ex.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: done ? t.text4 : t.text1,
-                            decoration:
-                                done ? TextDecoration.lineThrough : null,
-                            decorationColor: t.text4,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Wrap(
-                          spacing: 5,
-                          runSpacing: 3,
-                          children: [
-                            ...ex.muscles.map(
-                              (m) => Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: t.primary.withOpacity(0.07),
-                                  borderRadius: BorderRadius.circular(5),
-                                ),
-                                child: Text(
-                                  m,
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: t.text3,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            if (ex.muscleTarget.isNotEmpty)
-                              Text(
-                                ex.muscleTarget,
-                                style:
-                                    TextStyle(fontSize: 10.5, color: t.text3),
-                              ),
-                          ],
-                        ),
-                        if (ex.note != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 7),
-                            child: Text(
-                              ex.note!,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: t.text3,
-                                height: 1.45,
-                              ),
-                            ),
-                          ),
-                        const SizedBox(height: 7),
-                        SizedBox(
-                          height: 18,
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              status,
-                              key: ValueKey(
-                                'exercise_set_progress_${_day}_${num - 1}',
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: done ? t.success : t.text3,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(
-                              text: '${ex.sets}',
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                                color: done ? t.text4 : t.primary,
-                                fontFeatures: const [
-                                  FontFeature.tabularFigures(),
-                                ],
-                              ),
-                            ),
-                            TextSpan(
-                              text: ' ×',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: done ? t.text4 : t.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        ex.reps,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: done ? t.text4 : t.text2,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      SizedBox.square(
-                        dimension: 48,
-                        child: done
-                            ? TextButton(
-                                key: ValueKey(
-                                  'exercise_reset_${_day}_${num - 1}',
-                                ),
-                                onPressed: reset,
-                                style: TextButton.styleFrom(
-                                  padding: EdgeInsets.zero,
-                                  foregroundColor: t.success,
-                                ),
-                                child: const Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.undo_rounded, size: 18),
-                                    Text('撤销', style: TextStyle(fontSize: 10)),
-                                  ],
-                                ),
-                              )
-                            : startTimer == null
-                                ? Center(
-                                    child: Text(
-                                      ex.rest,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.w600,
-                                        color: t.text3,
-                                      ),
-                                    ),
-                                  )
-                                : TextButton(
-                                    key: ValueKey(
-                                      'exercise_timer_${_day}_${num - 1}',
-                                    ),
-                                    onPressed: startTimer,
-                                    style: TextButton.styleFrom(
-                                      padding: EdgeInsets.zero,
-                                      foregroundColor: t.primary,
-                                    ),
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        const Icon(
-                                          Icons.timer_outlined,
-                                          size: 18,
-                                        ),
-                                        Text(
-                                          ex.rest,
-                                          maxLines: 1,
-                                          softWrap: false,
-                                          overflow: TextOverflow.fade,
-                                          style: const TextStyle(fontSize: 10),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// RECORD PAGE — v6.5: 训练记录（月度日历热力图 + 年度统计）
+// RECORD PAGE — month and year summaries of actual dated workouts
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class RecordPage extends StatefulWidget {
@@ -2665,10 +931,12 @@ class _RecordPageState extends State<RecordPage> {
   int _viewYear = DateTime.now().year;
   int _viewMonth = DateTime.now().month;
   Map<int, int> _monthData = {};
+  Map<int, Map<int, int>> _yearMonths = {};
   bool _loading = true;
   int _yearTotal = 0;
   int _yearTrainDays = 0;
   int _loadGeneration = 0;
+  String? _loadError;
 
   @override
   void initState() {
@@ -2687,15 +955,26 @@ class _RecordPageState extends State<RecordPage> {
     final generation = ++_loadGeneration;
     final year = _viewYear;
     final month = _viewMonth;
-    final p = await SharedPreferences.getInstance();
-    final summary = await loadRecordSummary(p, year, month);
-    if (mounted && generation == _loadGeneration) {
-      setState(() {
-        _monthData = summary.monthData;
-        _yearTotal = summary.yearTotal;
-        _yearTrainDays = summary.yearTrainDays;
-        _loading = false;
-      });
+    try {
+      final p = await SharedPreferences.getInstance();
+      final summary = await loadRecordSummary(p, year, month);
+      if (mounted && generation == _loadGeneration) {
+        setState(() {
+          _monthData = summary.monthData;
+          _yearMonths = summary.yearMonths;
+          _yearTotal = summary.yearTotal;
+          _yearTrainDays = summary.yearTrainDays;
+          _loading = false;
+          _loadError = null;
+        });
+      }
+    } catch (_) {
+      if (mounted && generation == _loadGeneration) {
+        setState(() {
+          _loading = false;
+          _loadError = '训练统计读取失败，原记录未被覆盖。';
+        });
+      }
     }
   }
 
@@ -2770,6 +1049,13 @@ class _RecordPageState extends State<RecordPage> {
 
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
+    }
+    if (_loadError != null) {
+      return Center(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text(_loadError!),
+        TextButton(onPressed: _loadData, child: const Text('重试'))
+      ]));
     }
 
     return CustomScrollView(
@@ -2861,7 +1147,7 @@ class _RecordPageState extends State<RecordPage> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _statBlock('完成动作', '${_totalExercises()}', '个', t),
+                      _statBlock('已练项目', '${_totalExercises()}', '个', t),
                       Container(width: 1, height: 36, color: t.border),
                       _statBlock('训练天数', '${_trainDays()}', '天', t),
                       Container(width: 1, height: 36, color: t.border),
@@ -2965,7 +1251,7 @@ class _RecordPageState extends State<RecordPage> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _statBlock('年度完成', '$_yearTotal', '个动作', t),
+                          _statBlock('年度已练', '$_yearTotal', '个项目', t),
                           _statBlock('训练天数', '$_yearTrainDays', '天', t),
                         ],
                       ),
@@ -3121,58 +1407,27 @@ class _RecordPageState extends State<RecordPage> {
 
   Widget _buildYearGrid(WorkoutTheme t) {
     final now = DateTime.now();
-    return FutureBuilder<SharedPreferences>(
-      future: SharedPreferences.getInstance(),
-      builder: (ctx, snap) {
-        if (!snap.hasData) return const SizedBox(height: 100);
-        final p = snap.data!;
-        return Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (int m = 1; m <= 12; m++)
-              _buildMiniMonth(
-                p,
-                _viewYear,
-                m,
-                '$m',
-                t,
-                _viewYear == now.year && m == now.month,
-              ),
-          ],
-        );
-      },
-    );
+    return Wrap(spacing: 8, runSpacing: 8, children: [
+      for (var month = 1; month <= 12; month++)
+        _buildMiniMonth(_yearMonths[month] ?? {}, _viewYear, month, '$month', t,
+            _viewYear == now.year && month == now.month),
+    ]);
   }
 
   Widget _buildMiniMonth(
-    SharedPreferences p,
+    Map<int, int> counts,
     int year,
     int month,
     String label,
     WorkoutTheme t,
     bool isCurrent,
   ) {
-    final data = p.getString(historyKey(year, month));
-    Map<String, dynamic> history = {};
-    if (data != null) {
-      try {
-        history = jsonDecode(data) as Map<String, dynamic>;
-      } catch (_) {}
-    }
-    final daysInMonth = DateTime(year, month + 1, 0).day;
-    history.removeWhere((k, v) {
-      final day = int.tryParse(k);
-      final count = v is int ? v : int.tryParse('$v');
-      return day == null ||
-          day < 1 ||
-          day > daysInMonth ||
-          count == null ||
-          count <= 0;
-    });
+    final history = <String, int>{
+      for (final e in counts.entries) '${e.key}': e.value
+    };
     final total = history.values.fold<int>(
       0,
-      (s, v) => s + (v is int ? v : int.tryParse('$v') ?? 0),
+      (s, v) => s + v,
     );
     return Container(
       width: (MediaQuery.of(context).size.width - 32 - 24) / 4,
@@ -3262,308 +1517,6 @@ class _RecordPageState extends State<RecordPage> {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // NUTRITION PAGE
-// ═══════════════════════════════════════════════════════════════════════════════
-
-class NutritionPage extends StatelessWidget {
-  const NutritionPage({super.key});
-  @override
-  Widget build(BuildContext context) {
-    final t = ThemeInherited.of(context).theme;
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-            child: GradientTitle(
-              text: '饮食营养',
-              primary: t.primary,
-              accent: t.primaryLight,
-              fontSize: 22,
-            ),
-          ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              FadeScaleEntry(
-                index: 0,
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: LayoutBuilder(
-                      builder: (context, box) {
-                        final itemWidth = (box.maxWidth - 8) / 2;
-                        return Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _macroStat(
-                              '每日热量',
-                              '2200',
-                              'kcal',
-                              Icons.local_fire_department_rounded,
-                              t.primary,
-                              t,
-                              itemWidth,
-                            ),
-                            _macroStat(
-                              '蛋白质',
-                              '130-160',
-                              'g',
-                              Icons.fitness_center_rounded,
-                              t.success,
-                              t,
-                              itemWidth,
-                            ),
-                            _macroStat(
-                              '碳水',
-                              '200-270',
-                              'g',
-                              Icons.grain_rounded,
-                              t.warning,
-                              t,
-                              itemWidth,
-                            ),
-                            _macroStat(
-                              '脂肪',
-                              '58-73',
-                              'g',
-                              Icons.water_drop_rounded,
-                              t.accent,
-                              t,
-                              itemWidth,
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              FadeScaleEntry(
-                index: 1,
-                child: _mc(
-                  '蛋白质',
-                  '130-160g',
-                  '1.8-2.2g/kg · 25%',
-                  '鸡胸 · 牛肉 · 鸡蛋 · 鱼虾 · 豆腐 · 蛋白粉',
-                  t.primary,
-                  t,
-                ),
-              ),
-              const SizedBox(height: 8),
-              FadeScaleEntry(
-                index: 2,
-                child: _mc(
-                  '碳水',
-                  '200-270g',
-                  '2-3g/kg · 40%',
-                  '糙米 · 红薯 · 燕麦 · 全麦 · 玉米 · 水果',
-                  t.warning,
-                  t,
-                ),
-              ),
-              const SizedBox(height: 8),
-              FadeScaleEntry(
-                index: 3,
-                child: _mc(
-                  '脂肪',
-                  '58-73g',
-                  '0.8-1g/kg · 30%',
-                  '橄榄油 · 坚果 · 牛油果 · 深海鱼 · 蛋黄',
-                  t.success,
-                  t,
-                ),
-              ),
-              const SizedBox(height: 24),
-              FadeScaleEntry(
-                index: 4,
-                child: Text(
-                  '饮食建议',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: t.text1,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              ...nutritionTips.asMap().entries.map(
-                    (e) => FadeScaleEntry(
-                      index: e.key + 5,
-                      child: Card(
-                        margin: const EdgeInsets.only(bottom: 6),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 12,
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 3,
-                                height: 14,
-                                margin:
-                                    const EdgeInsets.only(right: 10, top: 2),
-                                decoration: BoxDecoration(
-                                  color: t.primary,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  nutritionTips[e.key],
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: t.text2,
-                                    height: 1.6,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              const SizedBox(height: 8),
-            ]),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _macroStat(
-    String label,
-    String value,
-    String unit,
-    IconData icon,
-    Color color,
-    WorkoutTheme t,
-    double width,
-  ) {
-    return Container(
-      width: width,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withOpacity(t.isDark ? 0.10 : 0.07),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.14), width: 0.8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 14, color: color),
-              const SizedBox(width: 5),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: t.text3,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w900,
-                    color: color,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(width: 3),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: Text(
-                    unit,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: t.text4,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _mc(String l, String v, String p, String f, Color c, WorkoutTheme t) =>
-      Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 28,
-                    height: 3,
-                    decoration: BoxDecoration(
-                      color: c,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    l,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: t.text4,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(p, style: TextStyle(fontSize: 10, color: t.text3)),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                v,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                  color: c,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                f,
-                style: TextStyle(fontSize: 11, color: t.text3, height: 1.5),
-              ),
-            ],
-          ),
-        ),
-      );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// PROGRESSION PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class ProgressionPage extends StatelessWidget {
@@ -3940,213 +1893,6 @@ class ThemePage extends StatelessWidget {
   }
 }
 
-class WorkoutPlanEditorPage extends StatefulWidget {
-  const WorkoutPlanEditorPage({super.key});
-
-  @override
-  State<WorkoutPlanEditorPage> createState() => _WorkoutPlanEditorPageState();
-}
-
-class _WorkoutPlanEditorPageState extends State<WorkoutPlanEditorPage> {
-  List<WorkoutDay>? _plan;
-
-  @override
-  void initState() {
-    super.initState();
-    loadWorkoutPlan(workoutDays).then((plan) {
-      if (mounted) setState(() => _plan = plan);
-    });
-  }
-
-  Future<void> _editExercise(int dayIndex, int exerciseIndex) async {
-    final current = _plan![dayIndex].exercises[exerciseIndex];
-    final name = TextEditingController(text: current.name);
-    final sets = TextEditingController(text: '${current.sets}');
-    final reps = TextEditingController(text: current.reps);
-    final rest = TextEditingController(text: current.rest);
-    final note = TextEditingController(text: current.note ?? '');
-    final result = await showDialog<Exercise>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('修改 ${current.name}'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: name,
-                decoration: const InputDecoration(labelText: '动作名称'),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: sets,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: '组数'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: reps,
-                      decoration: const InputDecoration(labelText: '次数'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: rest,
-                decoration: const InputDecoration(labelText: '休息时间'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: note,
-                maxLines: 3,
-                decoration: const InputDecoration(labelText: '动作说明'),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final count = int.tryParse(sets.text);
-              if (name.text.trim().isEmpty || count == null || count < 1) {
-                return;
-              }
-              Navigator.pop(
-                ctx,
-                current.copyWith(
-                  name: name.text.trim(),
-                  sets: count,
-                  reps: reps.text.trim(),
-                  rest: rest.text.trim(),
-                  note: note.text.trim(),
-                ),
-              );
-            },
-            child: const Text('保存'),
-          ),
-        ],
-      ),
-    );
-    if (result == null) return;
-    final nextExercises = List<Exercise>.from(_plan![dayIndex].exercises);
-    nextExercises[exerciseIndex] = result;
-    final next = List<WorkoutDay>.from(_plan!);
-    next[dayIndex] = next[dayIndex].copyWith(exercises: nextExercises);
-    await saveWorkoutPlan(next);
-    workoutPlanRevision.value++;
-    if (mounted) setState(() => _plan = next);
-  }
-
-  Future<void> _reset() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('恢复默认训练计划？'),
-        content: const Text('将恢复当前内置的周一至周日健身安排。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('恢复默认'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    await resetWorkoutPlan();
-    workoutPlanRevision.value++;
-    if (mounted) setState(() => _plan = List<WorkoutDay>.from(workoutDays));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final t = ThemeInherited.of(context).theme;
-    final plan = _plan;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('训练计划'),
-        actions: [TextButton(onPressed: _reset, child: const Text('恢复默认'))],
-      ),
-      body: plan == null
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-              itemCount: plan.length,
-              itemBuilder: (context, dayIndex) {
-                final day = plan[dayIndex];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ExpansionTile(
-                    initiallyExpanded: dayIndex == DateTime.now().weekday - 1,
-                    title: Text(
-                      '${day.dayName} · ${day.subtitle}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: t.text1,
-                      ),
-                    ),
-                    subtitle: Text(
-                      day.isRest ? '休息日' : '${day.exercises.length} 个动作',
-                      style: TextStyle(color: t.text3),
-                    ),
-                    children: [
-                      if (day.exercises.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          child: Text(
-                            day.recoveryOptions == null ? '无训练动作' : '恢复日项目保持默认',
-                            style: TextStyle(color: t.text3),
-                          ),
-                        )
-                      else
-                        for (var i = 0; i < day.exercises.length; i++)
-                          ListTile(
-                            key: ValueKey('plan_${dayIndex}_$i'),
-                            leading: CircleAvatar(
-                              radius: 15,
-                              backgroundColor: t.primary.withOpacity(0.1),
-                              child: Text(
-                                '${i + 1}',
-                                style: TextStyle(
-                                  color: t.primary,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            title: Text(day.exercises[i].name),
-                            subtitle: Text(
-                              '${day.exercises[i].sets}组 × ${day.exercises[i].reps} · 休息 ${day.exercises[i].rest}',
-                            ),
-                            trailing: const Icon(Icons.edit_rounded, size: 19),
-                            onTap: () => _editExercise(dayIndex, i),
-                          ),
-                    ],
-                  ),
-                );
-              },
-            ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// TREND CHART WIDGET — lightweight CustomPainter line chart
-// ═══════════════════════════════════════════════════════════════════════════════
-
 class TrendChartPainter extends CustomPainter {
   final List<(String, double)> data; // (label, value)
   final WorkoutTheme theme;
@@ -4275,7 +2021,7 @@ class _SettingsPageState extends State<SettingsPage> {
   List<WeightEntry> _weightHistory = [];
   List<BodyMeasurement> _measurements = [];
   String _trendTab = 'weight'; // weight or measurements
-  bool _autoRestTimer = true;
+  bool _autoRestTimer = false;
 
   @override
   void initState() {
@@ -4288,13 +2034,14 @@ class _SettingsPageState extends State<SettingsPage> {
     final weights = await loadWeightHistory();
     final measurements = await loadMeasurements();
     final autoRestTimer = await loadAutoRestTimer();
-    if (mounted)
+    if (mounted) {
       setState(() {
         _profile = profile;
         _weightHistory = weights;
         _measurements = measurements;
         _autoRestTimer = autoRestTimer;
       });
+    }
   }
 
   Future<void> _saveProfile(UserProfile p) async {
@@ -4321,7 +2068,7 @@ class _SettingsPageState extends State<SettingsPage> {
           child: Icon(Icons.timer_rounded, color: t.accent, size: 21),
         ),
         title: Text(
-          '完成动作后自动计时',
+          '完成一组后自动计时',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
@@ -4329,7 +2076,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
         subtitle: Text(
-          '按训练计划中的休息时间启动，可随时加 30 秒或结束',
+          '默认关闭；开启后按项目休息时长计时，补记历史不启动',
           style: TextStyle(fontSize: 11, color: t.text3),
         ),
         value: _autoRestTimer,
@@ -4352,7 +2099,7 @@ class _SettingsPageState extends State<SettingsPage> {
       child: PressScale(
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute<void>(
-            builder: (_) => const WorkoutPlanEditorPage(),
+            builder: (_) => const TemplateManagerPage(),
           ),
         ),
         child: Padding(
@@ -4378,7 +2125,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '训练计划',
+                      '训练模板与每周参考',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -4387,7 +2134,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '修改动作、组数、次数和休息时间',
+                      '搭建模板、增删项目、设置每天的参考安排',
                       style: TextStyle(fontSize: 11, color: t.text3),
                     ),
                   ],
@@ -4434,6 +2181,19 @@ class _SettingsPageState extends State<SettingsPage> {
               const SizedBox(height: 12),
               // ── 训练偏好 ──
               FadeScaleEntry(index: 3, child: _trainingPreferencesCard(t)),
+              const SizedBox(height: 12),
+              Card(
+                  child: ListTile(
+                      leading: Icon(Icons.trending_up_rounded,
+                          size: 21, color: t.primary),
+                      title: const Text('训练参考', style: TextStyle(fontSize: 13)),
+                      trailing: const Icon(Icons.chevron_right, size: 18),
+                      onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => Scaffold(
+                                  appBar: AppBar(title: const Text('训练参考')),
+                                  body: const ProgressionPage()))))),
               const SizedBox(height: 12),
               // ── 数据管理 ──
               FadeScaleEntry(index: 4, child: _dataCard(t)),
@@ -4832,7 +2592,7 @@ class _SettingsPageState extends State<SettingsPage> {
             .toList(),
       ),
     );
-    if (result != null)
+    if (result != null) {
       _saveProfile(
         UserProfile(
           birthday: p.birthday,
@@ -4841,6 +2601,7 @@ class _SettingsPageState extends State<SettingsPage> {
           gender: result,
         ),
       );
+    }
   }
 
   Future<void> _editHeight(UserProfile p) async {
@@ -4868,7 +2629,7 @@ class _SettingsPageState extends State<SettingsPage> {
         ],
       ),
     );
-    if (result != null)
+    if (result != null) {
       _saveProfile(
         UserProfile(
           birthday: p.birthday,
@@ -4877,6 +2638,7 @@ class _SettingsPageState extends State<SettingsPage> {
           gender: p.gender,
         ),
       );
+    }
   }
 
   Future<void> _editWeight(UserProfile p) async {
@@ -5520,10 +3282,11 @@ class _SettingsPageState extends State<SettingsPage> {
         );
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('❌ 导出失败: $e')));
+      }
     }
   }
 
@@ -5597,10 +3360,11 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         );
       } catch (e) {
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(SnackBar(content: Text('❌ 导入失败: $e')));
+        }
       }
     }
   }

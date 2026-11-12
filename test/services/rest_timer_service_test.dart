@@ -28,12 +28,12 @@ void main() {
         0);
   });
 
-  test('auto rest timer preference defaults on and persists', () async {
+  test('auto rest timer preference defaults off and persists', () async {
     final preferences = await SharedPreferences.getInstance();
-    expect(await loadAutoRestTimer(preferences: preferences), isTrue);
-
-    await saveAutoRestTimer(false, preferences: preferences);
-
     expect(await loadAutoRestTimer(preferences: preferences), isFalse);
+
+    await saveAutoRestTimer(true, preferences: preferences);
+
+    expect(await loadAutoRestTimer(preferences: preferences), isTrue);
   });
 }

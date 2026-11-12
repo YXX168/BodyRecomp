@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-const String autoRestTimerKey = 'recomp_auto_rest_timer_v1';
+// The new explicit-completion UI starts with manual timers, including upgrades.
+const String autoRestTimerKey = 'recomp_auto_rest_timer_v2';
 
 int restSecondsUntil(DateTime deadline, {DateTime? now}) {
   final milliseconds =
@@ -23,7 +24,7 @@ int? parseRestSeconds(String value) {
 
 Future<bool> loadAutoRestTimer({SharedPreferences? preferences}) async {
   final prefs = preferences ?? await SharedPreferences.getInstance();
-  return prefs.getBool(autoRestTimerKey) ?? true;
+  return prefs.getBool(autoRestTimerKey) ?? false;
 }
 
 Future<void> saveAutoRestTimer(

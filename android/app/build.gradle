@@ -59,7 +59,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix ".preview"
+            resValue "string", "app_name", "Body Recomp 预览"
+        }
         release {
+            resValue "string", "app_name", "Body Recomp"
             if (keystorePropertiesFile.exists()) {
                 signingConfig signingConfigs.release
             }
