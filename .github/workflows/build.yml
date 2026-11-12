@@ -136,3 +136,6 @@ jobs:
               --title "青阳 $RELEASE_TAG" \
               --notes-file "$NOTES" --latest
           fi
+      - name: Remove temporary signing files
+        if: always()
+        run: rm -f android/app/bodyrecomp-release.jks android/key.properties
