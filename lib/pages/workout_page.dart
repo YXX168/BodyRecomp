@@ -11,7 +11,6 @@ import '../services/rest_timer_service.dart';
 import '../services/rest_countdown.dart';
 import '../widgets/rest_timer_pill.dart';
 import '../widgets/daily_date_bar.dart';
-import '../widgets/week_calendar.dart';
 import '../widgets/exercise_editor.dart';
 import '../widgets/exercise_picker.dart';
 import '../widgets/text_prompt.dart';
@@ -315,16 +314,7 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
                       _date = date;
                       _followToday = date == dateOnly(_now);
                     })),
-            WeekCalendar(
-                date: _date,
-                today: _now,
-                sessions: _sessions,
-                enabled: !_busy,
-                onChanged: (date) => setState(() {
-                      _date = date;
-                      _followToday = date == dateOnly(_now);
-                    })),
-            const SizedBox(height: 14),
+            const SizedBox(height: 6),
             Container(
                 key: const Key('daily-suggestion'),
                 padding: const EdgeInsets.fromLTRB(14, 8, 8, 12),

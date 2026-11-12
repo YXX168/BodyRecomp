@@ -14,7 +14,7 @@ class RestCountdownState {
       required this.total});
 }
 
-/// Only the dock listens to ticks; exercise cards keep their layout and state.
+/// Only the header pill listens to ticks; exercise cards keep their layout and state.
 class RestCountdown extends ValueNotifier<RestCountdownState?> {
   final DateTime Function() now;
   final VoidCallback? onFinished;

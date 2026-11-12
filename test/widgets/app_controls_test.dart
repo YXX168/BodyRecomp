@@ -5,7 +5,7 @@ import 'package:body_recomp/models/daily_workout.dart';
 import 'package:body_recomp/pages/template_manager_page.dart';
 import 'package:body_recomp/services/daily_workout_service.dart';
 import 'package:body_recomp/widgets/exercise_editor.dart';
-import 'package:body_recomp/widgets/week_calendar.dart';
+import 'package:body_recomp/widgets/daily_date_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -85,24 +85,43 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('week strip switches real dates and blocks future entry',
+  testWidgets('compact date selector opens on demand and can return to today',
       (tester) async {
     var date = DateTime(2026, 11, 12);
     final today = date;
     await tester.pumpWidget(MaterialApp(
         home: Scaffold(
             body: StatefulBuilder(
-                builder: (context, update) => WeekCalendar(
+                builder: (context, update) => DailyDateBar(
                     date: date,
                     today: today,
-                    sessions: {},
                     onChanged: (value) => update(() => date = value))))));
-    await tester.tap(find.byKey(const ValueKey('week-day-2026-11-11')));
+    expect(find.byType(CalendarDatePicker), findsNothing);
+    await tester.tap(find.byKey(const Key('choose-date')));
+    await tester.pumpAndSettle();
+    expect(
+        tester
+            .widget<CalendarDatePicker>(find.byType(CalendarDatePicker))
+            .lastDate,
+        today);
+    await tester.tap(find.descendant(
+        of: find.byType(CalendarDatePicker), matching: find.text('11')));
+    await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
     expect(date, DateTime(2026, 11, 11));
-    await tester.tap(find.byKey(const ValueKey('week-day-2026-11-13')));
+    await tester.tap(find.byKey(const Key('choose-date')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(
+        of: find.byType(CalendarDatePicker), matching: find.text('10')));
+    await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(date, DateTime(2026, 11, 11));
+    await tester.tap(find.byKey(const Key('return-today')));
+    await tester.pumpAndSettle();
+    expect(date, today);
+    expect(
+        tester.widget<IconButton>(find.byKey(const Key('next-date'))).onPressed,
+        isNull);
   });
 
   testWidgets('theme changes isolate hidden tabs and retain workout and timer',

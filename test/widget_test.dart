@@ -140,8 +140,11 @@ void main() {
     expect(pill.bottom, lessThanOrEqualTo(tester.getTopLeft(block).dy));
     now = now.add(const Duration(minutes: 2));
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('休息结束'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('rest-timer-panel')), findsNothing);
     expect(tester.getRect(block), before);
+    await tester.tap(find.byKey(const ValueKey('start-rest-0')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('rest-timer-dismiss')));
     await tester.pumpAndSettle();
     expect(tester.getRect(block), before);
@@ -168,8 +171,7 @@ void main() {
     expect(find.text('2:00'), findsOneWidget);
     now = now.add(const Duration(minutes: 3));
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('休息结束'), findsOneWidget);
-    await tapVisible(tester, find.byKey(const Key('rest-timer-dismiss')));
+    await tester.pumpAndSettle();
     expect(timer, findsNothing);
     expect((await loadDailyWorkouts())[dayKey(today)]!.completedSets, 0);
     expect(tester.takeException(), isNull);
