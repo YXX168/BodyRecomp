@@ -12,6 +12,12 @@ void main() {
     expect(parseRestSeconds('1.5 分钟'), 90);
     expect(parseRestSeconds('循环'), isNull);
     expect(parseRestSeconds(''), isNull);
+    expect(parseRestSeconds('1分30秒'), 90);
+    expect(parseRestSeconds('01:30'), 90);
+    expect(parseRestSeconds('-30s'), isNull);
+    expect(parseRestSeconds('0s'), isNull);
+    expect(parseRestSeconds('随便123'), isNull);
+    expect(parseRestSeconds('1:90'), isNull);
   });
 
   test('deadline countdown is exact after pauses and rounds partial seconds up',

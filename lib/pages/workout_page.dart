@@ -449,14 +449,14 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
                     Text(session.rested ? '今天，好好休息' : '选几块，开始今天的训练',
                         style: const TextStyle(
                             fontSize: 13, fontWeight: FontWeight.w600)),
-                    if (!session.rested)
-                      TextButton(
-                          key: const Key('record-rest'),
-                          onPressed: _busy
-                              ? null
-                              : () => _save(session.copyWith(rested: true)),
-                          child: Text('今天休息',
-                              style: TextStyle(fontSize: 11, color: muted))),
+                    TextButton(
+                        key: const Key('record-rest'),
+                        onPressed: _busy
+                            ? null
+                            : () => _save(
+                                session.copyWith(rested: !session.rested)),
+                        child: Text(session.rested ? '取消休息标记' : '今天休息',
+                            style: TextStyle(fontSize: 11, color: muted))),
                   ])),
             for (var i = 0; i < session.blocks.length; i++)
               _blockCard(session.blocks[i], i),
@@ -559,7 +559,7 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
                         : Text('${i + 1}',
                             style: TextStyle(fontSize: 9, color: muted))),
               if (exercise.sets > 12)
-                Text('+${exercise.sets - 12}',
+                Text('${block.completedSets} / ${exercise.sets} 组',
                     style: TextStyle(fontSize: 10, color: muted))
             ])),
             IconButton(

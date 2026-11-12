@@ -115,4 +115,33 @@ void main() {
     expect(finished, isTrue);
     expect(result, isNull);
   });
+
+  testWidgets(
+      'search keeps different prescriptions and shares identical selections',
+      (tester) async {
+    final exercise = defaultTemplates.first.exercises.first;
+    await open(tester, templates: [
+      WorkoutTemplate(id: 'a', name: 'A', exercises: [exercise]),
+      WorkoutTemplate(
+          id: 'b',
+          name: 'B',
+          exercises: [exercise, exercise.copyWith(sets: 7)]),
+    ]);
+    await tap(tester, 'pick_0_0');
+    await tap(tester, 'picker-template-b');
+    expect(find.text('1 项已选'), findsOneWidget);
+    final first = tester.widget<Semantics>(find
+        .ancestor(
+            of: find.byKey(const ValueKey('pick_1_0')),
+            matching: find.byType(Semantics))
+        .first);
+    expect(first.properties.selected, isTrue);
+    await tester.enterText(
+        find.byKey(const Key('exercise-search')), exercise.name);
+    await tester.pumpAndSettle();
+    expect(find.text('7 组 × ${exercise.reps}'), findsOneWidget);
+    expect(find.byKey(const ValueKey('pick_1_0')), findsNothing);
+    await tap(tester, 'pick_1_1');
+    expect(find.text('2 项已选'), findsOneWidget);
+  });
 }

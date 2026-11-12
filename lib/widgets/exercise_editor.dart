@@ -199,6 +199,14 @@ class _ExerciseEditorState extends State<_ExerciseEditor> {
                 controller: _rest,
                 style: const TextStyle(fontSize: 12),
                 onChanged: (_) => setState(() {}),
+                validator: (value) {
+                  final text = value?.trim() ?? '';
+                  return text.isNotEmpty &&
+                          !text.contains('循环') &&
+                          parseRestSeconds(text) == null
+                      ? '例如 75s、1分30秒；留空不计时'
+                      : null;
+                },
                 decoration: field('自定义，例如 75s；留空不计时').copyWith(
                     prefixIcon:
                         Icon(Icons.timer_outlined, size: 17, color: muted))),

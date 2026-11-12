@@ -5,6 +5,7 @@ import '../models/recomp_models.dart';
 import '../services/app_signals.dart';
 import '../services/nutrition_service.dart';
 import '../widgets/daily_date_bar.dart';
+import '../widgets/sheet_frame.dart';
 
 class NutritionPage extends StatefulWidget {
   const NutritionPage({super.key});
@@ -62,11 +63,16 @@ class _NutritionPageState extends State<NutritionPage>
   }
 
   Future<void> _edit((String, String, String) reference) async {
+    if (_busy) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     final date = dayKey(_date);
     final id = '$date|${reference.$1}';
     final before = _meals![id];
-    final result = await showDialog<_MealResult>(
+    final result = await showModalBottomSheet<_MealResult>(
         context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Colors.transparent,
         builder: (_) =>
             _MealEditor(date: date, reference: reference, initial: before));
     if (result == null || !mounted) return;
@@ -83,25 +89,28 @@ class _NutritionPageState extends State<NutritionPage>
         }
       });
       if (result.entry == null && before != null) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: const Text('已清除此餐记录'),
-            action: SnackBarAction(
-                label: '撤销',
-                onPressed: () async {
-                  if (_busy) return;
-                  setState(() => _busy = true);
-                  try {
-                    await saveMealEntry(id, before);
-                    await _load();
-                  } catch (_) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('恢复失败，请重试')));
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(
+              content: const Text('已清除此餐记录'),
+              action: SnackBarAction(
+                  label: '撤销',
+                  onPressed: () async {
+                    // An old undo must never replace a later record of this meal.
+                    if (!mounted || _busy || _meals!.containsKey(id)) return;
+                    setState(() => _busy = true);
+                    try {
+                      await saveMealEntry(id, before);
+                      await _load();
+                    } catch (_) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('恢复失败，请重试')));
+                      }
+                    } finally {
+                      if (mounted) setState(() => _busy = false);
                     }
-                  } finally {
-                    if (mounted) setState(() => _busy = false);
-                  }
-                })));
+                  })));
       }
     } catch (_) {
       if (mounted) {
@@ -213,14 +222,15 @@ class _NutritionPageState extends State<NutritionPage>
                   Text('已记录 ${entries.length} 餐',
                       style: TextStyle(fontSize: 10, color: muted)),
                   const Spacer(),
-                  InkWell(
-                      onTap: () => showDialog(
+                  IconButton(
+                      tooltip: '营养汇总说明',
+                      onPressed: () => showDialog(
                           context: context,
                           builder: (context) => const AlertDialog(
                               title: Text('营养汇总'),
                               content:
                                   Text('仅汇总手动填写的热量和蛋白质。未填写的餐次不参与计算，也不等于零摄入。'))),
-                      child: Icon(Icons.info_outline, size: 15, color: muted))
+                      icon: Icon(Icons.info_outline, size: 15, color: muted))
                 ]),
               ])),
           const SizedBox(height: 20),
@@ -352,60 +362,126 @@ class _MealEditorState extends State<_MealEditor> {
         : null;
   }
 
+  void _save() {
+    if (!_form.currentState!.validate()) return;
+    Navigator.pop(
+        context,
+        _MealResult(MealEntry(
+            date: widget.date,
+            meal: widget.reference.$1,
+            actual: _actual.text.trim(),
+            calories: double.tryParse(_calories.text.trim()),
+            protein: double.tryParse(_protein.text.trim()))));
+  }
+
   @override
-  Widget build(BuildContext context) => AlertDialog(
-          title: Text('记录${widget.reference.$2}'),
-          content: SingleChildScrollView(
-              child: Form(
-                  key: _form,
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    TextFormField(
-                        key: const Key('meal-actual-input'),
-                        controller: _actual,
-                        maxLines: 4,
-                        decoration: const InputDecoration(labelText: '实际吃了什么'),
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? '请填写实际饮食' : null),
-                    TextButton(
-                        onPressed: () => _actual.text = widget.reference.$3,
-                        child: const Text('按参考填入，再按实际修改')),
-                    TextFormField(
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return SheetFrame(
+        title: '记录${widget.reference.$2}',
+        subtitle: widget.date,
+        icon: Icons.restaurant_rounded,
+        body: Form(
+            key: _form,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                  decoration: BoxDecoration(
+                      color: colors.primary.withValues(alpha: .05),
+                      borderRadius: BorderRadius.circular(12)),
+                  child: ExpansionTile(
+                      tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+                      childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                      shape: const Border(),
+                      collapsedShape: const Border(),
+                      title: const Text('份量参考', style: TextStyle(fontSize: 12)),
+                      children: [
+                        Text(widget.reference.$3,
+                            style: TextStyle(
+                                fontSize: 12,
+                                height: 1.6,
+                                color:
+                                    colors.onSurface.withValues(alpha: .65))),
+                        TextButton(
+                            onPressed: () async {
+                              if (_actual.text.trim().isNotEmpty) {
+                                final replace = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                            title: const Text('替换已填写的饮食？'),
+                                            content:
+                                                const Text('填入参考后，还可以按实际情况修改。'),
+                                            actions: [
+                                              TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(ctx, false),
+                                                  child: const Text('保留原内容')),
+                                              FilledButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(ctx, true),
+                                                  child: const Text('填入参考')),
+                                            ]));
+                                if (replace != true || !mounted) return;
+                              }
+                              _actual.text = widget.reference.$3;
+                            },
+                            child: const Text('按参考填入，再按实际修改')),
+                      ])),
+              const SizedBox(height: 18),
+              TextFormField(
+                  key: const Key('meal-actual-input'),
+                  controller: _actual,
+                  minLines: 3,
+                  maxLines: 5,
+                  style: const TextStyle(fontSize: 13, height: 1.5),
+                  decoration: const InputDecoration(
+                      labelText: '实际吃了什么',
+                      alignLabelWithHint: true,
+                      hintText: '例如：米饭、鸡胸肉和青菜'),
+                  validator: (v) =>
+                      v == null || v.trim().isEmpty ? '请填写实际饮食' : null),
+              const SizedBox(height: 16),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(
+                    child: TextFormField(
                         key: const Key('meal-calories-input'),
                         controller: _calories,
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
                         decoration:
                             const InputDecoration(labelText: '热量 kcal（选填）'),
-                        validator: _number),
-                    TextFormField(
+                        validator: _number)),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: TextFormField(
+                        key: const Key('meal-protein-input'),
                         controller: _protein,
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
                         decoration:
                             const InputDecoration(labelText: '蛋白质 g（选填）'),
-                        validator: _number),
-                  ]))),
-          actions: [
-            if (widget.initial != null)
-              TextButton(
-                  onPressed: () =>
-                      Navigator.pop(context, const _MealResult(null)),
-                  child: const Text('清除此餐')),
+                        validator: _number)),
+              ]),
+              const SizedBox(height: 8),
+              Text('营养数值选填，仅汇总你手动填写的内容。',
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: colors.onSurface.withValues(alpha: .5))),
+            ])),
+        footer: Row(children: [
+          if (widget.initial != null)
             TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('取消')),
-            FilledButton(
-                onPressed: () {
-                  if (!_form.currentState!.validate()) return;
-                  Navigator.pop(
-                      context,
-                      _MealResult(MealEntry(
-                          date: widget.date,
-                          meal: widget.reference.$1,
-                          actual: _actual.text.trim(),
-                          calories: double.tryParse(_calories.text),
-                          protein: double.tryParse(_protein.text))));
-                },
-                child: const Text('保存')),
-          ]);
+                key: const Key('clear-meal'),
+                onPressed: () =>
+                    Navigator.pop(context, const _MealResult(null)),
+                child: const Text('清除')),
+          const Spacer(),
+          TextButton(
+              onPressed: () => Navigator.pop(context), child: const Text('取消')),
+          const SizedBox(width: 8),
+          FilledButton(
+              key: const Key('save-meal'),
+              onPressed: _save,
+              child: const Text('保存')),
+        ]));
+  }
 }

@@ -6,7 +6,7 @@
 每天按实际情况搭建训练积木，用模板作参考，同时记录饮食和身体变化。Android 本地应用，无需注册。
 
 [![构建状态](https://github.com/YXX168/BodyRecomp/actions/workflows/build.yml/badge.svg)](https://github.com/YXX168/BodyRecomp/actions/workflows/build.yml)
-[![源码版本](https://img.shields.io/badge/源码-v7.0.0%2B84_预览-2563EB)](CHANGELOG.md)
+[![源码版本](https://img.shields.io/badge/源码-v7.0.0%2B85_预览-2563EB)](CHANGELOG.md)
 [![许可](https://img.shields.io/badge/许可-MIT-059669)](LICENSE)
 </div>
 
@@ -26,6 +26,7 @@
 - 早餐、午餐、练前加餐、晚餐与其他饮食分别展示参考，可填写实际吃了什么。参考内容不会自动记为已吃。
 - 热量、蛋白质为选填，合计仅包含手动填写的数据；不预设个人热量目标。
 - 保留体重、围度、个人资料、趋势图、六套主题和渐进超负荷参考。
+- 身体数据表单校验有效正数；生日使用日期选择。模板未保存返回时可继续编辑、保存或放弃，移除项目支持撤销。
 - 月度和年度统计基于实际记录，完成至少一组的项目计入已练项目；已记录休息与未开始项目不计为训练。
 
 ## 数据与升级

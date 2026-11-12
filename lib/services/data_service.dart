@@ -35,16 +35,22 @@ Future<UserProfile> loadProfile() async {
   final preferences = await SharedPreferences.getInstance();
   final raw = preferences.getString(profileKey);
   if (raw == null) return UserProfile();
-  try {
-    return UserProfile.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-  } catch (_) {
-    return UserProfile();
-  }
+  return UserProfile.fromJson(jsonDecode(raw) as Map<String, dynamic>);
 }
 
 Future<void> saveProfile(UserProfile profile) async {
+  UserProfile.fromJson(profile.toJson());
   final preferences = await SharedPreferences.getInstance();
-  await preferences.setString(profileKey, jsonEncode(profile.toJson()));
+  await writeJson(preferences, profileKey, profile.toJson());
+}
+
+final _bodyWrites = Expando<Future<void>>('body writes');
+Future<T> _serializeBody<T>(Future<T> Function() action) async {
+  final prefs = await SharedPreferences.getInstance();
+  final next =
+      (_bodyWrites[prefs] ?? Future<void>.value()).then((_) => action());
+  _bodyWrites[prefs] = next.then<void>((_) {}, onError: (Object _) {});
+  return next;
 }
 
 Future<List<WeightEntry>> loadWeightHistory() async {
@@ -55,32 +61,39 @@ Future<List<WeightEntry>> loadWeightHistory() async {
   )..sort((a, b) => a.date.compareTo(b.date));
 }
 
-Future<void> saveWeightHistory(List<WeightEntry> entries) async {
+Future<void> saveWeightHistory(List<WeightEntry> entries) =>
+    _serializeBody(() => _writeWeightHistory(entries));
+
+Future<void> _writeWeightHistory(List<WeightEntry> entries) async {
   final preferences = await SharedPreferences.getInstance();
   var normalized = <WeightEntry>[];
   for (final entry in entries) {
+    WeightEntry.fromJson(entry.toJson());
     normalized = upsertWeightEntry(normalized, entry);
   }
-  await preferences.setString(
+  await writeJson(
+    preferences,
     weightHistoryKey,
-    jsonEncode(normalized.map((entry) => entry.toJson()).toList()),
+    normalized.map((entry) => entry.toJson()).toList(),
   );
 }
 
-Future<List<WeightEntry>> saveWeightEntry(WeightEntry entry) async {
-  final next = upsertWeightEntry(await loadWeightHistory(), entry);
-  await saveWeightHistory(next);
-  return next;
-}
+Future<List<WeightEntry>> saveWeightEntry(WeightEntry entry) =>
+    _serializeBody(() async {
+      final next = upsertWeightEntry(await loadWeightHistory(), entry);
+      await _writeWeightHistory(next);
+      return next;
+    });
 
-Future<List<WeightEntry>> deleteWeightEntry(DateTime date) async {
-  final day = dateOnly(date);
-  final next = (await loadWeightHistory())
-      .where((entry) => dateOnly(entry.date) != day)
-      .toList();
-  await saveWeightHistory(next);
-  return next;
-}
+Future<List<WeightEntry>> deleteWeightEntry(DateTime date) =>
+    _serializeBody(() async {
+      final day = dateOnly(date);
+      final next = (await loadWeightHistory())
+          .where((entry) => dateOnly(entry.date) != day)
+          .toList();
+      await _writeWeightHistory(next);
+      return next;
+    });
 
 Future<List<BodyMeasurement>> loadMeasurements() async {
   final preferences = await SharedPreferences.getInstance();
@@ -90,40 +103,48 @@ Future<List<BodyMeasurement>> loadMeasurements() async {
   )..sort((a, b) => a.date.compareTo(b.date));
 }
 
-Future<void> saveMeasurements(List<BodyMeasurement> entries) async {
+Future<void> saveMeasurements(List<BodyMeasurement> entries) =>
+    _serializeBody(() => _writeMeasurements(entries));
+
+Future<void> _writeMeasurements(List<BodyMeasurement> entries) async {
   final preferences = await SharedPreferences.getInstance();
   var normalized = <BodyMeasurement>[];
   for (final entry in entries) {
+    BodyMeasurement.fromJson(entry.toJson());
     normalized = upsertMeasurement(normalized, entry);
   }
-  await preferences.setString(
+  await writeJson(
+    preferences,
     measurementHistoryKey,
-    jsonEncode(normalized.map((entry) => entry.toJson()).toList()),
+    normalized.map((entry) => entry.toJson()).toList(),
   );
 }
 
 Future<List<BodyMeasurement>> saveMeasurement(
   BodyMeasurement entry, {
   bool replaceSameDay = false,
-}) async {
-  var current = await loadMeasurements();
-  if (replaceSameDay) {
-    final day = dateOnly(entry.date);
-    current = current.where((value) => dateOnly(value.date) != day).toList();
-  }
-  final next = upsertMeasurement(current, entry);
-  await saveMeasurements(next);
-  return next;
-}
+}) =>
+    _serializeBody(() async {
+      var current = await loadMeasurements();
+      if (replaceSameDay) {
+        final day = dateOnly(entry.date);
+        current =
+            current.where((value) => dateOnly(value.date) != day).toList();
+      }
+      final next = upsertMeasurement(current, entry);
+      await _writeMeasurements(next);
+      return next;
+    });
 
-Future<List<BodyMeasurement>> deleteMeasurement(DateTime date) async {
-  final day = dateOnly(date);
-  final next = (await loadMeasurements())
-      .where((entry) => dateOnly(entry.date) != day)
-      .toList();
-  await saveMeasurements(next);
-  return next;
-}
+Future<List<BodyMeasurement>> deleteMeasurement(DateTime date) =>
+    _serializeBody(() async {
+      final day = dateOnly(date);
+      final next = (await loadMeasurements())
+          .where((entry) => dateOnly(entry.date) != day)
+          .toList();
+      await _writeMeasurements(next);
+      return next;
+    });
 
 Future<List<ExerciseLog>> loadExerciseLogs() async {
   final preferences = await SharedPreferences.getInstance();
@@ -527,14 +548,10 @@ List<T> _decodeStringList<T>(
   T Function(Map<String, dynamic>) fromJson,
 ) {
   if (raw == null || raw.isEmpty) return [];
-  try {
-    final decoded = jsonDecode(raw) as List<dynamic>;
-    return decoded
-        .map((item) => fromJson(Map<String, dynamic>.from(item as Map)))
-        .toList();
-  } catch (_) {
-    return [];
-  }
+  final decoded = jsonDecode(raw) as List<dynamic>;
+  return decoded
+      .map((item) => fromJson(Map<String, dynamic>.from(item as Map)))
+      .toList();
 }
 
 List<ExerciseLog> _decodeExerciseLogs(String? raw) {

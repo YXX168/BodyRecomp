@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../data/exercise_library.dart';
 import '../models/daily_workout.dart';
@@ -38,6 +39,10 @@ class _ExercisePickerState extends State<_ExercisePicker> {
   final _scroll = ScrollController(keepScrollOffset: false);
   late final List<List<List<_PickerItem>>> _items;
 
+  // Identical copies across templates share selection; different prescriptions
+  // remain separate choices, including in search results.
+  String _identity(Exercise exercise) => jsonEncode(exercise.toJson());
+
   List<WorkoutTemplate> get _groups =>
       _source == 0 ? widget.templates : exerciseLibraryGroups;
   @override
@@ -62,7 +67,10 @@ class _ExercisePickerState extends State<_ExercisePicker> {
                           .length;
                   ei++)
                 _PickerItem(
-                    '${source == 0 ? 'template' : 'library'}:${(source == 0 ? widget.templates : exerciseLibraryGroups)[gi].id}:$ei',
+                    _identity((source == 0
+                            ? widget.templates
+                            : exerciseLibraryGroups)[gi]
+                        .exercises[ei]),
                     source == 0
                         ? 'pick_${gi}_$ei'
                         : 'pick-${exerciseLibraryGroups[gi].id}-$ei',
@@ -111,7 +119,7 @@ class _ExercisePickerState extends State<_ExercisePicker> {
                     ('${item.exercise.name} ${item.exercise.muscles.join(' ')} ${item.exercise.muscleTarget}')
                         .toLowerCase()
                         .contains) &&
-                seen.add(item.exercise.name.trim().toLowerCase()))
+                seen.add(item.id))
               item
     ];
   }

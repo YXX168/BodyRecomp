@@ -16,6 +16,7 @@ import 'pages/nutrition_page.dart';
 import 'pages/template_manager_page.dart';
 import 'widgets/app_navigation_bar.dart';
 import 'widgets/sheet_frame.dart';
+import 'widgets/body_editor.dart';
 export 'services/app_signals.dart';
 
 const appVersion = '7.0.0';
@@ -661,6 +662,9 @@ class RecompApp extends StatelessWidget {
                       fontFamilyFallback: const ['sans-serif']))),
           outlinedButtonTheme: OutlinedButtonThemeData(
               style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  side: BorderSide(color: t.border),
                   textStyle: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -668,6 +672,8 @@ class RecompApp extends StatelessWidget {
                       fontFamilyFallback: const ['sans-serif']))),
           filledButtonTheme: FilledButtonThemeData(
               style: FilledButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   textStyle: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -1824,6 +1830,7 @@ class TrendChartPainter extends CustomPainter {
     );
     final chartW = size.width - padding.left - padding.right;
     final chartH = size.height - padding.top - padding.bottom;
+    if (chartW <= 0 || chartH <= 0) return;
     final values = data.map((d) => d.$2).toList();
     double minV = values.reduce(math.min);
     double maxV = values.reduce(math.max);
@@ -1844,6 +1851,7 @@ class TrendChartPainter extends CustomPainter {
       ..color = theme.primary
       ..style = PaintingStyle.fill;
     final textPainter = TextPainter(textDirection: TextDirection.ltr);
+    final dateStep = math.max(1, ((data.length - 1) / 3).ceil());
 
     final path = Path();
     final fillPath = Path();
@@ -1875,22 +1883,33 @@ class TrendChartPainter extends CustomPainter {
           ..color = theme.bg
           ..style = PaintingStyle.fill,
       );
-      textPainter.text = TextSpan(
-        text: data[i].$2.toStringAsFixed(1),
-        style: TextStyle(
-          fontSize: 9,
-          color: theme.text3,
-          fontWeight: FontWeight.w600,
-        ),
-      );
-      textPainter.layout();
-      textPainter.paint(
-        canvas,
-        Offset(points[i].dx - textPainter.width / 2, points[i].dy - 20),
-      );
+      if (data.length <= 6 || i == points.length - 1) {
+        textPainter.text = TextSpan(
+          text: data[i].$2.toStringAsFixed(1),
+          style: TextStyle(
+            fontSize: 9,
+            color: theme.text3,
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Inter',
+            fontFamilyFallback: const ['sans-serif'],
+          ),
+        );
+        textPainter.layout();
+        textPainter.paint(
+          canvas,
+          Offset(points[i].dx - textPainter.width / 2, points[i].dy - 20),
+        );
+      }
+      if (i % dateStep != 0 && i != points.length - 1) continue;
+      if (i != points.length - 1 && i > 0 && points.length - 1 - i < dateStep)
+        continue;
       textPainter.text = TextSpan(
         text: data[i].$1,
-        style: TextStyle(fontSize: 8, color: theme.text4),
+        style: TextStyle(
+            fontSize: 8,
+            color: theme.text4,
+            fontFamily: 'Inter',
+            fontFamilyFallback: const ['sans-serif']),
       );
       textPainter.layout();
       textPainter.paint(
@@ -1912,6 +1931,7 @@ class MiniTrendChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
+      width: double.infinity,
       height: 180,
       child: CustomPaint(
         painter: TrendChartPainter(data: data, theme: theme),
@@ -1937,6 +1957,8 @@ class _SettingsPageState extends State<SettingsPage> {
   List<BodyMeasurement> _measurements = [];
   String _trendTab = 'weight'; // weight or measurements
   bool _autoRestTimer = false;
+  bool _saving = false;
+  String? _loadError;
 
   @override
   void initState() {
@@ -1945,17 +1967,39 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _loadAll() async {
-    final profile = await loadProfile();
-    final weights = await loadWeightHistory();
-    final measurements = await loadMeasurements();
-    final autoRestTimer = await loadAutoRestTimer();
-    if (mounted) {
-      setState(() {
-        _profile = profile;
-        _weightHistory = weights;
-        _measurements = measurements;
-        _autoRestTimer = autoRestTimer;
-      });
+    try {
+      final profile = await loadProfile();
+      final weights = await loadWeightHistory();
+      final measurements = await loadMeasurements();
+      final autoRestTimer = await loadAutoRestTimer();
+      if (mounted) {
+        setState(() {
+          _profile = profile;
+          _weightHistory = weights;
+          _measurements = measurements;
+          _autoRestTimer = autoRestTimer;
+          _loadError = null;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadError = '身体数据读取失败，原记录已保留。');
+    }
+  }
+
+  Future<void> _persist(Future<void> Function() action) async {
+    if (_saving || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      await action();
+    } catch (_) {
+      if (mounted) {
+        await _loadAll();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('保存失败，请重试，未保存的修改不会显示为成功。')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -1996,11 +2040,13 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         value: _autoRestTimer,
         activeThumbColor: t.primary,
-        onChanged: (value) async {
-          setState(() => _autoRestTimer = value);
-          await saveAutoRestTimer(value);
-          restTimerPreferenceRevision.value++;
-        },
+        onChanged: _saving
+            ? null
+            : (value) => _persist(() async {
+                  await saveAutoRestTimer(value);
+                  if (mounted) setState(() => _autoRestTimer = value);
+                  restTimerPreferenceRevision.value++;
+                }),
       ),
     );
   }
@@ -2067,98 +2113,110 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final t = ThemeInherited.of(context).theme;
     final p = _profile;
+    if (_loadError != null) {
+      return Center(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text(_loadError!),
+        TextButton(onPressed: _loadAll, child: const Text('重试')),
+        TextButton(onPressed: _exportData, child: const Text('导出原数据')),
+        TextButton(onPressed: _importData, child: const Text('导入备份')),
+      ]));
+    }
     if (p == null) return const LoadingView();
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              // ── 个人资料卡片 ──
-              _settingsGroup(t, Icons.person_outline_rounded, '个人资料',
-                  '身高、体重与基本信息', _profileCard(p, t)),
-              const SizedBox(height: 12),
-              // ── 身体数据趋势 ──
-              FadeScaleEntry(index: 1, child: _bodyTrendCard(t)),
-              const SizedBox(height: 12),
-              // ── 训练计划 ──
-              FadeScaleEntry(index: 2, child: _workoutPlanCard(t)),
-              const SizedBox(height: 12),
-              // ── 训练偏好 ──
-              _settingsGroup(t, Icons.timer_outlined, '训练偏好', '休息计时方式',
-                  _trainingPreferencesCard(t)),
-              const SizedBox(height: 12),
-              Card(
-                  child: ListTile(
-                      leading: Icon(Icons.trending_up_rounded,
-                          size: 21, color: t.primary),
-                      title: const Text('训练参考', style: TextStyle(fontSize: 13)),
-                      trailing: const Icon(Icons.chevron_right, size: 18),
-                      onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => Scaffold(
-                                  appBar: AppBar(title: const Text('训练参考')),
-                                  body: const ProgressionPage()))))),
-              const SizedBox(height: 12),
-              // ── 数据管理 ──
-              _settingsGroup(t, Icons.cloud_download_outlined, '备份与恢复',
-                  '导出、导入本地记录', _dataCard(t)),
-              const SizedBox(height: 12),
-              // ── 主题设置 ──
-              _settingsGroup(
-                  t, Icons.palette_outlined, '外观', '主题与配色', _themeCard(t)),
-              const SizedBox(height: 12),
-              // ── 关于 ──
-              FadeScaleEntry(
-                index: 6,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: t.card,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '关于',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: t.text3,
-                          ),
+    return AbsorbPointer(
+        absorbing: _saving,
+        child: CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  // ── 个人资料卡片 ──
+                  _settingsGroup(t, Icons.person_outline_rounded, '个人资料',
+                      '身高、体重与基本信息', _profileCard(p, t)),
+                  const SizedBox(height: 12),
+                  // ── 身体数据趋势 ──
+                  FadeScaleEntry(index: 1, child: _bodyTrendCard(t)),
+                  const SizedBox(height: 12),
+                  // ── 训练计划 ──
+                  FadeScaleEntry(index: 2, child: _workoutPlanCard(t)),
+                  const SizedBox(height: 12),
+                  // ── 训练偏好 ──
+                  _settingsGroup(t, Icons.timer_outlined, '训练偏好', '休息计时方式',
+                      _trainingPreferencesCard(t)),
+                  const SizedBox(height: 12),
+                  Card(
+                      child: ListTile(
+                          leading: Icon(Icons.trending_up_rounded,
+                              size: 21, color: t.primary),
+                          title: const Text('训练参考',
+                              style: TextStyle(fontSize: 13)),
+                          trailing: const Icon(Icons.chevron_right, size: 18),
+                          onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => Scaffold(
+                                      appBar: AppBar(title: const Text('训练参考')),
+                                      body: const ProgressionPage()))))),
+                  const SizedBox(height: 12),
+                  // ── 数据管理 ──
+                  _settingsGroup(t, Icons.cloud_download_outlined, '备份与恢复',
+                      '导出、导入本地记录', _dataCard(t)),
+                  const SizedBox(height: 12),
+                  // ── 主题设置 ──
+                  _settingsGroup(
+                      t, Icons.palette_outlined, '外观', '主题与配色', _themeCard(t)),
+                  const SizedBox(height: 12),
+                  // ── 关于 ──
+                  FadeScaleEntry(
+                    index: 6,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: t.card,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '关于',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: t.text3,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              '青阳 v$appVersion',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: t.text2,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '健身追踪 · 趋势分析 · 数据备份',
+                              style: TextStyle(fontSize: 11, color: t.text4),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'GitHub: YXX168/BodyRecomp',
+                              style: TextStyle(fontSize: 10, color: t.text4),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Body Recomp v$appVersion',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: t.text2,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '健身追踪 · 趋势分析 · 数据备份',
-                          style: TextStyle(fontSize: 11, color: t.text4),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'GitHub: YXX168/BodyRecomp',
-                          style: TextStyle(fontSize: 10, color: t.text4),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
+                ]),
               ),
-            ]),
-          ),
-        ),
-      ],
-    );
+            ),
+          ],
+        ));
   }
 
   Widget _settingsGroup(WorkoutTheme t, IconData icon, String title,
@@ -2320,7 +2378,7 @@ class _SettingsPageState extends State<SettingsPage> {
               t,
               Icons.height_rounded,
               '身高',
-              '${p.heightCm.toInt()} cm',
+              '${p.heightCm % 1 == 0 ? p.heightCm.toInt() : p.heightCm} cm',
               () => _editHeight(p),
             ),
             const Divider(height: 1),
@@ -2463,44 +2521,24 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _editBirthday(UserProfile p) async {
-    final ctrl = TextEditingController(text: p.birthday);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('选择生日'),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: TextInputType.datetime,
-          decoration: const InputDecoration(
-            hintText: 'YYYY-MM-DD',
-            labelText: '生日日期',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-    if (result != null && result.isNotEmpty) {
-      try {
-        DateTime.parse(result);
-        _saveProfile(
-          UserProfile(
-            birthday: result,
-            heightCm: p.heightCm,
-            weightKg: p.weightKg,
-            gender: p.gender,
-          ),
-        );
-      } catch (_) {}
-    }
+    final today = dateOnly(DateTime.now());
+    final birth = DateTime.tryParse(p.birthday);
+    final result = await showDatePicker(
+        context: context,
+        initialDate:
+            birth != null && !birth.isAfter(today) && birth.year >= 1900
+                ? birth
+                : DateTime(today.year - 25, today.month, today.day),
+        firstDate: DateTime(1900),
+        lastDate: today,
+        helpText: '选择生日',
+        initialDatePickerMode: DatePickerMode.year);
+    if (result == null || !mounted) return;
+    await _persist(() => _saveProfile(UserProfile(
+        birthday: result.toIso8601String().substring(0, 10),
+        heightCm: p.heightCm,
+        weightKg: p.weightKg,
+        gender: p.gender)));
   }
 
   Future<void> _editGender(UserProfile p) async {
@@ -2519,81 +2557,48 @@ class _SettingsPageState extends State<SettingsPage> {
             .toList(),
       ),
     );
-    if (result != null) {
-      _saveProfile(
-        UserProfile(
-          birthday: p.birthday,
-          heightCm: p.heightCm,
-          weightKg: p.weightKg,
-          gender: result,
-        ),
-      );
+    if (result != null && mounted) {
+      await _persist(() => _saveProfile(
+            UserProfile(
+              birthday: p.birthday,
+              heightCm: p.heightCm,
+              weightKg: p.weightKg,
+              gender: result,
+            ),
+          ));
     }
   }
 
   Future<void> _editHeight(UserProfile p) async {
-    final ctrl = TextEditingController(text: p.heightCm.toInt().toString());
-    final result = await showDialog<double>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('设置身高 (cm)'),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              final v = double.tryParse(ctrl.text);
-              if (v != null) Navigator.pop(ctx, v);
-            },
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-    if (result != null) {
-      _saveProfile(
-        UserProfile(
-          birthday: p.birthday,
-          heightCm: result,
-          weightKg: p.weightKg,
-          gender: p.gender,
-        ),
-      );
+    final values = await editBodyValues(context,
+        title: '设置身高',
+        fields: const {'height': '身高 · cm'},
+        initial: {'height': p.heightCm});
+    if (values != null && mounted) {
+      await _persist(() => _saveProfile(
+            UserProfile(
+              birthday: p.birthday,
+              heightCm: values['height']!,
+              weightKg: p.weightKg,
+              gender: p.gender,
+            ),
+          ));
     }
   }
 
   Future<void> _editWeight(UserProfile p) async {
-    final ctrl = TextEditingController(text: p.weightKg.toString());
-    final result = await showDialog<double>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('记录体重 (kg)'),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              final v = double.tryParse(ctrl.text);
-              if (v != null) Navigator.pop(ctx, v);
-            },
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-    if (result != null) {
+    final values = await editBodyValues(context,
+        title: '记录今天的体重',
+        fields: const {'weight': '体重 · kg'},
+        initial: {'weight': p.weightKg},
+        subtitle: '同一天的体重会更新为本次记录');
+    if (values == null || !mounted) return;
+    final result = values['weight']!;
+    await _persist(() async {
+      final entries = await saveWeightEntry(
+        WeightEntry(date: DateTime.now(), weightKg: result),
+      );
+      if (mounted) setState(() => _weightHistory = entries);
       await _saveProfile(
         UserProfile(
           birthday: p.birthday,
@@ -2602,11 +2607,7 @@ class _SettingsPageState extends State<SettingsPage> {
           gender: p.gender,
         ),
       );
-      final entries = await saveWeightEntry(
-        WeightEntry(date: DateTime.now(), weightKg: result),
-      );
-      if (mounted) setState(() => _weightHistory = entries);
-    }
+    });
   }
 
   Widget _bodyTrendCard(WorkoutTheme t) {
@@ -2914,54 +2915,31 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _addWeightEntry({WeightEntry? existing}) async {
     final date = existing?.date ?? DateTime.now();
-    final ctrl = TextEditingController(
-      text:
-          existing?.weightKg.toString() ?? _profile?.weightKg.toString() ?? '',
-    );
-    final result = await showDialog<double>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(existing == null ? '记录体重 (kg)' : '编辑体重 (kg)'),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(
-            hintText: '输入体重',
-            labelText: '${date.year}-${date.month}-${date.day}',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              final value = double.tryParse(ctrl.text);
-              if (value != null && value > 0) Navigator.pop(ctx, value);
-            },
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-    if (result == null) return;
-    final entries = await saveWeightEntry(
-      WeightEntry(date: date, weightKg: result),
-    );
-    if (!mounted) return;
-    setState(() => _weightHistory = entries);
-    if (dateOnly(date) == dateOnly(DateTime.now())) {
-      final p = _profile!;
-      await _saveProfile(
-        UserProfile(
-          birthday: p.birthday,
-          heightCm: p.heightCm,
-          weightKg: result,
-          gender: p.gender,
-        ),
+    final values = await editBodyValues(context,
+        title: existing == null ? '记录体重' : '编辑体重',
+        subtitle: '${date.year}年${date.month}月${date.day}日 · 同日记录会更新',
+        fields: const {'weight': '体重 · kg'},
+        initial: {'weight': existing?.weightKg ?? _profile!.weightKg});
+    if (values == null || !mounted) return;
+    final result = values['weight']!;
+    await _persist(() async {
+      final entries = await saveWeightEntry(
+        WeightEntry(date: date, weightKg: result),
       );
-    }
+      if (!mounted) return;
+      setState(() => _weightHistory = entries);
+      if (dateOnly(date) == dateOnly(DateTime.now())) {
+        final p = _profile!;
+        await _saveProfile(
+          UserProfile(
+            birthday: p.birthday,
+            heightCm: p.heightCm,
+            weightKg: result,
+            gender: p.gender,
+          ),
+        );
+      }
+    });
   }
 
   Future<void> _editWeightEntry(WeightEntry entry) =>
@@ -2971,89 +2949,45 @@ class _SettingsPageState extends State<SettingsPage> {
     final confirmed = await _confirmDelete(
       '删除 ${entry.weightKg.toStringAsFixed(1)}kg 的体重记录？',
     );
-    if (!confirmed) return;
-    final entries = await deleteWeightEntry(entry.date);
-    if (mounted) setState(() => _weightHistory = entries);
+    if (!confirmed || !mounted) return;
+    await _persist(() async {
+      final entries = await deleteWeightEntry(entry.date);
+      if (mounted) setState(() => _weightHistory = entries);
+    });
   }
 
   Future<void> _addMeasurement({BodyMeasurement? existing}) async {
     const fields = {
-      'waist': '腰围',
-      'chest': '胸围',
-      'hip': '臀围',
-      'arm': '臂围',
-      'thigh': '大腿围',
+      'waist': '腰围 · cm',
+      'chest': '胸围 · cm',
+      'hip': '臀围 · cm',
+      'arm': '臂围 · cm',
+      'thigh': '大腿围 · cm',
     };
-    final controllers = {
-      for (final field in fields.keys)
-        field: TextEditingController(
-          text: existing?.values[field]?.toString() ?? '',
-        ),
-    };
-    final values = await showDialog<Map<String, double>>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(existing == null ? '记录围度 (cm)' : '编辑围度 (cm)'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final field in fields.entries) ...[
-                TextField(
-                  controller: controllers[field.key],
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: field.value,
-                    hintText: '可选',
-                  ),
-                ),
-                const SizedBox(height: 6),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final result = <String, double>{};
-              for (final field in controllers.entries) {
-                final value = double.tryParse(field.value.text);
-                if (value != null && value > 0) result[field.key] = value;
-              }
-              if (result.isEmpty) {
-                ScaffoldMessenger.of(
-                  ctx,
-                ).showSnackBar(const SnackBar(content: Text('请至少填写一项围度')));
-                return;
-              }
-              Navigator.pop(ctx, result);
-            },
-            child: const Text('保存'),
-          ),
-        ],
-      ),
-    );
-    if (values == null) return;
-    final entries = await saveMeasurement(
-      BodyMeasurement(date: existing?.date ?? DateTime.now(), values: values),
-      replaceSameDay: existing != null,
-    );
-    if (mounted) setState(() => _measurements = entries);
+    final values = await editBodyValues(context,
+        title: existing == null ? '记录围度' : '编辑围度',
+        subtitle: '填写需要记录的部位，单位为厘米',
+        fields: fields,
+        initial: existing?.values ?? const {});
+    if (values == null || !mounted) return;
+    await _persist(() async {
+      final entries = await saveMeasurement(
+        BodyMeasurement(date: existing?.date ?? DateTime.now(), values: values),
+        replaceSameDay: existing != null,
+      );
+      if (mounted) setState(() => _measurements = entries);
+    });
   }
 
   Future<void> _deleteMeasurement(BodyMeasurement entry) async {
     final confirmed = await _confirmDelete(
       '删除 ${entry.date.month}/${entry.date.day} 的围度记录？',
     );
-    if (!confirmed) return;
-    final entries = await deleteMeasurement(entry.date);
-    if (mounted) setState(() => _measurements = entries);
+    if (!confirmed || !mounted) return;
+    await _persist(() async {
+      final entries = await deleteMeasurement(entry.date);
+      if (mounted) setState(() => _measurements = entries);
+    });
   }
 
   Future<bool> _confirmDelete(String message) async {
@@ -3166,7 +3100,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'JSON 格式 · 含资料、训练、体重与围度 · 导入前自动备份',
+              'JSON 备份 · 含训练、饮食与身体数据 · 导入前保留原数据',
               style: TextStyle(fontSize: 10, color: t.text4),
             ),
           ],
@@ -3191,8 +3125,9 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             actions: [
               TextButton(
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: json));
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: json));
+                  if (!ctx.mounted || !mounted) return;
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(
                     context,
@@ -3233,7 +3168,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   controller: ctrl,
                   maxLines: 8,
                   decoration: const InputDecoration(
-                    hintText: '粘贴 v6.7 JSON 备份数据...',
+                    hintText: '粘贴导出的 JSON 备份…',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -3250,7 +3185,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   groupValue: mode,
                   onChanged: (value) => setDialogState(() => mode = value!),
                   title: const Text('覆盖'),
-                  subtitle: const Text('清除当前 BodyRecomp 数据后恢复备份'),
+                  subtitle: const Text('用备份替换青阳的全部本地记录'),
                 ),
               ],
             ),
@@ -3270,7 +3205,8 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       ),
     );
-    if (result != null && ctrl.text.trim().isNotEmpty) {
+    if (result != null && ctrl.text.trim().isNotEmpty && mounted && !_saving) {
+      setState(() => _saving = true);
       try {
         final imported = await importAllData(ctrl.text, mode: result);
         if (!mounted) return;
@@ -3292,6 +3228,8 @@ class _SettingsPageState extends State<SettingsPage> {
             context,
           ).showSnackBar(SnackBar(content: Text('❌ 导入失败: $e')));
         }
+      } finally {
+        if (mounted) setState(() => _saving = false);
       }
     }
   }

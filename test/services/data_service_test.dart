@@ -182,4 +182,59 @@ void main() {
       throwsFormatException,
     );
   });
+
+  test('concurrent body entries retain every day and same-day field', () async {
+    await Future.wait([
+      saveWeightEntry(WeightEntry(date: DateTime(2026, 11, 10), weightKg: 72)),
+      saveWeightEntry(
+          WeightEntry(date: DateTime(2026, 11, 11), weightKg: 71.8)),
+      saveMeasurement(BodyMeasurement(
+          date: DateTime(2026, 11, 11), values: const {'waist': 80})),
+      saveMeasurement(BodyMeasurement(
+          date: DateTime(2026, 11, 11), values: const {'arm': 32})),
+    ]);
+    expect((await loadWeightHistory()).map((e) => e.weightKg), [72, 71.8]);
+    expect((await loadMeasurements()).single.values, {'waist': 80, 'arm': 32});
+  });
+
+  test('invalid body values and damaged history cannot overwrite records',
+      () async {
+    await saveProfile(UserProfile());
+    final prefs = await SharedPreferences.getInstance();
+    final before = prefs.getString(profileKey);
+    await expectLater(
+        saveProfile(UserProfile(heightCm: 0)), throwsFormatException);
+    expect(prefs.getString(profileKey), before);
+    await expectLater(
+        saveWeightEntry(
+            WeightEntry(date: DateTime(2026), weightKg: double.infinity)),
+        throwsFormatException);
+    await prefs.setString(weightHistoryKey, '[damaged');
+    await expectLater(loadWeightHistory(), throwsFormatException);
+    await expectLater(
+        saveWeightEntry(WeightEntry(date: DateTime(2026), weightKg: 70)),
+        throwsFormatException);
+    expect(prefs.getString(weightHistoryKey), '[damaged');
+    expect(await exportAllData(), contains('[damaged'));
+  });
+
+  test('invalid nested backup is rejected before any local data changes',
+      () async {
+    await saveProfile(UserProfile(weightKg: 70));
+    final prefs = await SharedPreferences.getInstance();
+    for (final value in [
+      'not json',
+      '[{"d":"2026-02-31","w":72}]',
+      '[{"d":"2026-11-10","w":-2}]'
+    ]) {
+      final backup = jsonEncode({
+        'schemaVersion': 3,
+        'preferences': {weightHistoryKey: value}
+      });
+      await expectLater(importAllData(backup, mode: ImportMode.overwrite),
+          throwsFormatException);
+      expect((await loadProfile()).weightKg, 70);
+      expect(prefs.containsKey(lastImportBackupKey), isFalse);
+    }
+  });
 }

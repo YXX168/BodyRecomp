@@ -1,4 +1,5 @@
 import '../widgets/loading_view.dart';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/daily_workout.dart';
 import '../models/recomp_models.dart';
@@ -231,10 +232,16 @@ class _TemplateManagerPageState extends State<TemplateManagerPage> {
                                       ? '平板卧推'
                                       : template.exercises.first.name,
                                   size: 40),
-                              title: Text(template.name),
-                              subtitle: Text(
-                                  '${template.exercises.length} 个项目 · 点击编辑'),
-                              trailing: const Icon(Icons.edit_outlined),
+                              title: Text(template.name,
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600)),
+                              subtitle: Text('${template.exercises.length} 个项目',
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      color: Theme.of(context).hintColor)),
+                              trailing: Icon(Icons.chevron_right_rounded,
+                                  size: 19, color: Theme.of(context).hintColor),
                               onTap: _busy ? null : () => _edit(template))),
                     OutlinedButton.icon(
                         onPressed: _busy ? null : () => _edit(null),
@@ -242,7 +249,8 @@ class _TemplateManagerPageState extends State<TemplateManagerPage> {
                         label: const Text('新建模板')),
                     const SizedBox(height: 24),
                     Text('每周参考安排',
-                        style: Theme.of(context).textTheme.titleLarge),
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 8),
                     Text('按日期提示，不限制当天实际训练。',
                         style: TextStyle(
@@ -266,8 +274,93 @@ class _TemplateEditorState extends State<_TemplateEditor> {
   late final _note = TextEditingController(text: widget.template?.note ?? '');
   late final List<Exercise> _exercises =
       List.from(widget.template?.exercises ?? []);
+  late final String _initial;
+  bool _allowPop = false;
+  bool _leaving = false;
+  bool _finishing = false;
+
+  String _snapshot() => jsonEncode({
+        'name': _name,
+        'note': _note.text.trim(),
+        'exercises': _exercises.map((e) => e.toJson()).toList(),
+      });
+  bool get _dirty => _snapshot() != _initial;
+
+  @override
+  void initState() {
+    super.initState();
+    // Capture before the first edit, including controller-only note changes.
+    _initial = _snapshot();
+    _note.addListener(_noteChanged);
+  }
+
+  void _noteChanged() => setState(() {});
+
+  Future<void> _finish({required bool save}) async {
+    if (_finishing) return;
+    _finishing = true;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    setState(() => _allowPop = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    Navigator.pop(
+        context,
+        save
+            ? WorkoutTemplate(
+                id: widget.template?.id ??
+                    'custom_${DateTime.now().microsecondsSinceEpoch}',
+                name: _name,
+                note: _note.text.trim(),
+                exercises: List.from(_exercises))
+            : null);
+  }
+
+  Future<void> _leave() async {
+    if (_leaving || _finishing) return;
+    if (!_dirty) {
+      await _finish(save: false);
+      return;
+    }
+    _leaving = true;
+    final save = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+                title: const Text('模板有未保存的修改'),
+                content: const Text('返回前是否保存这次修改？'),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('继续编辑')),
+                  TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('放弃修改')),
+                  FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('保存并返回')),
+                ]));
+    _leaving = false;
+    if (save != null && mounted) await _finish(save: save);
+  }
+
+  void _remove(int index) {
+    final exercise = _exercises[index];
+    setState(() => _exercises.removeAt(index));
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+          content: Text('已移除 ${exercise.name}'),
+          action: SnackBarAction(
+              label: '撤销',
+              onPressed: () {
+                if (!mounted) return;
+                setState(() => _exercises.insert(
+                    index.clamp(0, _exercises.length), exercise));
+              })));
+  }
+
   @override
   void dispose() {
+    _note.removeListener(_noteChanged);
     _note.dispose();
     super.dispose();
   }
@@ -287,17 +380,16 @@ class _TemplateEditorState extends State<_TemplateEditor> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => PopScope(
+      canPop: _allowPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _leave();
+      },
+      child: Scaffold(
         appBar: AppBar(title: const Text('编辑模板'), actions: [
           TextButton(
-              onPressed: () => Navigator.pop(
-                  context,
-                  WorkoutTemplate(
-                      id: widget.template?.id ??
-                          'custom_${DateTime.now().microsecondsSinceEpoch}',
-                      name: _name,
-                      note: _note.text.trim(),
-                      exercises: List.from(_exercises))),
+              key: const Key('save-template'),
+              onPressed: () => _finish(save: true),
               child: const Text('保存'))
         ]),
         body: ListView(padding: const EdgeInsets.all(16), children: [
@@ -348,8 +440,7 @@ class _TemplateEditorState extends State<_TemplateEditor> {
                                 }),
                         icon: const Icon(Icons.arrow_downward, size: 20)),
                     TextButton(
-                        onPressed: () => setState(() => _exercises.removeAt(i)),
-                        child: const Text('移除')),
+                        onPressed: () => _remove(i), child: const Text('移除')),
                   ]),
                 ])),
           OutlinedButton.icon(
@@ -360,11 +451,11 @@ class _TemplateEditorState extends State<_TemplateEditor> {
                 }
               },
               icon: const Icon(Icons.view_module_outlined),
-              label: const Text('从模板挑选项目')),
+              label: const Text('从动作库 / 模板添加')),
           OutlinedButton.icon(
               onPressed: () => _custom(),
               icon: const Icon(Icons.add),
               label: const Text('自定义项目')),
         ]),
-      );
+      ));
 }
