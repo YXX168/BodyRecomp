@@ -35,19 +35,21 @@ class ExerciseMark extends StatelessWidget {
   }
 
   String _kind(String value) {
-    if (RegExp('走|跑|散步|有氧').hasMatch(value)) return 'walk';
-    if (RegExp('腹|核心').hasMatch(value)) return 'core';
+    if (RegExp('走|跑|散步|有氧|椭圆|单车|划船机|放松').hasMatch(value)) return 'walk';
+    if (RegExp('腹|核心|平板支撑|死虫|鸟狗|举腿').hasMatch(value)) return 'core';
     if (value.contains('硬拉')) return 'hinge';
-    if (RegExp('腿|倒蹬|深蹲').hasMatch(value)) return 'leg';
-    if (value.contains('下拉')) return 'pull';
+    if (RegExp('腿|倒蹬|深蹲|臀|提踵|外展').hasMatch(value)) return 'leg';
+    if (RegExp('下拉|引体').hasMatch(value)) return 'pull';
     if (value.contains('划船')) return 'row';
-    if (value.contains('飞鸟')) return 'rear';
+    if (RegExp('飞鸟|面拉').hasMatch(value)) return 'rear';
     if (value.contains('侧平举')) return 'raise';
     if (value.contains('弯举')) return 'curl';
     if (value.contains('下压')) return 'cable';
     if (value.contains('肩推')) return 'shoulder';
     if (value.contains('上斜')) return 'incline';
-    return 'bench';
+    if (value.contains('俯卧撑')) return 'pushup';
+    if (RegExp('卧推|推胸').hasMatch(value)) return 'bench';
+    return 'weights';
   }
 }
 
@@ -193,6 +195,14 @@ class _EquipmentPainter extends CustomPainter {
         line(32, 42, 41, 49);
         bar(16, 23, angle: 1.2);
         bar(48, 23, angle: -1.2);
+      case 'pushup':
+        head(19, 27);
+        line(24, 30, 43, 34);
+        line(29, 31, 27, 43);
+        line(27, 43, 20, 43);
+        line(43, 34, 50, 43);
+        line(13, 48, 53, 48);
+      case 'weights':
       case 'raise':
       case 'curl':
       case 'hinge':

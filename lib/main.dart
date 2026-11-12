@@ -1,3 +1,4 @@
+import 'widgets/loading_view.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -973,7 +974,7 @@ class _RecordPageState extends State<RecordPage> {
     final weekLabels = ['一', '二', '三', '四', '五', '六', '日'];
 
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const LoadingView();
     }
     if (_loadError != null) {
       return Center(
@@ -2066,7 +2067,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final t = ThemeInherited.of(context).theme;
     final p = _profile;
-    if (p == null) return const Center(child: CircularProgressIndicator());
+    if (p == null) return const LoadingView();
     return CustomScrollView(
       slivers: [
         SliverPadding(

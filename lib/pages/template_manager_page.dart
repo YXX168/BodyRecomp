@@ -1,3 +1,4 @@
+import '../widgets/loading_view.dart';
 import 'package:flutter/material.dart';
 import '../models/daily_workout.dart';
 import '../models/recomp_models.dart';
@@ -215,7 +216,7 @@ class _TemplateManagerPageState extends State<TemplateManagerPage> {
                 TextButton(onPressed: _load, child: const Text('重试'))
               ]))
             : _templates == null
-                ? const Center(child: CircularProgressIndicator())
+                ? const LoadingView()
                 : ListView(padding: const EdgeInsets.all(16), children: [
                     Text('用模板做参考，按自己的节奏练。',
                         style: TextStyle(

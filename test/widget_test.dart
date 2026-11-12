@@ -122,6 +122,34 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('timer start, expiry and dismissal never shift exercise cards',
+      (tester) async {
+    seed(seeded());
+    var now = today;
+    await pump(tester, WorkoutPage(now: () => now),
+        size: const Size(320, 568), scale: 1.3);
+    final block = find.byKey(const ValueKey('workout-block-0'));
+    await tester.ensureVisible(block);
+    await tester.pumpAndSettle();
+    final before = tester.getRect(block);
+    final dock = tester.getRect(find.byKey(const Key('rest-timer-dock')));
+    await tester.tap(find.byKey(const ValueKey('start-rest-0')));
+    await tester.pumpAndSettle();
+    expect(tester.getRect(block), before);
+    expect(tester.getRect(find.byKey(const Key('rest-timer-dock'))), dock);
+    expect(tester.getBottomRight(block).dy, lessThanOrEqualTo(dock.top));
+    now = now.add(const Duration(minutes: 2));
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('休息结束'), findsOneWidget);
+    expect(tester.getRect(block), before);
+    await tester.tap(find.byKey(const Key('rest-timer-dismiss')));
+    await tester.pumpAndSettle();
+    expect(tester.getRect(block), before);
+    expect(tester.getRect(find.byKey(const Key('rest-timer-dock'))), dock);
+    expect((await loadDailyWorkouts())[dayKey(today)]!.completedSets, 0);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
       'manual countdown fits compact phone with large text without overlay',
       (tester) async {

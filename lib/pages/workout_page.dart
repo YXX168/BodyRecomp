@@ -1,5 +1,4 @@
-import 'dart:async';
-
+import '../widgets/loading_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -9,6 +8,8 @@ import '../models/recomp_models.dart';
 import '../services/app_signals.dart';
 import '../services/daily_workout_service.dart';
 import '../services/rest_timer_service.dart';
+import '../services/rest_countdown.dart';
+import '../widgets/rest_timer_dock.dart';
 import '../widgets/daily_date_bar.dart';
 import '../widgets/week_calendar.dart';
 import '../widgets/exercise_editor.dart';
@@ -37,11 +38,9 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
   String? _error;
   int _generation = 0;
   int _nextId = 0;
-  Timer? _ticker;
-  DateTime? _deadline;
-  String _timerLabel = '';
-  int _remaining = 0;
+  late final RestCountdown _rest;
   bool _visible = true;
+  bool _foreground = true;
 
   DailyWorkout get _session =>
       _sessions[dayKey(_date)] ?? DailyWorkout(date: dayKey(_date));
@@ -54,6 +53,8 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _rest = RestCountdown(
+        now: () => _now, onFinished: () => HapticFeedback.heavyImpact());
     WidgetsBinding.instance.addObserver(this);
     workoutDataRevision.addListener(_reload);
     workoutPlanRevision.addListener(_reload);
@@ -65,9 +66,8 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final visible = TickerMode.valuesOf(context).enabled;
-    final becameVisible = visible && !_visible;
     _visible = visible;
-    if (becameVisible) _tick();
+    _rest.setActive(_visible && _foreground);
   }
 
   @override
@@ -76,14 +76,16 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
     workoutDataRevision.removeListener(_reload);
     workoutPlanRevision.removeListener(_reload);
     restTimerPreferenceRevision.removeListener(_reload);
-    _ticker?.cancel();
+    _rest.dispose();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _tick();
+    _foreground = state == AppLifecycleState.resumed;
+    _rest.setActive(_visible && _foreground);
+    if (_foreground) {
+      _rest.refresh();
       if (_followToday && dateOnly(_now) != _date) {
         setState(() => _date = dateOnly(_now));
       }
@@ -257,84 +259,10 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
 
   void _startTimer(Exercise exercise) {
     final seconds = parseRestSeconds(exercise.rest);
-    if (seconds == null) return;
-    _ticker?.cancel();
-    setState(() {
-      _deadline = _now.add(Duration(seconds: seconds));
-      _remaining = seconds;
-      _timerLabel = '${_date.month}/${_date.day} · ${exercise.name}';
-    });
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
-  }
-
-  void _tick() {
-    if (!mounted || !_visible || _deadline == null) return;
-    final remaining = restSecondsUntil(_deadline!, now: _now);
-    if (remaining == _remaining) return;
-    setState(() => _remaining = remaining);
-    if (remaining == 0) {
-      _ticker?.cancel();
-      HapticFeedback.heavyImpact();
+    if (seconds != null) {
+      _rest.start(seconds, '${_date.month}/${_date.day} · ${exercise.name}');
     }
   }
-
-  Widget _timerCard() => Container(
-        key: const Key('rest-timer-panel'),
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
-        decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-                color: Theme.of(context)
-                    .colorScheme
-                    .primary
-                    .withValues(alpha: .16))),
-        child: Row(children: [
-          Icon(Icons.timer_outlined,
-              size: 19, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(width: 10),
-          Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text(
-                    _remaining == 0
-                        ? '休息结束'
-                        : '${_remaining ~/ 60}:${(_remaining % 60).toString().padLeft(2, '0')}',
-                    style: const TextStyle(
-                        fontSize: 23,
-                        fontWeight: FontWeight.w600,
-                        fontFeatures: [])),
-                Text(_timerLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        fontSize: 10, color: Theme.of(context).hintColor)),
-              ])),
-          TextButton(
-              key: const Key('rest-timer-add'),
-              onPressed: () {
-                final base = _deadline!.isAfter(_now) ? _deadline! : _now;
-                setState(() {
-                  _deadline = base.add(const Duration(seconds: 30));
-                  _remaining = restSecondsUntil(_deadline!, now: _now);
-                });
-                _ticker?.cancel();
-                _ticker =
-                    Timer.periodic(const Duration(seconds: 1), (_) => _tick());
-              },
-              child: const Text('+30s', style: TextStyle(fontSize: 12))),
-          IconButton(
-              key: const Key('rest-timer-dismiss'),
-              tooltip: '结束计时',
-              onPressed: () {
-                _ticker?.cancel();
-                setState(() => _deadline = null);
-              },
-              icon: const Icon(Icons.close, size: 17)),
-        ]),
-      );
 
   Future<void> _pickSuggestion() async {
     final suggestion = _suggestion;
@@ -346,7 +274,7 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_loading) return const LoadingView();
     if (_error != null)
       return Center(
           child: Padding(
@@ -363,187 +291,195 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
     final progress = session.plannedSets == 0
         ? 0.0
         : session.completedSets / session.plannedSets;
-    return ListView(
-        key: const PageStorageKey('daily-workout-scroll'),
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-        children: [
-          DailyDateBar(
-              date: _date,
-              today: _now,
-              enabled: !_busy,
-              onChanged: (date) => setState(() {
-                    _date = date;
-                    _followToday = date == dateOnly(_now);
-                  })),
-          WeekCalendar(
-              date: _date,
-              today: _now,
-              sessions: _sessions,
-              enabled: !_busy,
-              onChanged: (date) => setState(() {
-                    _date = date;
-                    _followToday = date == dateOnly(_now);
-                  })),
-          const SizedBox(height: 14),
-          Container(
-              key: const Key('daily-suggestion'),
-              padding: const EdgeInsets.fromLTRB(14, 8, 8, 12),
-              decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  border: Border.all(color: color.withValues(alpha: .09)),
-                  borderRadius: BorderRadius.circular(20)),
-              child: Column(children: [
-                Row(children: [
-                  Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                          color: color.withValues(alpha: .08),
-                          borderRadius: BorderRadius.circular(9)),
-                      child: Icon(
-                          suggestion == null
-                              ? Icons.spa_outlined
-                              : Icons.bookmark_border_rounded,
-                          size: 15,
-                          color: color)),
-                  const SizedBox(width: 9),
-                  Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                        Text('当天参考',
-                            style: TextStyle(fontSize: 9, color: muted)),
-                        const SizedBox(height: 3),
-                        Text(suggestion?.name ?? '休息 / 恢复',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontSize: 12, fontWeight: FontWeight.w600)),
-                      ])),
-                  if (suggestion != null)
-                    TextButton(
-                        key: const Key('use-suggestion'),
-                        onPressed: _busy ? null : _pickSuggestion,
-                        child:
-                            const Text('挑选', style: TextStyle(fontSize: 11))),
-                  if (suggestion == null)
-                    IconButton(
-                        tooltip: '恢复安排',
-                        onPressed: () => showModalBottomSheet(
-                            context: context,
-                            builder: (context) => SafeArea(
-                                child: Padding(
-                                    padding: const EdgeInsets.all(24),
-                                    child: Text(
-                                        recoveryNotes[_date.weekday - 1].isEmpty
-                                            ? '按当天状态自由恢复。'
-                                            : recoveryNotes[_date.weekday - 1],
-                                        style: const TextStyle(
-                                            fontSize: 13, height: 1.7))))),
-                        icon: Icon(Icons.info_outline_rounded,
-                            size: 17, color: muted)),
-                  IconButton(
-                      tooltip: '管理模板',
-                      onPressed: _busy
-                          ? null
-                          : () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const TemplateManagerPage())),
-                      icon: Icon(Icons.tune_rounded, size: 17, color: muted)),
-                ]),
-                Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Divider(
-                        height: 1, color: muted.withValues(alpha: .12))),
-                Row(children: [
-                  Expanded(
-                      child: _summaryMetric('${session.blocks.length}', '个项目')),
-                  Expanded(
-                      child: _summaryMetric(
-                          '${session.completedSets} / ${session.plannedSets}',
-                          '已完成组数')),
-                  SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: Stack(alignment: Alignment.center, children: [
-                        SizedBox.expand(
-                            child: CircularProgressIndicator(
-                                value: progress,
-                                strokeWidth: 3,
-                                strokeCap: StrokeCap.round,
-                                color: color,
-                                backgroundColor: color.withValues(alpha: .08))),
-                        Text('${(progress * 100).round()}%',
-                            style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w600,
-                                color: color)),
-                      ])),
-                  const SizedBox(width: 4),
-                ]),
-              ])),
-          const SizedBox(height: 10),
-          Row(children: [
-            const Text('我的训练',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-            const Spacer(),
-            TextButton.icon(
-                key: const Key('choose-blocks'),
-                onPressed: _busy ? null : _pick,
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('添加项目', style: TextStyle(fontSize: 11)))
-          ]),
-          if (_deadline != null) _timerCard(),
-          if (session.blocks.isEmpty)
+    return Column(children: [
+      Expanded(
+          child: ListView(
+              key: const PageStorageKey('daily-workout-scroll'),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              children: [
+            DailyDateBar(
+                date: _date,
+                today: _now,
+                enabled: !_busy,
+                onChanged: (date) => setState(() {
+                      _date = date;
+                      _followToday = date == dateOnly(_now);
+                    })),
+            WeekCalendar(
+                date: _date,
+                today: _now,
+                sessions: _sessions,
+                enabled: !_busy,
+                onChanged: (date) => setState(() {
+                      _date = date;
+                      _followToday = date == dateOnly(_now);
+                    })),
+            const SizedBox(height: 14),
             Container(
-                padding: const EdgeInsets.symmetric(vertical: 24),
+                key: const Key('daily-suggestion'),
+                padding: const EdgeInsets.fromLTRB(14, 8, 8, 12),
+                decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    border: Border.all(color: color.withValues(alpha: .09)),
+                    borderRadius: BorderRadius.circular(20)),
                 child: Column(children: [
-                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Transform.rotate(
-                        angle: -.12,
-                        child: const ExerciseMark('平板卧推', size: 44)),
-                    const SizedBox(width: 10),
-                    Transform.translate(
-                        offset: const Offset(0, -8),
-                        child: const ExerciseMark('腿', size: 50)),
-                    const SizedBox(width: 10),
-                    Transform.rotate(
-                        angle: .12, child: const ExerciseMark('散步', size: 44))
-                  ]),
-                  const SizedBox(height: 18),
-                  Text(session.rested ? '今天，好好休息' : '选几块，开始今天的训练',
-                      style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600)),
-                  if (!session.rested)
-                    TextButton(
-                        key: const Key('record-rest'),
+                  Row(children: [
+                    Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                            color: color.withValues(alpha: .08),
+                            borderRadius: BorderRadius.circular(9)),
+                        child: Icon(
+                            suggestion == null
+                                ? Icons.spa_outlined
+                                : Icons.bookmark_border_rounded,
+                            size: 15,
+                            color: color)),
+                    const SizedBox(width: 9),
+                    Expanded(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                          Text('当天参考',
+                              style: TextStyle(fontSize: 9, color: muted)),
+                          const SizedBox(height: 3),
+                          Text(suggestion?.name ?? '休息 / 恢复',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.w600)),
+                        ])),
+                    if (suggestion != null)
+                      TextButton(
+                          key: const Key('use-suggestion'),
+                          onPressed: _busy ? null : _pickSuggestion,
+                          child:
+                              const Text('挑选', style: TextStyle(fontSize: 11))),
+                    if (suggestion == null)
+                      IconButton(
+                          tooltip: '恢复安排',
+                          onPressed: () => showModalBottomSheet(
+                              context: context,
+                              builder: (context) => SafeArea(
+                                  child: Padding(
+                                      padding: const EdgeInsets.all(24),
+                                      child: Text(
+                                          recoveryNotes[_date.weekday - 1]
+                                                  .isEmpty
+                                              ? '按当天状态自由恢复。'
+                                              : recoveryNotes[
+                                                  _date.weekday - 1],
+                                          style: const TextStyle(
+                                              fontSize: 13, height: 1.7))))),
+                          icon: Icon(Icons.info_outline_rounded,
+                              size: 17, color: muted)),
+                    IconButton(
+                        tooltip: '管理模板',
                         onPressed: _busy
                             ? null
-                            : () => _save(session.copyWith(rested: true)),
-                        child: Text('今天休息',
-                            style: TextStyle(fontSize: 11, color: muted))),
+                            : () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const TemplateManagerPage())),
+                        icon: Icon(Icons.tune_rounded, size: 17, color: muted)),
+                  ]),
+                  Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Divider(
+                          height: 1, color: muted.withValues(alpha: .12))),
+                  Row(children: [
+                    Expanded(
+                        child:
+                            _summaryMetric('${session.blocks.length}', '个项目')),
+                    Expanded(
+                        child: _summaryMetric(
+                            '${session.completedSets} / ${session.plannedSets}',
+                            '已完成组数')),
+                    SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: Stack(alignment: Alignment.center, children: [
+                          SizedBox.expand(
+                              child: CircularProgressIndicator(
+                                  value: progress,
+                                  strokeWidth: 3,
+                                  strokeCap: StrokeCap.round,
+                                  color: color,
+                                  backgroundColor:
+                                      color.withValues(alpha: .08))),
+                          Text('${(progress * 100).round()}%',
+                              style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                  color: color)),
+                        ])),
+                    const SizedBox(width: 4),
+                  ]),
                 ])),
-          for (var i = 0; i < session.blocks.length; i++)
-            _blockCard(session.blocks[i], i),
-          const SizedBox(height: 6),
-          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            TextButton.icon(
-                onPressed: _busy ? null : () => _custom(),
-                icon: const Icon(Icons.edit_outlined, size: 14),
-                label: Text('自定义项目',
-                    style: TextStyle(fontSize: 11, color: muted))),
-            if (session.blocks.isNotEmpty) ...[
-              Container(
-                  height: 12, width: 1, color: muted.withValues(alpha: .25)),
+            const SizedBox(height: 10),
+            Row(children: [
+              const Text('我的训练',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              const Spacer(),
               TextButton.icon(
-                  onPressed: _busy ? null : _saveTemplate,
-                  icon: const Icon(Icons.bookmark_add_outlined, size: 14),
-                  label: Text('存为模板',
-                      style: TextStyle(fontSize: 11, color: muted)))
-            ],
-          ]),
-        ]);
+                  key: const Key('choose-blocks'),
+                  onPressed: _busy ? null : _pick,
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('添加项目', style: TextStyle(fontSize: 11)))
+            ]),
+            if (session.blocks.isEmpty)
+              Container(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Column(children: [
+                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Transform.rotate(
+                          angle: -.12,
+                          child: const ExerciseMark('平板卧推', size: 44)),
+                      const SizedBox(width: 10),
+                      Transform.translate(
+                          offset: const Offset(0, -8),
+                          child: const ExerciseMark('腿', size: 50)),
+                      const SizedBox(width: 10),
+                      Transform.rotate(
+                          angle: .12, child: const ExerciseMark('散步', size: 44))
+                    ]),
+                    const SizedBox(height: 18),
+                    Text(session.rested ? '今天，好好休息' : '选几块，开始今天的训练',
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600)),
+                    if (!session.rested)
+                      TextButton(
+                          key: const Key('record-rest'),
+                          onPressed: _busy
+                              ? null
+                              : () => _save(session.copyWith(rested: true)),
+                          child: Text('今天休息',
+                              style: TextStyle(fontSize: 11, color: muted))),
+                  ])),
+            for (var i = 0; i < session.blocks.length; i++)
+              _blockCard(session.blocks[i], i),
+            const SizedBox(height: 6),
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              TextButton.icon(
+                  onPressed: _busy ? null : () => _custom(),
+                  icon: const Icon(Icons.edit_outlined, size: 14),
+                  label: Text('自定义项目',
+                      style: TextStyle(fontSize: 11, color: muted))),
+              if (session.blocks.isNotEmpty) ...[
+                Container(
+                    height: 12, width: 1, color: muted.withValues(alpha: .25)),
+                TextButton.icon(
+                    onPressed: _busy ? null : _saveTemplate,
+                    icon: const Icon(Icons.bookmark_add_outlined, size: 14),
+                    label: Text('存为模板',
+                        style: TextStyle(fontSize: 11, color: muted)))
+              ],
+            ]),
+          ])),
+      RestTimerDock(controller: _rest),
+    ]);
   }
 
   Widget _summaryMetric(String value, String label) =>

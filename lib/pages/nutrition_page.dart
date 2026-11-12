@@ -1,3 +1,4 @@
+import '../widgets/loading_view.dart';
 import 'package:flutter/material.dart';
 import '../models/daily_workout.dart';
 import '../models/recomp_models.dart';
@@ -120,7 +121,7 @@ class _NutritionPageState extends State<NutritionPage>
         Text(_error!),
         TextButton(onPressed: _load, child: const Text('重试'))
       ]));
-    if (_meals == null) return const Center(child: CircularProgressIndicator());
+    if (_meals == null) return const LoadingView();
     final entries =
         _meals!.values.where((e) => e.date == dayKey(_date)).toList();
     final calories = entries.where((e) => e.calories != null);
