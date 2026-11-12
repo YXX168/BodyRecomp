@@ -4,6 +4,7 @@ import '../models/recomp_models.dart';
 import '../services/app_signals.dart';
 import '../services/daily_workout_service.dart';
 import '../widgets/exercise_editor.dart';
+import '../widgets/exercise_mark.dart';
 import '../widgets/exercise_picker.dart';
 import '../widgets/text_prompt.dart';
 
@@ -88,7 +89,7 @@ class _TemplateManagerPageState extends State<TemplateManagerPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('训练模板与每周参考')),
+        appBar: AppBar(title: const Text('训练模板')),
         body: _error != null
             ? Center(
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -98,12 +99,19 @@ class _TemplateManagerPageState extends State<TemplateManagerPage> {
             : _templates == null
                 ? const Center(child: CircularProgressIndicator())
                 : ListView(padding: const EdgeInsets.all(16), children: [
-                    const Text('模板是参考，不会限制实际训练，也不会改动过去的记录。'),
+                    Text('用模板做参考，按自己的节奏练。',
+                        style: TextStyle(
+                            fontSize: 11, color: Theme.of(context).hintColor)),
                     const SizedBox(height: 16),
                     for (final template in _templates!)
                       Card(
                           margin: const EdgeInsets.only(bottom: 8),
                           child: ListTile(
+                              leading: ExerciseMark(
+                                  template.exercises.isEmpty
+                                      ? '平板卧推'
+                                      : template.exercises.first.name,
+                                  size: 40),
                               title: Text(template.name),
                               subtitle: Text(
                                   '${template.exercises.length} 个项目 · 点击编辑'),
@@ -117,7 +125,9 @@ class _TemplateManagerPageState extends State<TemplateManagerPage> {
                     Text('每周参考安排',
                         style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 8),
-                    const Text('训练页会按日期提示对应模板。休息日也可以自行加入训练。'),
+                    Text('按日期提示，不限制当天实际训练。',
+                        style: TextStyle(
+                            fontSize: 11, color: Theme.of(context).hintColor)),
                     for (var day = 0; day < 7; day++)
                       Padding(
                           padding: const EdgeInsets.symmetric(vertical: 4),
@@ -223,6 +233,7 @@ class _TemplateEditorState extends State<_TemplateEditor> {
                 margin: const EdgeInsets.only(bottom: 8),
                 child: Column(children: [
                   ListTile(
+                      leading: ExerciseMark(_exercises[i].name, size: 40),
                       title: Text(_exercises[i].name),
                       subtitle: Text(
                           '${_exercises[i].sets} 组 × ${_exercises[i].reps}'),

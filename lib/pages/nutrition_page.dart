@@ -160,14 +160,6 @@ class _NutritionPageState extends State<NutritionPage>
                     _followToday = date == dateOnly(DateTime.now());
                   })),
           const SizedBox(height: 14),
-          const Text('好好吃饭。',
-              style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -.8)),
-          const SizedBox(height: 7),
-          Text('把每一餐，变成一点进步。', style: TextStyle(fontSize: 11, color: muted)),
-          const SizedBox(height: 20),
           Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
@@ -230,9 +222,9 @@ class _NutritionPageState extends State<NutritionPage>
                       child: Icon(Icons.info_outline, size: 15, color: muted))
                 ]),
               ])),
-          const SizedBox(height: 23),
-          const Text('今日餐盘',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 20),
+          const Text('每餐记录',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
           const SizedBox(height: 12),
           for (var i = 0; i < mealReferences.length; i++)
             Builder(builder: (context) {
@@ -276,7 +268,7 @@ class _NutritionPageState extends State<NutritionPage>
                                           color: theme.colorScheme.primary)
                                   ]),
                                   const SizedBox(height: 5),
-                                  Text(meal?.actual ?? summaries[i],
+                                  Text(meal?.actual ?? '参考 · ${summaries[i]}',
                                       key: ValueKey(
                                           'meal-actual-${reference.$1}'),
                                       maxLines: 2,

@@ -402,152 +402,128 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
                                     ? theme.colorScheme.onPrimary
                                     : future
                                         ? muted.withValues(alpha: .35)
-                                        : theme.colorScheme.onSurface))
+                                        : theme.colorScheme.onSurface)),
+                        const SizedBox(height: 5),
+                        Container(
+                            width: 3,
+                            height: 3,
+                            decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color:
+                                    (_sessions[dayKey(date)]?.completedSets ??
+                                                0) >
+                                            0
+                                        ? (selected
+                                            ? theme.colorScheme.onPrimary
+                                            : color)
+                                        : Colors.transparent)),
                       ]),
                     ));
               }))
           ]),
-          const SizedBox(height: 16),
-          Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                  color: const Color(0xFF1C3B2D),
-                  borderRadius: BorderRadius.circular(22)),
-              child: Row(children: [
-                Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      Row(children: [
-                        Container(
-                            width: 5,
-                            height: 5,
-                            decoration: const BoxDecoration(
-                                color: Color(0xFFCAE7A3),
-                                shape: BoxShape.circle)),
-                        const SizedBox(width: 6),
-                        Text(session.rested ? '休息日' : '按自己的节奏',
-                            style: const TextStyle(
-                                color: Color(0xFFCCE0D0), fontSize: 10))
-                      ]),
-                      const SizedBox(height: 12),
-                      FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text('${session.blocks.length}',
-                                    style: const TextStyle(
-                                        fontSize: 28,
-                                        height: 1,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white)),
-                                const Padding(
-                                    padding:
-                                        EdgeInsets.only(left: 5, bottom: 2),
-                                    child: Text('个项目',
-                                        style: TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.white60))),
-                                const SizedBox(width: 22),
-                                Text('${session.completedSets}',
-                                    style: const TextStyle(
-                                        fontSize: 28,
-                                        height: 1,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white)),
-                                Padding(
-                                    padding: const EdgeInsets.only(
-                                        left: 5, bottom: 2),
-                                    child: Text('/ ${session.plannedSets} 组',
-                                        style: const TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.white60))),
-                              ])),
-                    ])),
-                SizedBox(
-                    width: 59,
-                    height: 59,
-                    child: Stack(alignment: Alignment.center, children: [
-                      SizedBox.expand(
-                          child: CircularProgressIndicator(
-                              value: progress,
-                              strokeWidth: 4,
-                              strokeCap: StrokeCap.round,
-                              color: const Color(0xFFCAE7A3),
-                              backgroundColor:
-                                  Colors.white.withValues(alpha: .1))),
-                      Text('${(progress * 100).round()}%',
-                          style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFFE7F3D9))),
-                    ])),
-              ])),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Container(
               key: const Key('daily-suggestion'),
-              padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+              padding: const EdgeInsets.fromLTRB(14, 8, 8, 12),
               decoration: BoxDecoration(
                   color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(16)),
-              child: Row(children: [
-                Icon(
-                    suggestion == null
-                        ? Icons.spa_outlined
-                        : Icons.bookmark_border_rounded,
-                    size: 20,
-                    color: color),
-                const SizedBox(width: 10),
-                Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      Text('当天参考', style: TextStyle(fontSize: 9, color: muted)),
-                      const SizedBox(height: 3),
-                      Text(suggestion?.name ?? '休息 / 恢复',
-                          style: const TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w600),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis)
-                    ])),
-                if (suggestion != null)
-                  TextButton(
-                      key: const Key('use-suggestion'),
-                      onPressed: _busy ? null : _pickSuggestion,
-                      child: const Text('挑选', style: TextStyle(fontSize: 11))),
-                if (suggestion == null)
+                  border: Border.all(color: color.withValues(alpha: .09)),
+                  borderRadius: BorderRadius.circular(20)),
+              child: Column(children: [
+                Row(children: [
+                  Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                          color: color.withValues(alpha: .08),
+                          borderRadius: BorderRadius.circular(9)),
+                      child: Icon(
+                          suggestion == null
+                              ? Icons.spa_outlined
+                              : Icons.bookmark_border_rounded,
+                          size: 15,
+                          color: color)),
+                  const SizedBox(width: 9),
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text('当天参考',
+                            style: TextStyle(fontSize: 9, color: muted)),
+                        const SizedBox(height: 3),
+                        Text(suggestion?.name ?? '休息 / 恢复',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w600)),
+                      ])),
+                  if (suggestion != null)
+                    TextButton(
+                        key: const Key('use-suggestion'),
+                        onPressed: _busy ? null : _pickSuggestion,
+                        child:
+                            const Text('挑选', style: TextStyle(fontSize: 11))),
+                  if (suggestion == null)
+                    IconButton(
+                        tooltip: '恢复安排',
+                        onPressed: () => showModalBottomSheet(
+                            context: context,
+                            builder: (context) => SafeArea(
+                                child: Padding(
+                                    padding: const EdgeInsets.all(24),
+                                    child: Text(
+                                        recoveryNotes[_date.weekday - 1].isEmpty
+                                            ? '按当天状态自由恢复。'
+                                            : recoveryNotes[_date.weekday - 1],
+                                        style: const TextStyle(
+                                            fontSize: 13, height: 1.7))))),
+                        icon: Icon(Icons.info_outline_rounded,
+                            size: 17, color: muted)),
                   IconButton(
-                      tooltip: '恢复安排',
-                      onPressed: () => showModalBottomSheet(
-                          context: context,
-                          builder: (context) => SafeArea(
-                              child: Padding(
-                                  padding: const EdgeInsets.all(24),
-                                  child: Text(
-                                      recoveryNotes[_date.weekday - 1].isEmpty
-                                          ? '按当天状态自由恢复。'
-                                          : recoveryNotes[_date.weekday - 1],
-                                      style: const TextStyle(
-                                          fontSize: 13, height: 1.7))))),
-                      icon: Icon(Icons.info_outline_rounded,
-                          size: 17, color: muted)),
-                IconButton(
-                    tooltip: '管理模板',
-                    onPressed: _busy
-                        ? null
-                        : () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const TemplateManagerPage())),
-                    icon: Icon(Icons.tune_rounded, size: 18, color: muted)),
+                      tooltip: '管理模板',
+                      onPressed: _busy
+                          ? null
+                          : () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const TemplateManagerPage())),
+                      icon: Icon(Icons.tune_rounded, size: 17, color: muted)),
+                ]),
+                Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Divider(
+                        height: 1, color: muted.withValues(alpha: .12))),
+                Row(children: [
+                  Expanded(
+                      child: _summaryMetric('${session.blocks.length}', '个项目')),
+                  Expanded(
+                      child: _summaryMetric(
+                          '${session.completedSets} / ${session.plannedSets}',
+                          '已完成组数')),
+                  SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: Stack(alignment: Alignment.center, children: [
+                        SizedBox.expand(
+                            child: CircularProgressIndicator(
+                                value: progress,
+                                strokeWidth: 3,
+                                strokeCap: StrokeCap.round,
+                                color: color,
+                                backgroundColor: color.withValues(alpha: .08))),
+                        Text('${(progress * 100).round()}%',
+                            style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                color: color)),
+                      ])),
+                  const SizedBox(width: 4),
+                ]),
               ])),
-          const SizedBox(height: 18),
+          const SizedBox(height: 10),
           Row(children: [
-            const Text('训练积木',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            const Text('我的训练',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
             const Spacer(),
             TextButton.icon(
                 key: const Key('choose-blocks'),
@@ -607,6 +583,16 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
         ]);
   }
 
+  Widget _summaryMetric(String value, String label) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(value,
+            style: const TextStyle(
+                fontSize: 18, height: 1.2, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 4),
+        Text(label,
+            style: TextStyle(fontSize: 9, color: Theme.of(context).hintColor)),
+      ]);
+
   Widget _blockCard(WorkoutBlock block, int index) {
     final exercise = block.exercise;
     final complete = block.completedSets == exercise.sets;
@@ -616,17 +602,24 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
     return Container(
         key: ValueKey('workout-block-$index'),
         margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.fromLTRB(12, 6, 8, 10),
+        padding: const EdgeInsets.fromLTRB(12, 4, 8, 10),
         decoration: BoxDecoration(
             color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(18)),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+                color: complete
+                    ? color.withValues(alpha: .25)
+                    : color.withValues(alpha: .06))),
         child: Column(children: [
           ExpansionTile(
+            key:
+                PageStorageKey('exercise-details-${_session.date}-${block.id}'),
+            minTileHeight: 56,
             tilePadding: EdgeInsets.zero,
             dense: true,
             shape: const Border(),
             collapsedShape: const Border(),
-            leading: ExerciseMark(exercise.name, size: 38),
+            leading: ExerciseMark(exercise.name, size: 42),
             trailing: _blockMenu(block, index),
             title: Text(exercise.name,
                 style:
@@ -634,7 +627,7 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
             subtitle: Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                    '${exercise.sets} 组  ×  ${exercise.reps}${RegExp(r'[a-zA-Z分钟秒]').hasMatch(exercise.reps) ? '' : ' 次'}',
+                    '${exercise.sets} 组 · ${exercise.reps}${RegExp(r'[a-zA-Z分钟秒]').hasMatch(exercise.reps) ? '' : ' 次'}',
                     style: TextStyle(fontSize: 10, color: muted))),
             childrenPadding: const EdgeInsets.only(bottom: 10),
             children: [
@@ -685,18 +678,25 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
                   visualDensity: VisualDensity.compact,
                   onPressed: _busy ? null : () => _startTimer(exercise),
                   icon: Icon(Icons.timer_outlined, size: 18, color: muted)),
-            IconButton.filled(
+            FilledButton(
                 key: ValueKey('complete-set-$index'),
-                tooltip: complete ? '已完成' : '完成一组',
-                visualDensity: VisualDensity.compact,
-                style: IconButton.styleFrom(
+                style: FilledButton.styleFrom(
+                    minimumSize: const Size(68, 34),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                     backgroundColor:
                         complete ? color.withValues(alpha: .1) : color,
                     foregroundColor:
                         complete ? color : theme.colorScheme.onPrimary),
                 onPressed: _busy || complete ? null : () => _complete(block),
-                icon: Icon(complete ? Icons.check_rounded : Icons.add_rounded,
-                    size: 21)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(complete ? Icons.check_rounded : Icons.add_rounded,
+                      size: 14),
+                  const SizedBox(width: 3),
+                  Text(complete ? '完成' : '记一组',
+                      style: const TextStyle(fontSize: 10)),
+                ])),
           ]),
         ]));
   }

@@ -594,6 +594,12 @@ class RecompApp extends StatelessWidget {
             appBarTheme: AppBarTheme(
               backgroundColor: t.bg,
               foregroundColor: t.text1,
+              titleTextStyle: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: t.text1,
+                  fontFamily: 'Inter',
+                  fontFamilyFallback: const ['sans-serif']),
               elevation: 0,
               scrolledUnderElevation: dark ? 0.2 : 0.5,
             ),
@@ -683,7 +689,7 @@ class _MainPageState extends State<MainPage> {
     final t = ThemeInherited.of(context).theme;
     const labels = ['训练', '饮食', '趋势', '我的'];
     const icons = [
-      Icons.grid_view_rounded,
+      Icons.fitness_center_outlined,
       Icons.restaurant_outlined,
       Icons.insights_outlined,
       Icons.person_outline_rounded
@@ -698,24 +704,22 @@ class _MainPageState extends State<MainPage> {
             bottom: false,
             child: Column(children: [
               Padding(
-                  padding: const EdgeInsets.fromLTRB(22, 14, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(20, 8, 12, 4),
                   child: Row(children: [
-                    Container(
-                        width: 27,
-                        height: 27,
-                        decoration: BoxDecoration(
-                            color: t.primary,
-                            borderRadius: BorderRadius.circular(8)),
-                        child: Icon(Icons.fitness_center_rounded,
-                            size: 15, color: t.isDark ? t.bg : Colors.white)),
-                    const SizedBox(width: 9),
-                    Text('Bodyrecomp',
+                    Text(labels[_tab],
                         style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -.6,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -.5,
                             color: t.text1)),
                     const Spacer(),
+                    Text('BODY RECOMP',
+                        style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.2,
+                            color: t.text3)),
+                    const SizedBox(width: 8),
                     IconButton(
                         tooltip: '切换主题',
                         onPressed: _showThemeSheet,
@@ -748,13 +752,25 @@ class _MainPageState extends State<MainPage> {
                           setState(() => _tab = i);
                         },
                         child: SizedBox(
-                            height: 51,
+                            height: 56,
                             child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(icons[i],
-                                      size: 22,
-                                      color: i == _tab ? t.primary : t.text4),
+                                  AnimatedContainer(
+                                      duration:
+                                          const Duration(milliseconds: 180),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 15, vertical: 4),
+                                      decoration: BoxDecoration(
+                                          color: i == _tab
+                                              ? t.primary.withValues(alpha: .10)
+                                              : Colors.transparent,
+                                          borderRadius:
+                                              BorderRadius.circular(10)),
+                                      child: Icon(icons[i],
+                                          size: 20,
+                                          color:
+                                              i == _tab ? t.primary : t.text3)),
                                   const SizedBox(height: 4),
                                   Text(labels[i],
                                       style: TextStyle(
@@ -1060,17 +1076,6 @@ class _RecordPageState extends State<RecordPage> {
 
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-            child: GradientTitle(
-              text: '训练记录',
-              primary: t.primary,
-              accent: t.primaryLight,
-              fontSize: 22,
-            ),
-          ),
-        ),
         // 月份选择器
         SliverToBoxAdapter(
           child: Padding(
@@ -2155,23 +2160,13 @@ class _SettingsPageState extends State<SettingsPage> {
     if (p == null) return const Center(child: CircularProgressIndicator());
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-            child: GradientTitle(
-              text: '设置',
-              primary: t.primary,
-              accent: t.primaryLight,
-              fontSize: 22,
-            ),
-          ),
-        ),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
               // ── 个人资料卡片 ──
-              FadeScaleEntry(index: 0, child: _profileCard(p, t)),
+              _settingsGroup(t, Icons.person_outline_rounded, '个人资料',
+                  '身高、体重与基本信息', _profileCard(p, t)),
               const SizedBox(height: 12),
               // ── 身体数据趋势 ──
               FadeScaleEntry(index: 1, child: _bodyTrendCard(t)),
@@ -2180,7 +2175,8 @@ class _SettingsPageState extends State<SettingsPage> {
               FadeScaleEntry(index: 2, child: _workoutPlanCard(t)),
               const SizedBox(height: 12),
               // ── 训练偏好 ──
-              FadeScaleEntry(index: 3, child: _trainingPreferencesCard(t)),
+              _settingsGroup(t, Icons.timer_outlined, '训练偏好', '休息计时方式',
+                  _trainingPreferencesCard(t)),
               const SizedBox(height: 12),
               Card(
                   child: ListTile(
@@ -2196,10 +2192,12 @@ class _SettingsPageState extends State<SettingsPage> {
                                   body: const ProgressionPage()))))),
               const SizedBox(height: 12),
               // ── 数据管理 ──
-              FadeScaleEntry(index: 4, child: _dataCard(t)),
+              _settingsGroup(t, Icons.cloud_download_outlined, '备份与恢复',
+                  '导出、导入本地记录', _dataCard(t)),
               const SizedBox(height: 12),
               // ── 主题设置 ──
-              FadeScaleEntry(index: 5, child: _themeCard(t)),
+              _settingsGroup(
+                  t, Icons.palette_outlined, '外观', '主题与配色', _themeCard(t)),
               const SizedBox(height: 12),
               // ── 关于 ──
               FadeScaleEntry(
@@ -2252,6 +2250,25 @@ class _SettingsPageState extends State<SettingsPage> {
       ],
     );
   }
+
+  Widget _settingsGroup(WorkoutTheme t, IconData icon, String title,
+          String subtitle, Widget child) =>
+      Container(
+          decoration: BoxDecoration(
+              color: t.card, borderRadius: BorderRadius.circular(16)),
+          child: ExpansionTile(
+              key: PageStorageKey('settings-$title'),
+              shape: const Border(),
+              collapsedShape: const Border(),
+              tilePadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+              leading: Icon(icon, size: 20, color: t.primary),
+              title: Text(title,
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600)),
+              subtitle: Text(subtitle,
+                  style: TextStyle(fontSize: 10, color: t.text3)),
+              children: [child]));
 
   Widget _themeCard(WorkoutTheme t) {
     final inh = ThemeInherited.of(context);

@@ -98,6 +98,31 @@ void main() {
   });
 
   testWidgets(
+      'library search keeps selection across templates and fits keyboard',
+      (tester) async {
+    await pump(tester, WorkoutPage(now: () => today),
+        size: const Size(320, 568), scale: 1.3);
+    await tapVisible(tester, find.byKey(const Key('choose-blocks')));
+    await tester.enterText(find.byKey(const Key('exercise-search')), '侧平举');
+    tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const ValueKey('pick_0_3')));
+    await tester.pumpAndSettle();
+    tester.view.resetViewInsets();
+    await tester.enterText(find.byKey(const Key('exercise-search')), '下拉');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('pick_1_0')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('add-picked-exercises')));
+    await tester.pumpAndSettle();
+    final blocks = (await loadDailyWorkouts())[dayKey(today)]!.blocks;
+    expect(blocks.map((b) => b.exercise.name), ['哑铃侧平举', '宽握高位下拉']);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
       'manual countdown fits compact phone with large text without overlay',
       (tester) async {
     seed(seeded());
