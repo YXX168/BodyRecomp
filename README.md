@@ -6,7 +6,7 @@
 每天按实际情况搭建训练积木，用模板作参考，同时记录饮食和身体变化。Android 本地应用，无需注册。
 
 [![构建状态](https://github.com/YXX168/BodyRecomp/actions/workflows/build.yml/badge.svg)](https://github.com/YXX168/BodyRecomp/actions/workflows/build.yml)
-[![源码版本](https://img.shields.io/badge/源码-v7.0.0%2B81_预览-2563EB)](CHANGELOG.md)
+[![源码版本](https://img.shields.io/badge/源码-v7.0.0%2B82_预览-2563EB)](CHANGELOG.md)
 [![许可](https://img.shields.io/badge/许可-MIT-059669)](LICENSE)
 </div>
 

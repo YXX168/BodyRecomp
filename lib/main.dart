@@ -575,7 +575,7 @@ class RecompApp extends StatelessWidget {
         final t = inh.theme;
         final dark = t.isDark;
         return MaterialApp(
-          title: 'Body Recomp',
+          title: '青阳',
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
             brightness: dark ? Brightness.dark : Brightness.light,
@@ -706,18 +706,17 @@ class _MainPageState extends State<MainPage> {
               Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 12, 4),
                   child: Row(children: [
-                    Text(labels[_tab],
+                    Text('青阳',
                         style: TextStyle(
                             fontSize: 19,
                             fontWeight: FontWeight.w700,
                             letterSpacing: -.5,
                             color: t.text1)),
                     const Spacer(),
-                    Text('BODY RECOMP',
+                    Text(labels[_tab],
                         style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1.2,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
                             color: t.text3)),
                     const SizedBox(width: 8),
                     IconButton(
