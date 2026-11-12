@@ -21,7 +21,7 @@ import 'widgets/body_editor.dart';
 import 'widgets/rest_timer_pill.dart';
 export 'services/app_signals.dart';
 
-const appVersion = '7.0.0';
+const appVersion = '7.0.1';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // THEME SYSTEM — v6.6: profile + chart + settings support
@@ -691,7 +691,7 @@ class RecompApp extends StatelessWidget {
       builder: (context) {
         final inh = ThemeInherited.of(context);
         return MaterialApp(
-          title: '青阳',
+          title: '青燃',
           locale: const Locale('zh', 'CN'),
           supportedLocales: const [Locale('zh', 'CN')],
           localizationsDelegates: const [
@@ -766,7 +766,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
               Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 12, 4),
                   child: Row(children: [
-                    Text('青阳',
+                    Text('青燃',
                         style: TextStyle(
                             fontSize: 19,
                             fontWeight: FontWeight.w700,
@@ -2213,7 +2213,7 @@ class _SettingsPageState extends State<SettingsPage> {
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              '青阳 v$appVersion',
+                              '青燃 v$appVersion',
                               style: TextStyle(
                                 fontSize: 13,
                                 color: t.text2,
@@ -3208,7 +3208,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   groupValue: mode,
                   onChanged: (value) => setDialogState(() => mode = value!),
                   title: const Text('覆盖'),
-                  subtitle: const Text('用备份替换青阳的全部本地记录'),
+                  subtitle: const Text('用备份替换青燃的全部本地记录'),
                 ),
               ],
             ),

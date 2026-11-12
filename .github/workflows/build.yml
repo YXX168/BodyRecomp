@@ -1,4 +1,4 @@
-name: 青阳 · 检查与构建
+name: 青燃 · 检查与构建
 
 on:
   push:
@@ -47,7 +47,7 @@ jobs:
         if: ${{ !startsWith(github.ref, 'refs/tags/v') && inputs.release_tag == '' }}
         uses: actions/upload-artifact@v7
         with:
-          name: Qingyang-preview-${{ github.run_number }}-${{ github.sha }}
+          name: Qingran-preview-${{ github.run_number }}-${{ github.sha }}
           path: build/app/outputs/flutter-apk/app-profile.apk
           if-no-files-found: error
           retention-days: 14
@@ -117,7 +117,7 @@ jobs:
       - name: Prepare release files
         run: |
           mkdir -p dist
-          APK_NAME="Qingyang-${RELEASE_TAG}-arm64.apk"
+          APK_NAME="Qingran-${RELEASE_TAG}-arm64.apk"
           cp build/app/outputs/flutter-apk/app-release.apk "dist/$APK_NAME"
           cd dist
           sha256sum "$APK_NAME" > "$APK_NAME.sha256"
@@ -129,11 +129,11 @@ jobs:
           test -f "$NOTES"
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" dist/* --clobber
-            gh release edit "$RELEASE_TAG" --title "青阳 $RELEASE_TAG" --notes-file "$NOTES" --latest
+            gh release edit "$RELEASE_TAG" --title "青燃 $RELEASE_TAG" --notes-file "$NOTES" --latest
           else
             gh release create "$RELEASE_TAG" dist/* \
               --target "$GITHUB_SHA" \
-              --title "青阳 $RELEASE_TAG" \
+              --title "青燃 $RELEASE_TAG" \
               --notes-file "$NOTES" --latest
           fi
       - name: Remove temporary signing files

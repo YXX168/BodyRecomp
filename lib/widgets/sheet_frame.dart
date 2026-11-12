@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 /// Shared, keyboard-aware frame for short editing and selection flows.
-class SheetFrame extends StatelessWidget {
+class SheetFrame extends StatefulWidget {
   final String title;
   final String? subtitle;
   final IconData icon;
@@ -17,7 +17,19 @@ class SheetFrame extends StatelessWidget {
       this.footer});
 
   @override
+  State<SheetFrame> createState() => _SheetFrameState();
+}
+
+class _SheetFrameState extends State<SheetFrame> {
+  final _bodyKey = GlobalKey();
+
+  @override
   Widget build(BuildContext context) {
+    final title = widget.title;
+    final subtitle = widget.subtitle;
+    final icon = widget.icon;
+    final footer = widget.footer;
+    final body = KeyedSubtree(key: _bodyKey, child: widget.body);
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final media = MediaQuery.of(context);
@@ -40,68 +52,90 @@ class SheetFrame extends StatelessWidget {
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(26)),
                 clipBehavior: Clip.antiAlias,
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Container(
-                      width: 30,
-                      height: 4,
-                      margin: const EdgeInsets.only(top: 10, bottom: 16),
-                      decoration: BoxDecoration(
-                          color: colors.onSurface.withValues(alpha: .13),
-                          borderRadius: BorderRadius.circular(4))),
-                  Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 12, 16),
-                      child: Row(children: [
-                        Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                                color: colors.primary.withValues(alpha: .09),
-                                borderRadius: BorderRadius.circular(12)),
-                            child: Icon(icon, color: colors.primary, size: 20)),
-                        const SizedBox(width: 12),
-                        Expanded(
-                            child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                              Text(title,
-                                  style: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w700)),
-                              if (subtitle != null) ...[
-                                const SizedBox(height: 4),
-                                Text(subtitle!,
-                                    style: TextStyle(
-                                        fontSize: 10,
-                                        color: colors.onSurface
-                                            .withValues(alpha: .50))),
-                              ],
-                            ])),
-                        IconButton(
-                            tooltip: '关闭',
-                            onPressed: () => Navigator.pop(context),
-                            icon: Icon(Icons.close_rounded,
-                                size: 19,
-                                color: colors.onSurface.withValues(alpha: .5))),
-                      ])),
-                  Divider(
-                      height: 1,
-                      color: colors.onSurface.withValues(alpha: .07)),
-                  Flexible(
-                      child: SingleChildScrollView(
+                child: LayoutBuilder(builder: (context, constraints) {
+                  final scrollAll = constraints.maxHeight <
+                      200 * media.textScaler.scale(1).clamp(1.0, 2.0);
+                  final children = <Widget>[
+                    Container(
+                        width: 30,
+                        height: 4,
+                        margin: const EdgeInsets.only(top: 10, bottom: 16),
+                        decoration: BoxDecoration(
+                            color: colors.onSurface.withValues(alpha: .13),
+                            borderRadius: BorderRadius.circular(4))),
+                    Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 12, 16),
+                        child: Row(children: [
+                          Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                  color: colors.primary.withValues(alpha: .09),
+                                  borderRadius: BorderRadius.circular(12)),
+                              child:
+                                  Icon(icon, color: colors.primary, size: 20)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                Text(title,
+                                    style: const TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w700)),
+                                if (subtitle != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text(subtitle,
+                                      style: TextStyle(
+                                          fontSize: 10,
+                                          color: colors.onSurface
+                                              .withValues(alpha: .50))),
+                                ],
+                              ])),
+                          IconButton(
+                              tooltip: '关闭',
+                              onPressed: () => Navigator.pop(context),
+                              icon: Icon(Icons.close_rounded,
+                                  size: 19,
+                                  color:
+                                      colors.onSurface.withValues(alpha: .5))),
+                        ])),
+                    Divider(
+                        height: 1,
+                        color: colors.onSurface.withValues(alpha: .07)),
+                    if (scrollAll)
+                      Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                          child: body)
+                    else
+                      Flexible(
+                          child: SingleChildScrollView(
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
+                              padding:
+                                  const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                              child: body)),
+                    if (footer != null)
+                      Container(
+                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                          decoration: BoxDecoration(
+                              border: Border(
+                                  top: BorderSide(
+                                      color: colors.onSurface
+                                          .withValues(alpha: .07)))),
+                          child: footer),
+                  ];
+                  // With little vertical room, scroll the header and actions too.
+                  // Keeping them pinned would squeeze the form to zero height.
+                  final content = Column(
+                      mainAxisSize: MainAxisSize.min, children: children);
+                  return scrollAll
+                      ? SingleChildScrollView(
                           keyboardDismissBehavior:
                               ScrollViewKeyboardDismissBehavior.onDrag,
-                          padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-                          child: body)),
-                  if (footer != null)
-                    Container(
-                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-                        decoration: BoxDecoration(
-                            border: Border(
-                                top: BorderSide(
-                                    color: colors.onSurface
-                                        .withValues(alpha: .07)))),
-                        child: footer),
-                ]),
+                          child: content)
+                      : content;
+                }),
               ),
             ),
           )),

@@ -8,7 +8,8 @@ import '../widgets/daily_date_bar.dart';
 import '../widgets/sheet_frame.dart';
 
 class NutritionPage extends StatefulWidget {
-  const NutritionPage({super.key});
+  final DateTime Function()? now;
+  const NutritionPage({super.key, this.now});
   @override
   State<NutritionPage> createState() => _NutritionPageState();
 }
@@ -16,7 +17,9 @@ class NutritionPage extends StatefulWidget {
 class _NutritionPageState extends State<NutritionPage>
     with WidgetsBindingObserver {
   bool _followToday = true;
-  DateTime _date = dateOnly(DateTime.now());
+  DateTime get _now => widget.now?.call() ?? DateTime.now();
+  late DateTime _date = dateOnly(_now);
+  bool _visible = true;
   Map<String, MealEntry>? _meals;
   String? _error;
   bool _busy = false;
@@ -30,6 +33,16 @@ class _NutritionPageState extends State<NutritionPage>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final visible = TickerMode.valuesOf(context).enabled;
+    if (visible && !_visible && _followToday) {
+      _date = dateOnly(_now);
+    }
+    _visible = visible;
+  }
+
+  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     workoutDataRevision.removeListener(_load);
@@ -40,8 +53,8 @@ class _NutritionPageState extends State<NutritionPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed &&
         _followToday &&
-        _date != dateOnly(DateTime.now())) {
-      setState(() => _date = dateOnly(DateTime.now()));
+        _date != dateOnly(_now)) {
+      setState(() => _date = dateOnly(_now));
     }
   }
 
@@ -164,11 +177,11 @@ class _NutritionPageState extends State<NutritionPage>
         children: [
           DailyDateBar(
               date: _date,
-              today: DateTime.now(),
+              today: _now,
               enabled: !_busy,
               onChanged: (date) => setState(() {
                     _date = date;
-                    _followToday = date == dateOnly(DateTime.now());
+                    _followToday = date == dateOnly(_now);
                   })),
           const SizedBox(height: 6),
           Container(

@@ -69,6 +69,9 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final visible = TickerMode.valuesOf(context).enabled;
+    if (visible && !_visible && _followToday) {
+      _date = dateOnly(_now);
+    }
     _visible = visible;
     if (widget.restController == null) _rest.setActive(_visible && _foreground);
   }
