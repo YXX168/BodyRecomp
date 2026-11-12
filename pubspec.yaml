@@ -1,13 +1,15 @@
 name: body_recomp
 description: 本地优先的积木式健身记录：自由组合训练、参考模板、饮食与体重追踪。
 publish_to: 'none'
-version: 7.0.0+82
+version: 7.0.0+83
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
 
 dependencies:
   flutter:
+    sdk: flutter
+  flutter_localizations:
     sdk: flutter
   shared_preferences: ^2.5.5
 

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models/recomp_models.dart';
@@ -12,6 +13,8 @@ import 'services/rest_timer_service.dart';
 import 'pages/workout_page.dart';
 import 'pages/nutrition_page.dart';
 import 'pages/template_manager_page.dart';
+import 'widgets/app_navigation_bar.dart';
+import 'widgets/sheet_frame.dart';
 export 'services/app_signals.dart';
 
 const appVersion = '7.0.0';
@@ -526,6 +529,7 @@ class ThemeState extends StatefulWidget {
 
 class _ThemeStateState extends State<ThemeState> {
   AppTheme _mode = AppTheme.blue;
+  Future<void> _themeWrites = Future.value();
   @override
   void initState() {
     super.initState();
@@ -540,11 +544,15 @@ class _ThemeStateState extends State<ThemeState> {
   }
 
   Future<void> setTheme(AppTheme m) async {
-    final p = await SharedPreferences.getInstance();
-    await p.setInt('recomp_theme_v6', m.index);
-    if (!mounted) return;
-    HapticFeedback.selectionClick();
+    if (!mounted || _mode == m) return;
     setState(() => _mode = m);
+    HapticFeedback.selectionClick();
+    final write = _themeWrites.then((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('recomp_theme_v6', m.index);
+    });
+    _themeWrites = write.catchError((Object _) {});
+    await write;
   }
 
   @override
@@ -566,98 +574,125 @@ void main() {
 }
 
 class RecompApp extends StatelessWidget {
+  static final _themeCache = <AppTheme, ThemeData>{};
+  static ThemeData themeFor(AppTheme mode) => _themeCache.putIfAbsent(mode, () {
+        final t = themes[mode]!;
+        final dark = t.isDark;
+        return ThemeData(
+          brightness: dark ? Brightness.dark : Brightness.light,
+          scaffoldBackgroundColor: t.bg,
+          colorScheme: ColorScheme(
+            brightness: dark ? Brightness.dark : Brightness.light,
+            primary: t.primary,
+            onPrimary: dark ? const Color(0xFF15251B) : Colors.white,
+            secondary: t.accent,
+            onSecondary: Colors.white,
+            surface: t.card,
+            onSurface: t.text1,
+            error: t.warning,
+            onError: Colors.white,
+          ),
+          appBarTheme: AppBarTheme(
+            backgroundColor: t.bg,
+            foregroundColor: t.text1,
+            titleTextStyle: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: t.text1,
+                fontFamily: 'Inter',
+                fontFamilyFallback: const ['sans-serif']),
+            elevation: 0,
+            scrolledUnderElevation: dark ? 0.2 : 0.5,
+          ),
+          cardTheme: CardThemeData(
+            color: t.card,
+            elevation: 0,
+            margin: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+              side: BorderSide(
+                color: t.border.withOpacity(dark ? 0.72 : 0.85),
+                width: 0.8,
+              ),
+            ),
+          ),
+          useMaterial3: true,
+          fontFamily: 'Inter',
+          fontFamilyFallback: const ['sans-serif'],
+          textTheme:
+              (dark ? ThemeData.dark().textTheme : ThemeData.light().textTheme)
+                  .apply(fontFamily: 'Inter')
+                  .copyWith(
+                      bodyMedium: TextStyle(fontSize: 13, color: t.text1),
+                      bodySmall: TextStyle(fontSize: 11, color: t.text3),
+                      titleMedium: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: t.text1),
+                      titleLarge: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: t.text1)),
+          datePickerTheme: DatePickerThemeData(
+            backgroundColor: t.card,
+            surfaceTintColor: Colors.transparent,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            headerBackgroundColor: t.primary,
+            headerHeadlineStyle:
+                const TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
+            headerForegroundColor: dark ? t.bg : Colors.white,
+            dayShape: WidgetStatePropertyAll(RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10))),
+            yearShape: WidgetStatePropertyAll(RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10))),
+            todayBorder: BorderSide(color: t.primary.withValues(alpha: .5)),
+          ),
+          listTileTheme: const ListTileThemeData(dense: true),
+          dividerTheme: DividerThemeData(
+              color: t.border.withValues(alpha: .7), thickness: .5),
+          textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                  textStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Inter',
+                      fontFamilyFallback: const ['sans-serif']))),
+          outlinedButtonTheme: OutlinedButtonThemeData(
+              style: OutlinedButton.styleFrom(
+                  textStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Inter',
+                      fontFamilyFallback: const ['sans-serif']))),
+          filledButtonTheme: FilledButtonThemeData(
+              style: FilledButton.styleFrom(
+                  textStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Inter',
+                      fontFamilyFallback: const ['sans-serif']))),
+        );
+      });
+
   const RecompApp({super.key});
   @override
   Widget build(BuildContext context) {
     return Builder(
       builder: (context) {
         final inh = ThemeInherited.of(context);
-        final t = inh.theme;
-        final dark = t.isDark;
         return MaterialApp(
           title: '青阳',
+          locale: const Locale('zh', 'CN'),
+          supportedLocales: const [Locale('zh', 'CN')],
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
           debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            brightness: dark ? Brightness.dark : Brightness.light,
-            scaffoldBackgroundColor: t.bg,
-            colorScheme: ColorScheme(
-              brightness: dark ? Brightness.dark : Brightness.light,
-              primary: t.primary,
-              onPrimary: dark ? const Color(0xFF15251B) : Colors.white,
-              secondary: t.accent,
-              onSecondary: Colors.white,
-              surface: t.card,
-              onSurface: t.text1,
-              error: t.warning,
-              onError: Colors.white,
-            ),
-            appBarTheme: AppBarTheme(
-              backgroundColor: t.bg,
-              foregroundColor: t.text1,
-              titleTextStyle: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: t.text1,
-                  fontFamily: 'Inter',
-                  fontFamilyFallback: const ['sans-serif']),
-              elevation: 0,
-              scrolledUnderElevation: dark ? 0.2 : 0.5,
-            ),
-            cardTheme: CardThemeData(
-              color: t.card,
-              elevation: 0,
-              margin: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-                side: BorderSide(
-                  color: t.border.withOpacity(dark ? 0.72 : 0.85),
-                  width: 0.8,
-                ),
-              ),
-            ),
-            useMaterial3: true,
-            fontFamily: 'Inter',
-            fontFamilyFallback: const ['sans-serif'],
-            textTheme: (dark
-                    ? ThemeData.dark().textTheme
-                    : ThemeData.light().textTheme)
-                .apply(fontFamily: 'Inter')
-                .copyWith(
-                    bodyMedium: TextStyle(fontSize: 13, color: t.text1),
-                    bodySmall: TextStyle(fontSize: 11, color: t.text3),
-                    titleMedium: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: t.text1),
-                    titleLarge: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: t.text1)),
-            listTileTheme: const ListTileThemeData(dense: true),
-            dividerTheme: DividerThemeData(
-                color: t.border.withValues(alpha: .7), thickness: .5),
-            textButtonTheme: TextButtonThemeData(
-                style: TextButton.styleFrom(
-                    textStyle: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'Inter',
-                        fontFamilyFallback: const ['sans-serif']))),
-            outlinedButtonTheme: OutlinedButtonThemeData(
-                style: OutlinedButton.styleFrom(
-                    textStyle: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'Inter',
-                        fontFamilyFallback: const ['sans-serif']))),
-            filledButtonTheme: FilledButtonThemeData(
-                style: FilledButton.styleFrom(
-                    textStyle: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'Inter',
-                        fontFamilyFallback: const ['sans-serif']))),
-          ),
+          theme: themeFor(inh.current),
+          themeAnimationDuration: Duration.zero,
           home: const MainPage(),
         );
       },
@@ -677,6 +712,7 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage> {
   int _tab = 0;
+  final _pageModes = <int, AppTheme>{};
   late final List<Widget> _pages = [
     const WorkoutPage(),
     const NutritionPage(),
@@ -686,14 +722,10 @@ class _MainPageState extends State<MainPage> {
 
   @override
   Widget build(BuildContext context) {
-    final t = ThemeInherited.of(context).theme;
-    const labels = ['训练', '饮食', '趋势', '我的'];
-    const icons = [
-      Icons.fitness_center_outlined,
-      Icons.restaurant_outlined,
-      Icons.insights_outlined,
-      Icons.person_outline_rounded
-    ];
+    final inh = ThemeInherited.of(context);
+    final t = inh.theme;
+    _pageModes[_tab] = inh.current;
+    const labels = AppNavigationBar.labels;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
@@ -728,207 +760,85 @@ class _MainPageState extends State<MainPage> {
                   ])),
               Expanded(
                   child: IndexedStack(
-                      index: _tab, sizing: StackFit.expand, children: _pages)),
+                      index: _tab,
+                      sizing: StackFit.expand,
+                      children: [
+                    for (var i = 0; i < _pages.length; i++) _tabBody(i, inh),
+                  ])),
             ])),
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(
-              color: t.navbarBg,
-              border: Border(
-                  top: BorderSide(color: t.border.withValues(alpha: .65)))),
-          child: SafeArea(
-              top: false,
-              child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-                  child: Row(children: [
-                    for (var i = 0; i < labels.length; i++)
-                      Expanded(
-                          child: InkWell(
-                        key: ValueKey('nav-$i'),
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          setState(() => _tab = i);
-                        },
-                        child: SizedBox(
-                            height: 56,
-                            child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  AnimatedContainer(
-                                      duration:
-                                          const Duration(milliseconds: 180),
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 15, vertical: 4),
-                                      decoration: BoxDecoration(
-                                          color: i == _tab
-                                              ? t.primary.withValues(alpha: .10)
-                                              : Colors.transparent,
-                                          borderRadius:
-                                              BorderRadius.circular(10)),
-                                      child: Icon(icons[i],
-                                          size: 20,
-                                          color:
-                                              i == _tab ? t.primary : t.text3)),
-                                  const SizedBox(height: 4),
-                                  Text(labels[i],
-                                      style: TextStyle(
-                                          fontFamily: 'Inter',
-                                          fontFamilyFallback: const [
-                                            'sans-serif'
-                                          ],
-                                          fontSize: 10,
-                                          fontWeight: i == _tab
-                                              ? FontWeight.w700
-                                              : FontWeight.w500,
-                                          color:
-                                              i == _tab ? t.text1 : t.text4)),
-                                ])),
-                      )),
-                  ]))),
-        ),
+        bottomNavigationBar: AppNavigationBar(
+            index: _tab,
+            onChanged: (index) {
+              if (index == _tab) return;
+              HapticFeedback.selectionClick();
+              setState(() => _tab = index);
+            }),
       ),
     );
   }
 
-  void _showThemeSheet() {
-    HapticFeedback.mediumImpact();
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) {
-        final inh = ThemeInherited.of(ctx);
-        final t = inh.theme;
-        final cur = inh.current;
-        return Container(
-          decoration: BoxDecoration(
-            color: t.navbarBg,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 16, 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '主题选择',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: t.text1,
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => Navigator.pop(ctx),
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: t.border.withOpacity(0.5),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(Icons.close, size: 18, color: t.text3),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: AppTheme.values.map((m) {
-                        final mt = themes[m]!;
-                        final sel = m == cur;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: PressScale(
-                            onTap: () {
-                              inh.setTheme(m);
-                              Navigator.pop(ctx);
-                            },
-                            child: Container(
+  Widget _tabBody(int index, ThemeInherited inh) {
+    final mode = _pageModes[index];
+    if (mode == null) return const SizedBox.shrink();
+    return TickerMode(
+        enabled: _tab == index,
+        child: RepaintBoundary(
+            child: ThemeInherited(
+          current: mode,
+          theme: themes[mode]!,
+          setTheme: inh.setTheme,
+          child: Theme(data: RecompApp.themeFor(mode), child: _pages[index]),
+        )));
+  }
+
+  Future<void> _showThemeSheet() async {
+    final inh = ThemeInherited.of(context);
+    Future<dynamic>? closed;
+    final mode = await showModalBottomSheet<AppTheme>(
+        context: context,
+        useSafeArea: true,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) {
+          closed = ModalRoute.of(ctx)?.completed;
+          return SheetFrame(
+              title: '外观主题',
+              subtitle: '选择适合自己的配色',
+              icon: Icons.palette_outlined,
+              body: Column(mainAxisSize: MainAxisSize.min, children: [
+                for (final mode in AppTheme.values)
+                  Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: SelectionOption(
+                          key: ValueKey('theme-option-${mode.name}'),
+                          title: themes[mode]!.name,
+                          subtitle: mode == inh.current ? '当前主题' : null,
+                          leading: Container(
+                              width: 36,
+                              height: 36,
                               decoration: BoxDecoration(
-                                color:
-                                    sel ? mt.primary.withOpacity(0.06) : null,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: sel ? mt.primary : t.border,
-                                  width: sel ? 2 : 1,
-                                ),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 40,
-                                      height: 40,
+                                  color: themes[mode]!.bg,
+                                  border: Border.all(
+                                      color: themes[mode]!
+                                          .primary
+                                          .withValues(alpha: .2)),
+                                  borderRadius: BorderRadius.circular(11)),
+                              child: Center(
+                                  child: Container(
+                                      width: 18,
+                                      height: 18,
                                       decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [mt.primary, mt.accent],
-                                        ),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: sel
-                                          ? const Icon(
-                                              Icons.check,
-                                              color: Colors.white,
-                                              size: 20,
-                                            )
-                                          : null,
-                                    ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            mt.name,
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w700,
-                                              color: sel ? mt.primary : t.text1,
-                                            ),
-                                          ),
-                                          Text(
-                                            sel ? '当前使用中' : '点击切换',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              color: sel
-                                                  ? mt.primary.withOpacity(0.7)
-                                                  : t.text4,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+                                          color: themes[mode]!.primary,
+                                          borderRadius:
+                                              BorderRadius.circular(6))))),
+                          selected: mode == inh.current,
+                          onTap: () => Navigator.pop(ctx, mode))),
+              ]));
+        });
+    // Let the closing sheet finish before recoloring the visible page.
+    if (mode == null) return;
+    await closed;
+    if (mounted) await inh.setTheme(mode);
   }
 }
 

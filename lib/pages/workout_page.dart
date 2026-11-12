@@ -10,6 +10,7 @@ import '../services/app_signals.dart';
 import '../services/daily_workout_service.dart';
 import '../services/rest_timer_service.dart';
 import '../widgets/daily_date_bar.dart';
+import '../widgets/week_calendar.dart';
 import '../widgets/exercise_editor.dart';
 import '../widgets/exercise_picker.dart';
 import '../widgets/text_prompt.dart';
@@ -40,6 +41,7 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
   DateTime? _deadline;
   String _timerLabel = '';
   int _remaining = 0;
+  bool _visible = true;
 
   DailyWorkout get _session =>
       _sessions[dayKey(_date)] ?? DailyWorkout(date: dayKey(_date));
@@ -57,6 +59,15 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
     workoutPlanRevision.addListener(_reload);
     restTimerPreferenceRevision.addListener(_reload);
     _reload();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final visible = TickerMode.valuesOf(context).enabled;
+    final becameVisible = visible && !_visible;
+    _visible = visible;
+    if (becameVisible) _tick();
   }
 
   @override
@@ -253,11 +264,11 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
       _remaining = seconds;
       _timerLabel = '${_date.month}/${_date.day} · ${exercise.name}';
     });
-    _ticker = Timer.periodic(const Duration(milliseconds: 250), (_) => _tick());
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
   }
 
   void _tick() {
-    if (!mounted || _deadline == null) return;
+    if (!mounted || !_visible || _deadline == null) return;
     final remaining = restSecondsUntil(_deadline!, now: _now);
     if (remaining == _remaining) return;
     setState(() => _remaining = remaining);
@@ -310,8 +321,8 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
                   _remaining = restSecondsUntil(_deadline!, now: _now);
                 });
                 _ticker?.cancel();
-                _ticker = Timer.periodic(
-                    const Duration(milliseconds: 250), (_) => _tick());
+                _ticker =
+                    Timer.periodic(const Duration(seconds: 1), (_) => _tick());
               },
               child: const Text('+30s', style: TextStyle(fontSize: 12))),
           IconButton(
@@ -349,7 +360,6 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
     final theme = Theme.of(context);
     final color = theme.colorScheme.primary;
     final muted = theme.colorScheme.onSurface.withValues(alpha: .45);
-    final monday = _date.subtract(Duration(days: _date.weekday - 1));
     final progress = session.plannedSets == 0
         ? 0.0
         : session.completedSets / session.plannedSets;
@@ -365,62 +375,15 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
                     _date = date;
                     _followToday = date == dateOnly(_now);
                   })),
-          Row(children: [
-            for (var i = 0; i < 7; i++)
-              Expanded(child: Builder(builder: (context) {
-                final date = dateOnly(monday.add(Duration(days: i)));
-                final selected = date == _date;
-                final future = date.isAfter(dateOnly(_now));
-                return InkWell(
-                    borderRadius: BorderRadius.circular(13),
-                    onTap: future || _busy
-                        ? null
-                        : () => setState(() {
-                              _date = date;
-                              _followToday = date == dateOnly(_now);
-                            }),
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                          color: selected ? color : Colors.transparent,
-                          borderRadius: BorderRadius.circular(13)),
-                      child: Column(children: [
-                        Text(['一', '二', '三', '四', '五', '六', '日'][i],
-                            style: TextStyle(
-                                fontSize: 9,
-                                color: selected
-                                    ? theme.colorScheme.onPrimary
-                                        .withValues(alpha: .7)
-                                    : muted)),
-                        const SizedBox(height: 5),
-                        Text('${date.day}',
-                            style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: selected
-                                    ? theme.colorScheme.onPrimary
-                                    : future
-                                        ? muted.withValues(alpha: .35)
-                                        : theme.colorScheme.onSurface)),
-                        const SizedBox(height: 5),
-                        Container(
-                            width: 3,
-                            height: 3,
-                            decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color:
-                                    (_sessions[dayKey(date)]?.completedSets ??
-                                                0) >
-                                            0
-                                        ? (selected
-                                            ? theme.colorScheme.onPrimary
-                                            : color)
-                                        : Colors.transparent)),
-                      ]),
-                    ));
-              }))
-          ]),
+          WeekCalendar(
+              date: _date,
+              today: _now,
+              sessions: _sessions,
+              enabled: !_busy,
+              onChanged: (date) => setState(() {
+                    _date = date;
+                    _followToday = date == dateOnly(_now);
+                  })),
           const SizedBox(height: 14),
           Container(
               key: const Key('daily-suggestion'),

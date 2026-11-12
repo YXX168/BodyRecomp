@@ -1,12 +1,12 @@
 <div align="center">
   <img src="assets/branding/bodyrecomp-icon.png" alt="BodyRecomp 图标" width="112">
 
-# BodyRecomp｜自由组合的健身记录
+# 青阳｜自由组合的健身记录
 
 每天按实际情况搭建训练积木，用模板作参考，同时记录饮食和身体变化。Android 本地应用，无需注册。
 
 [![构建状态](https://github.com/YXX168/BodyRecomp/actions/workflows/build.yml/badge.svg)](https://github.com/YXX168/BodyRecomp/actions/workflows/build.yml)
-[![源码版本](https://img.shields.io/badge/源码-v7.0.0%2B82_预览-2563EB)](CHANGELOG.md)
+[![源码版本](https://img.shields.io/badge/源码-v7.0.0%2B83_预览-2563EB)](CHANGELOG.md)
 [![许可](https://img.shields.io/badge/许可-MIT-059669)](LICENSE)
 </div>
 
@@ -36,9 +36,9 @@
 
 ## 安卓预览与正式版
 
-当前源码是 7.0 重构预览，尚不表示已发布正式版。可在 [Actions](https://github.com/YXX168/BodyRecomp/actions) 的成功构建中下载调试附件（保存 14 天）；[Releases](https://github.com/YXX168/BodyRecomp/releases) 中的安装包请以各自标注版本为准。
+当前源码是 7.0 重构预览，尚不表示已发布正式版。可在 [Actions](https://github.com/YXX168/BodyRecomp/actions) 的成功构建中下载性能预览附件（保存 14 天）；[Releases](https://github.com/YXX168/BodyRecomp/releases) 中的安装包请以各自标注版本为准。
 
-预览 APK 使用包名 `com.body.recomp.preview`，显示为 **Body Recomp 预览**，可与旧正式版并存。两者数据独立，需要时先在旧版导出 JSON，再到预览版导入。正式包继续使用 `com.body.recomp` 和正式签名；不要为了安装调试包而卸载旧版。
+当前预览使用体积更小的性能构建。预览 APK 使用包名 `com.body.recomp.preview`，显示为 **青阳 预览**，可与旧正式版并存。两者数据独立，需要时先在旧版导出 JSON，再到预览版导入。正式应用显示名称为「青阳」，正式包继续使用 `com.body.recomp` 和正式签名；不要为了安装预览版而卸载旧版。
 
 ## 开发与验证
 
@@ -49,10 +49,10 @@ flutter pub get
 dart format --output=none --set-exit-if-changed lib test
 flutter analyze --no-fatal-infos
 flutter test
-flutter build apk --debug --target-platform android-arm64
+flutter build apk --profile --target-platform android-arm64
 ```
 
-正式构建使用 `flutter build apk --release --target-platform android-arm64`，必须提供现有正式签名配置。CI 在 PR 上验证格式、静态分析、测试和调试构建；版本标签触发正式签名校验与发布。
+正式构建使用 `flutter build apk --release --target-platform android-arm64`，必须提供现有正式签名配置。CI 在 PR 上验证格式、静态分析、测试和性能预览构建；版本标签触发正式签名校验与发布。
 
 ```text
 lib/
@@ -65,3 +65,5 @@ lib/
 ```
 
 本项目基于 [MIT License](LICENSE) 开源。
+
+应用图标使用浅杏粉、薄荷绿与奶油黄的简洁几何图形。源文件为 `assets/branding/qingyang-icon.svg`；安装 Pillow 后运行 `python3 tools/generate_launcher_icon.py` 可重建 Android 图标资源。

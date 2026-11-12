@@ -7,6 +7,7 @@ import '../widgets/exercise_editor.dart';
 import '../widgets/exercise_mark.dart';
 import '../widgets/exercise_picker.dart';
 import '../widgets/text_prompt.dart';
+import '../widgets/sheet_frame.dart';
 
 class TemplateManagerPage extends StatefulWidget {
   const TemplateManagerPage({super.key});
@@ -87,6 +88,123 @@ class _TemplateManagerPageState extends State<TemplateManagerPage> {
     }
   }
 
+  Future<void> _chooseDay(int day) async {
+    final value = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => SheetFrame(
+          title: '周${['一', '二', '三', '四', '五', '六', '日'][day]}安排',
+          subtitle: '只作当天参考，实际训练仍可自由组合',
+          icon: Icons.calendar_month_outlined,
+          body: Column(mainAxisSize: MainAxisSize.min, children: [
+            SelectionOption(
+                key: const ValueKey('schedule-option-rest'),
+                title: '休息 / 恢复',
+                subtitle: '给身体留出恢复时间',
+                leading: _restMark(ctx),
+                selected: _schedule[day].isEmpty,
+                onTap: () => Navigator.pop(ctx, '')),
+            for (final t in _templates!)
+              Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: SelectionOption(
+                      key: ValueKey('schedule-option-${t.id}'),
+                      title: t.name,
+                      subtitle: '${t.exercises.length} 个项目',
+                      leading: ExerciseMark(
+                          t.exercises.isEmpty ? '' : t.exercises.first.name,
+                          size: 36),
+                      selected: _schedule[day] == t.id,
+                      onTap: () => Navigator.pop(ctx, t.id))),
+          ])),
+    );
+    if (value != null && mounted && value != _schedule[day]) {
+      await _setDay(day, value);
+    }
+  }
+
+  Widget _restMark(BuildContext context) => Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: .07),
+          borderRadius: BorderRadius.circular(11)),
+      child: Icon(Icons.spa_outlined,
+          size: 18, color: Theme.of(context).colorScheme.primary));
+
+  Widget _weeklySchedule(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final muted = colors.onSurface.withValues(alpha: .5);
+    return Container(
+      decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: colors.onSurface.withValues(alpha: .07))),
+      clipBehavior: Clip.antiAlias,
+      child: Column(children: [
+        for (var day = 0; day < 7; day++) ...[
+          if (day > 0)
+            Divider(
+                height: 1,
+                indent: 54,
+                endIndent: 14,
+                color: colors.onSurface.withValues(alpha: .06)),
+          Builder(builder: (ctx) {
+            final matches = _templates!.where((t) => t.id == _schedule[day]);
+            final template = matches.isEmpty ? null : matches.first;
+            return Material(
+                color: Colors.transparent,
+                child: InkWell(
+                    key: ValueKey('schedule-day-$day'),
+                    onTap: _busy ? null : () => _chooseDay(day),
+                    child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 11),
+                        child: Row(children: [
+                          SizedBox(
+                              width: 40,
+                              child: Text(
+                                  '周${[
+                                    '一',
+                                    '二',
+                                    '三',
+                                    '四',
+                                    '五',
+                                    '六',
+                                    '日'
+                                  ][day]}',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: muted))),
+                          template == null
+                              ? _restMark(ctx)
+                              : ExerciseMark(
+                                  template.exercises.isEmpty
+                                      ? ''
+                                      : template.exercises.first.name,
+                                  size: 36),
+                          const SizedBox(width: 10),
+                          Expanded(
+                              child: Text(template?.name ?? '休息 / 恢复',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: template == null
+                                          ? muted
+                                          : colors.onSurface))),
+                          const SizedBox(width: 8),
+                          Icon(Icons.unfold_more_rounded,
+                              size: 17, color: muted),
+                        ]))));
+          }),
+        ]
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(title: const Text('训练模板')),
@@ -128,38 +246,8 @@ class _TemplateManagerPageState extends State<TemplateManagerPage> {
                     Text('按日期提示，不限制当天实际训练。',
                         style: TextStyle(
                             fontSize: 11, color: Theme.of(context).hintColor)),
-                    for (var day = 0; day < 7; day++)
-                      Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(children: [
-                            Text(
-                                '周${['一', '二', '三', '四', '五', '六', '日'][day]}'),
-                            const SizedBox(width: 16),
-                            Expanded(
-                                child: DropdownButton<String>(
-                                    isExpanded: true,
-                                    value: _templates!
-                                            .any((t) => t.id == _schedule[day])
-                                        ? _schedule[day]
-                                        : '',
-                                    items: [
-                                      const DropdownMenuItem(
-                                          value: '', child: Text('休息 / 恢复')),
-                                      for (final t in _templates!)
-                                        DropdownMenuItem(
-                                            value: t.id,
-                                            child: Text(t.name,
-                                                overflow:
-                                                    TextOverflow.ellipsis))
-                                    ],
-                                    onChanged: _busy
-                                        ? null
-                                        : (value) {
-                                            if (value != null) {
-                                              _setDay(day, value);
-                                            }
-                                          })),
-                          ])),
+                    const SizedBox(height: 14),
+                    _weeklySchedule(context),
                   ]),
       );
 }
