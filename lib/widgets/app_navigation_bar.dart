@@ -16,7 +16,7 @@ class AppNavigationBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.8);
+    final labelHeight = MediaQuery.textScalerOf(context).scale(10) * 1.5;
     return DecoratedBox(
       decoration: BoxDecoration(
           color: colors.surface,
@@ -38,7 +38,7 @@ class AppNavigationBar extends StatelessWidget {
                     borderRadius: BorderRadius.circular(14),
                     onTap: () => onChanged(i),
                     child: SizedBox(
-                        height: 56 + (scale - 1) * 12,
+                        height: 41 + labelHeight,
                         child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -63,6 +63,7 @@ class AppNavigationBar extends StatelessWidget {
                               Text(labels[i],
                                   style: TextStyle(
                                       fontSize: 10,
+                                      height: 1.5,
                                       fontWeight: i == index
                                           ? FontWeight.w700
                                           : FontWeight.w500,

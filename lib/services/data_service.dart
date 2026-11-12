@@ -7,7 +7,7 @@ import 'daily_workout_service.dart';
 import 'nutrition_service.dart';
 
 const int currentSchemaVersion = 3;
-const String appDataVersion = '7.0.0';
+const String appDataVersion = '7.0.1';
 const String profileKey = 'recomp_profile_v6';
 const String weightHistoryKey = 'recomp_weight_history_v6';
 const String measurementHistoryKey = 'recomp_measurements_v6';
