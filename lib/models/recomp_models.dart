@@ -37,15 +37,41 @@ class UserProfile {
         'gender': gender,
       };
 
-  factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
-        birthday: json['birthday'] as String? ?? '',
-        heightCm: (json['heightCm'] as num?)?.toDouble() ?? 176.0,
-        weightKg: (json['weightKg'] as num?)?.toDouble() ?? 72.5,
-        gender: json['gender'] as String? ?? 'male',
-      );
+  factory UserProfile.fromJson(Map<String, dynamic> json) {
+    final profile = UserProfile(
+      birthday: json['birthday'] as String? ?? '',
+      heightCm: (json['heightCm'] as num?)?.toDouble() ?? 176.0,
+      weightKg: (json['weightKg'] as num?)?.toDouble() ?? 72.5,
+      gender: json['gender'] as String? ?? 'male',
+    );
+    _requirePositive(profile.heightCm);
+    _requirePositive(profile.weightKg);
+    if (profile.birthday.isNotEmpty) {
+      final birth = _recordDate(profile.birthday);
+      if (birth.isAfter(dateOnly(DateTime.now()))) {
+        throw const FormatException('生日不能在未来');
+      }
+    }
+    return profile;
+  }
 }
 
 DateTime dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
+
+void _requirePositive(double value) {
+  if (!value.isFinite || value <= 0) {
+    throw const FormatException('身体数据必须是大于 0 的有效数字');
+  }
+}
+
+DateTime _recordDate(String raw) {
+  final parsed = DateTime.parse(raw);
+  if (raw.length < 10 ||
+      parsed.toIso8601String().substring(0, 10) != raw.substring(0, 10)) {
+    throw const FormatException('日期无效');
+  }
+  return parsed;
+}
 
 class WeightEntry {
   final DateTime date;
@@ -58,10 +84,12 @@ class WeightEntry {
         'w': weightKg,
       };
 
-  factory WeightEntry.fromJson(Map<String, dynamic> json) => WeightEntry(
-        date: DateTime.parse(json['d'] as String),
-        weightKg: (json['w'] as num).toDouble(),
-      );
+  factory WeightEntry.fromJson(Map<String, dynamic> json) {
+    final weight = (json['w'] as num).toDouble();
+    _requirePositive(weight);
+    return WeightEntry(
+        date: _recordDate(json['d'] as String), weightKg: weight);
+  }
 }
 
 List<WeightEntry> upsertWeightEntry(
@@ -89,13 +117,15 @@ class BodyMeasurement {
         'v': values,
       };
 
-  factory BodyMeasurement.fromJson(Map<String, dynamic> json) =>
-      BodyMeasurement(
-        date: DateTime.parse(json['d'] as String),
-        values: (json['v'] as Map).map(
-          (key, value) => MapEntry(key as String, (value as num).toDouble()),
-        ),
-      );
+  factory BodyMeasurement.fromJson(Map<String, dynamic> json) {
+    final values = (json['v'] as Map).map(
+      (key, value) => MapEntry(key as String, (value as num).toDouble()),
+    );
+    if (values.isEmpty) throw const FormatException('围度记录不能为空');
+    values.values.forEach(_requirePositive);
+    return BodyMeasurement(
+        date: _recordDate(json['d'] as String), values: values);
+  }
 }
 
 List<BodyMeasurement> upsertMeasurement(

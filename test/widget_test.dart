@@ -1,328 +1,286 @@
 import 'dart:convert';
-
+import 'package:body_recomp/main.dart';
+import 'package:body_recomp/data/workout_templates.dart';
+import 'package:body_recomp/models/daily_workout.dart';
+import 'package:body_recomp/pages/workout_page.dart';
+import 'package:body_recomp/pages/nutrition_page.dart';
+import 'package:body_recomp/pages/template_manager_page.dart';
+import 'package:body_recomp/services/daily_workout_service.dart';
+import 'package:body_recomp/services/rest_timer_service.dart';
+import 'package:body_recomp/services/nutrition_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:body_recomp/main.dart';
-import 'package:body_recomp/services/history_service.dart';
-import 'package:body_recomp/services/rest_timer_service.dart';
-
 void main() {
-  Future<void> pumpApp(
-    WidgetTester tester, {
-    Size logicalSize = const Size(360, 800),
-    double devicePixelRatio = 3,
-    double textScaleFactor = 1,
-  }) async {
-    tester.view.physicalSize = logicalSize * devicePixelRatio;
-    tester.view.devicePixelRatio = devicePixelRatio;
-    tester.platformDispatcher.textScaleFactorTestValue = textScaleFactor;
+  final today = DateTime(2026, 11, 12, 19);
+  DailyWorkout seeded({int done = 0}) =>
+      DailyWorkout(date: dayKey(today), blocks: [
+        WorkoutBlock(
+            id: 'bench',
+            exercise: defaultTemplates.first.exercises.first,
+            completedSets: done)
+      ]);
+  void seed(DailyWorkout session) => SharedPreferences.setMockInitialValues({
+        dailyWorkoutsKey: jsonEncode({session.date: session.toJson()})
+      });
+  Future<void> pump(WidgetTester tester, Widget page,
+      {Size size = const Size(390, 844), double scale = 1}) async {
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = scale;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-    await tester.pumpWidget(const ThemeState(child: RecompApp()));
-    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pumpWidget(MaterialApp(
+        theme: ThemeData(useMaterial3: true), home: Scaffold(body: page)));
+    await tester.pumpAndSettle();
   }
 
-  setUp(() {
-    SharedPreferences.setMockInitialValues({
-      'recomp_done_v6_week': isoWeekNumber(DateTime.now()),
-      'recomp_done_v6_year': isoWeekYear(DateTime.now()),
-      'recomp_done_v6': '{}',
-    });
-  });
-
-  testWidgets('App smoke test', (WidgetTester tester) async {
-    await pumpApp(tester);
-    expect(find.byType(MaterialApp), findsOneWidget);
-  });
-
-  testWidgets('training UI fits a compact phone with larger text', (
-    WidgetTester tester,
-  ) async {
-    await pumpApp(
-      tester,
-      logicalSize: const Size(320, 568),
-      devicePixelRatio: 2,
-      textScaleFactor: 1.3,
-    );
-    await tester.tap(find.text('一'));
+  Future<void> tapVisible(WidgetTester tester, Finder finder) async {
+    if (finder.evaluate().isEmpty) {
+      await tester.scrollUntilVisible(finder, 180);
+    }
+    await tester.ensureVisible(finder);
     await tester.pumpAndSettle();
-    final firstCard = find.byKey(const ValueKey('exercise_card_0_0'));
-    expect(firstCard, findsOneWidget);
+    await tester.tap(finder);
+    await tester.pumpAndSettle();
+  }
 
-    await tester.ensureVisible(firstCard);
-    await tester.pump(const Duration(milliseconds: 250));
-    await tester.tap(firstCard);
-    await tester.pump(const Duration(milliseconds: 350));
-    expect(find.byKey(const Key('rest-timer-panel')), findsOneWidget);
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  testWidgets('reference remains separate and supports partial selection',
+      (tester) async {
+    await pump(tester, WorkoutPage(now: () => today));
+    expect(find.text('腿 · 核心与肩补强'), findsOneWidget);
+    expect(find.byKey(const ValueKey('workout-block-0')), findsNothing);
+    await tapVisible(tester, find.byKey(const Key('use-suggestion')));
+    await tester.tap(find.byKey(const ValueKey('pick_0_0')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('add-picked-exercises')));
+    await tester.pumpAndSettle();
+    final session = (await loadDailyWorkouts())[dayKey(today)]!;
+    expect(session.blocks.single.exercise.name, '倒蹬机');
+    expect(session.completedSets, 0);
+    expect(find.byKey(const Key('rest-timer-panel')), findsNothing);
+  });
+
+  testWidgets('title taps never log sets; explicit completion and undo persist',
+      (tester) async {
+    seed(seeded());
+    await pump(tester, WorkoutPage(now: () => today));
+    await tapVisible(tester, find.text('平板卧推'));
+    expect((await loadDailyWorkouts())[dayKey(today)]!.completedSets, 0);
+    await tapVisible(tester, find.byKey(const ValueKey('complete-set-0')));
+    expect((await loadDailyWorkouts())[dayKey(today)]!.completedSets, 1);
+    expect(find.byKey(const Key('rest-timer-panel')), findsNothing);
+    await tapVisible(tester, find.byKey(const ValueKey('undo-set-0')));
+    expect((await loadDailyWorkouts())[dayKey(today)]!.completedSets, 0);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('tapping an exercise card advances one set at a time', (
-    WidgetTester tester,
-  ) async {
-    await pumpApp(tester);
+  testWidgets(
+      'mixing blocks from different templates preserves earlier progress',
+      (tester) async {
+    seed(seeded(done: 2));
+    await pump(tester, WorkoutPage(now: () => today));
+    await tapVisible(tester, find.byKey(const Key('choose-blocks')));
+    await tester.tap(find.byKey(const ValueKey('pick_0_0')));
+    await tester.tap(find.byKey(const ValueKey('picker-template-pull')));
     await tester.pumpAndSettle();
-
-    final dayIndex = DateTime.now().weekday - 1;
-    if (workoutDays[dayIndex].exercises.isEmpty) {
-      final mondayTab = find.text('一');
-      expect(mondayTab, findsOneWidget);
-      await tester.tap(mondayTab);
-      await tester.pumpAndSettle();
-    }
-    final activeDayIndex =
-        workoutDays[dayIndex].exercises.isEmpty ? 0 : dayIndex;
-    final exerciseTotal = workoutDays[activeDayIndex].exercises.length;
-    final firstCard = find.byKey(ValueKey('exercise_card_${activeDayIndex}_0'));
-    final secondCard =
-        find.byKey(ValueKey('exercise_card_${activeDayIndex}_1'));
-    expect(firstCard, findsOneWidget);
-    expect(secondCard, findsOneWidget);
-    expect(find.text('0/$exerciseTotal'), findsOneWidget);
-    final initialFirstRect = tester.getRect(firstCard);
-    final initialSecondRect = tester.getRect(secondCard);
-
-    await tester.tap(firstCard);
+    await tester.tap(find.byKey(const ValueKey('pick_1_0')));
+    await tester.tap(find.byKey(const Key('add-picked-exercises')));
     await tester.pumpAndSettle();
-
-    final firstExercise = workoutDays[activeDayIndex].exercises.first;
-    expect(find.text('0/$exerciseTotal'), findsOneWidget);
-    expect(find.text('1/${firstExercise.sets} 组完成 · 点击继续'), findsOneWidget);
-    expect(
-      find.descendant(
-        of: firstCard,
-        matching: find.text(workoutDays[activeDayIndex].exercises.first.note!),
-      ),
-      findsOneWidget,
-    );
-    final preferences = await SharedPreferences.getInstance();
-    expect(
-      preferences.getString('recomp_done_v6'),
-      contains('${activeDayIndex}_0'),
-    );
-
-    for (var set = 1; set < firstExercise.sets; set++) {
-      await tester.tap(firstCard);
-      await tester.pump(const Duration(milliseconds: 350));
-    }
-    expect(find.text('1/$exerciseTotal'), findsOneWidget);
-    expect(
-      find.text('${firstExercise.sets}/${firstExercise.sets} 组已完成'),
-      findsOneWidget,
-    );
-    expect(tester.getRect(firstCard), initialFirstRect);
-    expect(tester.getRect(secondCard), initialSecondRect);
-
-    final saved = jsonDecode(
-      (await SharedPreferences.getInstance()).getString('recomp_done_v6')!,
-    ) as Map<String, dynamic>;
-    expect(saved['${activeDayIndex}_0'], isTrue);
-
-    await tester.tap(firstCard);
-    await tester.pump(const Duration(milliseconds: 250));
-    expect(find.text('1/$exerciseTotal'), findsOneWidget);
-
-    await tester.tap(
-      find.byKey(ValueKey('exercise_reset_${activeDayIndex}_0')),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('0/$exerciseTotal'), findsOneWidget);
+    final blocks = (await loadDailyWorkouts())[dayKey(today)]!.blocks;
+    expect(blocks, hasLength(3));
+    expect(blocks.first.completedSets, 2);
+    expect(blocks.last.exercise.name, '宽握高位下拉');
   });
 
   testWidgets(
-    'switching workout day uses a page transition and staged entries',
-    (WidgetTester tester) async {
-      await pumpApp(tester);
-
-      expect(find.byType(AnimatedSwitcher), findsWidgets);
-      expect(find.byType(FadeScaleEntry), findsWidgets);
-
-      final currentDay = DateTime.now().weekday - 1;
-      final nextDay = (currentDay + 1) % workoutDays.length;
-      await tester.tap(find.text(['一', '二', '三', '四', '五', '六', '日'][nextDay]));
-      await tester.pump(const Duration(milliseconds: 100));
-
-      expect(find.byType(SlideTransition), findsWidgets);
-    },
-  );
-
-  testWidgets('workout rest timer starts after a set, extends and dismisses', (
-    WidgetTester tester,
-  ) async {
-    await pumpApp(tester);
-
-    await tester.tap(find.text('一'));
+      'library search keeps selection across templates and fits keyboard',
+      (tester) async {
+    await pump(tester, WorkoutPage(now: () => today),
+        size: const Size(320, 568), scale: 1.3);
+    await tapVisible(tester, find.byKey(const Key('choose-blocks')));
+    await tester.enterText(find.byKey(const Key('exercise-search')), '侧平举');
+    tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+    addTearDown(tester.view.resetViewInsets);
     await tester.pumpAndSettle();
-    final firstCard = find.byKey(const ValueKey('exercise_card_0_0'));
-    await tester.tap(firstCard);
-    await tester.pump(const Duration(milliseconds: 250));
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const ValueKey('pick_0_3')));
+    await tester.pumpAndSettle();
+    tester.view.resetViewInsets();
+    await tester.enterText(find.byKey(const Key('exercise-search')), '下拉');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('pick_1_0')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('add-picked-exercises')));
+    await tester.pumpAndSettle();
+    final blocks = (await loadDailyWorkouts())[dayKey(today)]!.blocks;
+    expect(blocks.map((b) => b.exercise.name), ['哑铃侧平举', '宽握高位下拉']);
+    expect(tester.takeException(), isNull);
+  });
 
-    expect(find.byKey(const Key('rest-timer-panel')), findsOneWidget);
+  testWidgets('timer start, expiry and dismissal never shift exercise cards',
+      (tester) async {
+    seed(seeded());
+    var now = today;
+    await pump(tester, WorkoutPage(now: () => now),
+        size: const Size(320, 568), scale: 1.3);
+    final block = find.byKey(const ValueKey('workout-block-0'));
+    await tester.ensureVisible(block);
+    await tester.pumpAndSettle();
+    final before = tester.getRect(block);
+    final pill = tester.getRect(find.byKey(const Key('rest-timer-pill')));
+    await tester.tap(find.byKey(const ValueKey('start-rest-0')));
+    await tester.pumpAndSettle();
+    expect(tester.getRect(block), before);
+    expect(tester.getRect(find.byKey(const Key('rest-timer-pill'))), pill);
+    expect(pill.bottom, lessThanOrEqualTo(tester.getTopLeft(block).dy));
+    now = now.add(const Duration(minutes: 2));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('rest-timer-panel')), findsNothing);
+    expect(tester.getRect(block), before);
+    await tester.tap(find.byKey(const ValueKey('start-rest-0')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('rest-timer-dismiss')));
+    await tester.pumpAndSettle();
+    expect(tester.getRect(block), before);
+    expect(tester.getRect(find.byKey(const Key('rest-timer-pill'))), pill);
+    expect((await loadDailyWorkouts())[dayKey(today)]!.completedSets, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'manual countdown fits compact phone with large text without overlay',
+      (tester) async {
+    seed(seeded());
+    var now = today;
+    await pump(tester, WorkoutPage(now: () => now),
+        size: const Size(320, 568), scale: 1.3);
+    await tapVisible(tester, find.byKey(const ValueKey('start-rest-0')));
+    final timer = find.byKey(const Key('rest-timer-panel'));
+    await tester.ensureVisible(timer);
+    await tester.pumpAndSettle();
     expect(find.text('1:30'), findsOneWidget);
-
-    tester
-        .widget<IconButton>(find.byKey(const Key('rest-timer-add')))
-        .onPressed!();
-    await tester.pump();
+    expect(find.ancestor(of: timer, matching: find.byType(Positioned)),
+        findsNothing);
+    await tapVisible(tester, find.byKey(const Key('rest-timer-add')));
     expect(find.text('2:00'), findsOneWidget);
-
-    tester
-        .widget<IconButton>(find.byKey(const Key('rest-timer-dismiss')))
-        .onPressed!();
+    now = now.add(const Duration(minutes: 3));
+    await tester.pump(const Duration(seconds: 1));
     await tester.pumpAndSettle();
+    expect(timer, findsNothing);
+    expect((await loadDailyWorkouts())[dayKey(today)]!.completedSets, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('auto timer is opt in and stops starting after final set',
+      (tester) async {
+    seed(seeded(done: 2));
+    await saveAutoRestTimer(true);
+    await pump(tester, WorkoutPage(now: () => today));
+    await tapVisible(tester, find.byKey(const ValueKey('complete-set-0')));
+    expect(find.byKey(const Key('rest-timer-panel')), findsOneWidget);
+    await tapVisible(tester, find.byKey(const Key('rest-timer-dismiss')));
+    await tapVisible(tester, find.byKey(const ValueKey('complete-set-0')));
     expect(find.byKey(const Key('rest-timer-panel')), findsNothing);
+    expect((await loadDailyWorkouts())[dayKey(today)]!.completedSets, 4);
   });
 
-  testWidgets('rest timer overlay never moves exercise tap targets', (
-    WidgetTester tester,
-  ) async {
-    await pumpApp(tester);
-    await tester.tap(find.text('一'));
-    await tester.pumpAndSettle();
-
-    final firstCard = find.byKey(const ValueKey('exercise_card_0_0'));
-    final secondCard = find.byKey(const ValueKey('exercise_card_0_1'));
-    final firstRect = tester.getRect(firstCard);
-    final secondRect = tester.getRect(secondCard);
-
-    await tester.tapAt(firstRect.center);
-    await tester.pump(const Duration(milliseconds: 350));
-
-    expect(find.byKey(const Key('rest-timer-panel')), findsOneWidget);
-    expect(tester.getRect(firstCard), firstRect);
-    expect(tester.getRect(secondCard), secondRect);
-
-    await tester.tapAt(firstRect.center);
-    await tester.pump(const Duration(milliseconds: 250));
-    expect(find.text('2/4 组完成 · 点击继续'), findsOneWidget);
-    expect(
-      find.descendant(
-        of: secondCard,
-        matching: find.text('点击卡片完成第 1 组'),
-      ),
-      findsOneWidget,
-    );
+  testWidgets(
+      'backdated actual training is independent from rest-day suggestion',
+      (tester) async {
+    final yesterday = today.subtract(const Duration(days: 1));
+    seed(DailyWorkout(date: dayKey(yesterday), blocks: seeded().blocks));
+    await saveAutoRestTimer(true);
+    await pump(tester, WorkoutPage(now: () => today));
+    await tapVisible(tester, find.byKey(const Key('previous-date')));
+    expect(find.text('休息 / 恢复'), findsOneWidget);
+    await tapVisible(tester, find.byKey(const ValueKey('complete-set-0')));
+    expect(find.byKey(const Key('rest-timer-panel')), findsNothing);
+    await tapVisible(tester, find.byKey(const Key('next-date')));
+    expect(find.byKey(const ValueKey('workout-block-0')), findsNothing);
+    expect((await loadDailyWorkouts())[dayKey(yesterday)]!.completedSets, 1);
   });
 
-  testWidgets('manual timer button does not complete a set', (
-    WidgetTester tester,
-  ) async {
-    await pumpApp(tester);
-    await tester.tap(find.text('一'));
+  testWidgets('removal undo restores stable block identity and progress',
+      (tester) async {
+    seed(seeded(done: 2));
+    await pump(tester, WorkoutPage(now: () => today));
+    await tapVisible(tester, find.byKey(const ValueKey('block-menu-0')));
+    await tester.tap(find.text('移除项目（可撤销）'));
     await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const ValueKey('exercise_timer_0_0')));
-    await tester.pump(const Duration(milliseconds: 250));
-
-    expect(find.byKey(const Key('rest-timer-panel')), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('exercise_card_0_0')),
-        matching: find.text('点击卡片完成第 1 组'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      (await SharedPreferences.getInstance()).getString('recomp_done_v6'),
-      '{}',
-    );
+    expect((await loadDailyWorkouts())[dayKey(today)]!.blocks, isEmpty);
+    await tester.tap(find.text('撤销'));
+    await tester.pumpAndSettle();
+    final block = (await loadDailyWorkouts())[dayKey(today)]!.blocks.single;
+    expect(block.id, 'bench');
+    expect(block.completedSets, 2);
   });
 
-  testWidgets('timer and selected day survive bottom navigation changes', (
-    WidgetTester tester,
-  ) async {
-    await pumpApp(tester);
-    await tester.tap(find.text('一'));
+  testWidgets('custom templates validate set counts and save their projects',
+      (tester) async {
+    await pump(tester, const TemplateManagerPage());
+    await tapVisible(tester, find.text('新建模板'));
+    await tapVisible(tester, find.text('自定义项目'));
+    await tester.enterText(find.byKey(const Key('exercise-name')), '自由组合项目');
+    await tester.enterText(find.byKey(const Key('exercise-sets')), '0');
+    await tester.tap(find.text('保存').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('exercise_timer_0_0')));
-    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('请输入 1–100 组'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('exercise-sets')), '3');
+    await tester.tap(find.text('保存').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    expect((await loadWorkoutTemplates()).last.exercises.single.name, '自由组合项目');
+    expect(
+        await loadWeeklySchedule(), ['push', 'pull', '', 'legs', '', '', '']);
+  });
 
+  testWidgets('meal references are not logged until explicitly saved',
+      (tester) async {
+    await pump(tester, const NutritionPage());
+    expect(find.text('已记录 0 餐'), findsOneWidget);
+    await tapVisible(tester, find.byKey(const ValueKey('edit-meal-breakfast')));
+    await tester.enterText(
+        find.byKey(const Key('meal-actual-input')), '2 个鸡蛋 + 牛奶');
+    await tester.enterText(find.byKey(const Key('meal-calories-input')), 'NaN');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    expect(find.text('请输入非负数字，或留空'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('meal-calories-input')), '320');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    expect((await loadMeals()).values.single.actual, '2 个鸡蛋 + 牛奶');
+    await tester.scrollUntilVisible(find.text('已记录 1 餐'), -180);
+    expect(find.text('已记录 1 餐'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'tab navigation preserves timer and refreshes actual-workout statistics',
+      (tester) async {
+    seed(DailyWorkout(date: dayKey(DateTime.now()), blocks: seeded().blocks));
+    await tester.pumpWidget(const ThemeState(child: RecompApp()));
+    await tester.pumpAndSettle();
+    await tapVisible(tester, find.byKey(const ValueKey('complete-set-0')));
+    await tapVisible(tester, find.byKey(const ValueKey('start-rest-0')));
     await tester.tap(find.text('饮食'));
-    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('训练'));
-    await tester.pump(const Duration(milliseconds: 350));
-
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('rest-timer-panel')), findsOneWidget);
-    expect(find.byKey(const ValueKey('exercise_card_0_0')), findsOneWidget);
-    expect(find.text('1:30'), findsOneWidget);
-  });
-
-  testWidgets('auto rest preference updates the preserved workout page', (
-    WidgetTester tester,
-  ) async {
-    await pumpApp(tester);
-    await tester.tap(find.text('一'));
-    await tester.pumpAndSettle();
-
-    await saveAutoRestTimer(false);
-    restTimerPreferenceRevision.value++;
-    await tester.pump(const Duration(milliseconds: 250));
-    await tester.tap(find.byKey(const ValueKey('exercise_card_0_0')));
-    await tester.pump(const Duration(milliseconds: 350));
-    expect(find.byKey(const Key('rest-timer-panel')), findsNothing);
-  });
-
-  testWidgets('record page refreshes after workout progress changes', (
-    WidgetTester tester,
-  ) async {
-    await pumpApp(tester);
-    final now = DateTime.now();
-    final weekStart = startOfIsoWeek(now);
-    final dayIndex =
-        List<int>.generate(workoutDays.length, (index) => index).firstWhere(
-      (index) =>
-          workoutDays[index].exercises.isNotEmpty &&
-          weekStart.add(Duration(days: index)).month == now.month,
-    );
-    await tester.tap(find.text(['一', '二', '三', '四', '五', '六', '日'][dayIndex]));
-    await tester.pumpAndSettle();
-    final firstCard = find.byKey(ValueKey('exercise_card_${dayIndex}_0'));
-
-    for (var set = 0; set < workoutDays[dayIndex].exercises.first.sets; set++) {
-      await tester.tap(firstCard);
-      await tester.pump(const Duration(milliseconds: 350));
-    }
-
-    await tester.tap(find.text('记录'));
+    await tester.tap(find.byKey(const ValueKey('nav-2')));
     await tester.pumpAndSettle();
     expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('record-stat-完成动作')),
-        matching: find.text('1'),
-      ),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('finishing the last set does not start another rest timer', (
-    WidgetTester tester,
-  ) async {
-    await pumpApp(tester);
-
-    await tester.tap(find.text('一'));
-    await tester.pumpAndSettle();
-    final firstCard = find.byKey(const ValueKey('exercise_card_0_0'));
-    final sets = workoutDays.first.exercises.first.sets;
-
-    for (var set = 0; set < sets; set++) {
-      await tester.tap(firstCard);
-      await tester.pump(const Duration(milliseconds: 250));
-      if (set < sets - 1) {
-        expect(find.byKey(const Key('rest-timer-panel')), findsOneWidget);
-        tester
-            .widget<IconButton>(find.byKey(const Key('rest-timer-dismiss')))
-            .onPressed!();
-        await tester.pumpAndSettle();
-      }
-    }
-
-    expect(find.byKey(const Key('rest-timer-panel')), findsNothing);
-    expect(
-      find.text('1/${workoutDays.first.exercises.length}'),
-      findsOneWidget,
-    );
+        find.descendant(
+            of: find.byKey(const ValueKey('record-stat-已练项目')),
+            matching: find.text('1')),
+        findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
