@@ -1,14 +1,16 @@
 <div align="center">
-  <img src="assets/branding/bodyrecomp-icon.png" alt="BodyRecomp 图标" width="112">
+  <img src="assets/branding/bodyrecomp-icon.png" alt="青阳图标" width="112">
 
 # 青阳｜自由组合的健身记录
 
 每天按实际情况搭建训练积木，用模板作参考，同时记录饮食和身体变化。Android 本地应用，无需注册。
 
 [![构建状态](https://github.com/YXX168/BodyRecomp/actions/workflows/build.yml/badge.svg)](https://github.com/YXX168/BodyRecomp/actions/workflows/build.yml)
-[![源码版本](https://img.shields.io/badge/源码-v7.0.0%2B87_预览-2563EB)](CHANGELOG.md)
+[![正式版](https://img.shields.io/github/v/release/YXX168/BodyRecomp?label=正式版&color=287454)](https://github.com/YXX168/BodyRecomp/releases/latest)
 [![许可](https://img.shields.io/badge/许可-MIT-059669)](LICENSE)
 </div>
+
+[下载正式版 APK](https://github.com/YXX168/BodyRecomp/releases/latest) · [更新记录](CHANGELOG.md) · [反馈问题](https://github.com/YXX168/BodyRecomp/issues/new/choose)
 
 ## 每天怎么用
 
@@ -22,6 +24,8 @@
 组间计时默认手动启动，计时期间显示在「青阳」旁的顶部药丸里；空闲、手动结束或归零后隐藏。出现与消失使用淡入淡出和轻微缩放，不挤动动作列表，计时每秒刷新不会重播动画。可增加 30 秒或结束，也可在设置中开启完成一组后自动计时。补记过去日期与撤销操作不会自动启动计时。切换训练、饮食、趋势、我的时继续计时；应用进入后台后暂停界面刷新，返回前台按截止时间校准。进程退出后不恢复，也不提供后台通知。
 
 日期使用轻量文字入口，点击后再打开日历，主页面不展开整周日期。可前后切换记录日期，查看历史后可一键回到今天，不允许记录未来日期。
+
+训练与饮食的日期滚动位置分别保留，切换主页面保留已选日期与展开状态。
 
 ## 饮食与身体数据
 
@@ -39,11 +43,15 @@
 
 卸载或清除应用数据前，请先导出备份。新备份不能导入仅支持旧 schema 的版本。
 
-## 安卓预览与正式版
+## 下载与升级
 
-当前源码是 7.0 重构预览，尚不表示已发布正式版。可在 [Actions](https://github.com/YXX168/BodyRecomp/actions) 的成功构建中下载性能预览附件（保存 14 天）；[Releases](https://github.com/YXX168/BodyRecomp/releases) 中的安装包请以各自标注版本为准。
+当前正式版为 **7.0.0（88）**，适用于 Android 7.0 及以上 ARM64 设备。从 [最新发布页](https://github.com/YXX168/BodyRecomp/releases/latest) 下载 `Qingyang-v7.0.0-arm64.apk`；同页附 SHA-256 校验文件。
 
-当前预览使用体积更小的性能构建。预览 APK 使用包名 `com.body.recomp.preview`，显示为 **青阳 预览**，可与旧正式版并存。两者数据独立，需要时先在旧版导出 JSON，再到预览版导入。正式应用显示名称为「青阳」，正式包继续使用 `com.body.recomp` 和正式签名；不要为了安装预览版而卸载旧版。
+正式应用显示为「青阳」，包名 `com.body.recomp`，沿用原正式签名，可以覆盖旧正式版。升级前先导出 JSON 备份，升级后会自动迁移可还原的旧记录。
+
+此前的「青阳 预览」使用独立包名 `com.body.recomp.preview`，与正式版的数据互不相通。请先从预览版导出 JSON，再到正式版导入；核对记录后再移除预览版。
+
+发布页保留当前正式版和上一正式版供回退；更早版本源码与历史更新仍可通过标签和 Git 历史查看。新版备份不能导入旧版，回退前应保留旧版备份。
 
 ## 开发与验证
 
@@ -57,7 +65,7 @@ flutter test
 flutter build apk --profile --target-platform android-arm64
 ```
 
-正式构建使用 `flutter build apk --release --target-platform android-arm64`，必须提供现有正式签名配置。CI 在 PR 上验证格式、静态分析、测试和性能预览构建；版本标签触发正式签名校验与发布。
+正式构建使用 `flutter build apk --release --target-platform android-arm64`，必须提供现有正式签名配置。CI 在 PR 上验证格式、静态分析、测试和性能预览构建。版本标签，或在 main 上手动填写与源码一致的发布标签，会触发正式签名校验与发布；发布文案维护在 `docs/releases/`。
 
 ```text
 lib/

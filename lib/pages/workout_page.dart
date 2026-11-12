@@ -303,7 +303,7 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
                 child: RestTimerPill(controller: _rest))),
       Expanded(
           child: ListView(
-              key: const PageStorageKey('daily-workout-scroll'),
+              key: PageStorageKey('daily-workout-scroll-${dayKey(_date)}'),
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
               children: [
             DailyDateBar(
@@ -460,6 +460,7 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
                   ])),
             for (var i = 0; i < session.blocks.length; i++)
               Padding(
+                  key: ValueKey('${session.date}-${session.blocks[i].id}'),
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _blockCard(session.blocks[i], i)),
             const SizedBox(height: 6),

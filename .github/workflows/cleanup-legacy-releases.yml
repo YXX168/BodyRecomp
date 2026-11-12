@@ -1,0 +1,38 @@
+name: 整理旧版发布附件
+
+on:
+  workflow_dispatch:
+    inputs:
+      delete_legacy:
+        description: '删除 6.9.0 及更早的 15 个旧发布；保留标签、源码、7.0.0 与 6.10.0'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      DELETE_LEGACY: ${{ inputs.delete_legacy }}
+    steps:
+      - name: Verify current release before pruning
+        run: |
+          gh release view v7.0.0 --json isDraft,isPrerelease,assets > current.json
+          jq -e '.isDraft == false and .isPrerelease == false and ([.assets[].name] | index("Qingyang-v7.0.0-arm64.apk") != null and index("Qingyang-v7.0.0-arm64.apk.sha256") != null)' current.json
+          gh release view v6.10.0 >/dev/null
+      - name: List or delete the approved legacy releases
+        run: |
+          for tag in v6.9.0 v6.8.3 v6.8.2 v6.8.1 v6.8.0 v6.7.1 v6.7.0 v6.6.1 v6.5.1 v6.5.0 v6.4.3 v6.4.2 v6.4.1 v6.4.0 v6.2.0; do
+            if gh release view "$tag" >/dev/null 2>&1; then
+              echo "$tag" >> "$GITHUB_STEP_SUMMARY"
+              if [ "$DELETE_LEGACY" = 'true' ]; then
+                gh release delete "$tag" --yes
+              fi
+            fi
+          done
+          gh release list --limit 100

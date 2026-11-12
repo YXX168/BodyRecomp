@@ -159,6 +159,7 @@ class _NutritionPageState extends State<NutritionPage>
       Color(0xFF9984A4)
     ];
     return ListView(
+        key: PageStorageKey('nutrition-scroll-${dayKey(_date)}'),
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
         children: [
           DailyDateBar(
@@ -169,7 +170,7 @@ class _NutritionPageState extends State<NutritionPage>
                     _date = date;
                     _followToday = date == dateOnly(DateTime.now());
                   })),
-          const SizedBox(height: 14),
+          const SizedBox(height: 6),
           Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
