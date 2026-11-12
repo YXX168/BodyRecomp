@@ -9,7 +9,7 @@ import '../services/app_signals.dart';
 import '../services/daily_workout_service.dart';
 import '../services/rest_timer_service.dart';
 import '../services/rest_countdown.dart';
-import '../widgets/rest_timer_dock.dart';
+import '../widgets/rest_timer_pill.dart';
 import '../widgets/daily_date_bar.dart';
 import '../widgets/week_calendar.dart';
 import '../widgets/exercise_editor.dart';
@@ -20,7 +20,10 @@ import 'template_manager_page.dart';
 
 class WorkoutPage extends StatefulWidget {
   final DateTime Function()? now;
-  const WorkoutPage({super.key, this.now});
+  final RestCountdown? restController;
+  final bool showRestTimer;
+  const WorkoutPage(
+      {super.key, this.now, this.restController, this.showRestTimer = true});
   @override
   State<WorkoutPage> createState() => _WorkoutPageState();
 }
@@ -53,8 +56,9 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    _rest = RestCountdown(
-        now: () => _now, onFinished: () => HapticFeedback.heavyImpact());
+    _rest = widget.restController ??
+        RestCountdown(
+            now: () => _now, onFinished: () => HapticFeedback.heavyImpact());
     WidgetsBinding.instance.addObserver(this);
     workoutDataRevision.addListener(_reload);
     workoutPlanRevision.addListener(_reload);
@@ -67,7 +71,7 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
     super.didChangeDependencies();
     final visible = TickerMode.valuesOf(context).enabled;
     _visible = visible;
-    _rest.setActive(_visible && _foreground);
+    if (widget.restController == null) _rest.setActive(_visible && _foreground);
   }
 
   @override
@@ -76,14 +80,14 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
     workoutDataRevision.removeListener(_reload);
     workoutPlanRevision.removeListener(_reload);
     restTimerPreferenceRevision.removeListener(_reload);
-    _rest.dispose();
+    if (widget.restController == null) _rest.dispose();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _foreground = state == AppLifecycleState.resumed;
-    _rest.setActive(_visible && _foreground);
+    if (widget.restController == null) _rest.setActive(_visible && _foreground);
     if (_foreground) {
       _rest.refresh();
       if (_followToday && dateOnly(_now) != _date) {
@@ -292,6 +296,12 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
         ? 0.0
         : session.completedSets / session.plannedSets;
     return Column(children: [
+      if (widget.showRestTimer)
+        Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+            child: Align(
+                alignment: Alignment.centerRight,
+                child: RestTimerPill(controller: _rest))),
       Expanded(
           child: ListView(
               key: const PageStorageKey('daily-workout-scroll'),
@@ -459,7 +469,9 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
                             style: TextStyle(fontSize: 11, color: muted))),
                   ])),
             for (var i = 0; i < session.blocks.length; i++)
-              _blockCard(session.blocks[i], i),
+              Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _blockCard(session.blocks[i], i)),
             const SizedBox(height: 6),
             Row(mainAxisAlignment: MainAxisAlignment.center, children: [
               TextButton.icon(
@@ -478,7 +490,6 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
               ],
             ]),
           ])),
-      RestTimerDock(controller: _rest),
     ]);
   }
 
@@ -498,106 +509,114 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
     final theme = Theme.of(context);
     final color = theme.colorScheme.primary;
     final muted = theme.colorScheme.onSurface.withValues(alpha: .42);
-    return Container(
+    return Material(
         key: ValueKey('workout-block-$index'),
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.fromLTRB(12, 4, 8, 10),
-        decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
+        color: theme.colorScheme.surface,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(
+            side: BorderSide(
                 color: complete
                     ? color.withValues(alpha: .25)
                     : color.withValues(alpha: .06))),
-        child: Column(children: [
-          ExpansionTile(
-            key:
-                PageStorageKey('exercise-details-${_session.date}-${block.id}'),
-            minTileHeight: 56,
-            tilePadding: EdgeInsets.zero,
-            dense: true,
-            shape: const Border(),
-            collapsedShape: const Border(),
-            leading: ExerciseMark(exercise.name, size: 42),
-            trailing: _blockMenu(block, index),
-            title: Text(exercise.name,
-                style:
-                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-            subtitle: Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                    '${exercise.sets} 组 · ${exercise.reps}${RegExp(r'[a-zA-Z分钟秒]').hasMatch(exercise.reps) ? '' : ' 次'}',
-                    style: TextStyle(fontSize: 10, color: muted))),
-            childrenPadding: const EdgeInsets.only(bottom: 10),
-            children: [
-              Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                      exercise.note?.isNotEmpty == true
-                          ? exercise.note!
-                          : '按实际情况完成，可在菜单调整组数与次数。',
-                      style:
-                          TextStyle(fontSize: 12, height: 1.6, color: muted)))
-            ],
-          ),
-          const SizedBox(height: 2),
-          Row(children: [
-            Expanded(
-                child: Wrap(spacing: 5, runSpacing: 5, children: [
-              for (var i = 0; i < exercise.sets.clamp(0, 12); i++)
-                Container(
-                    width: 22,
-                    height: 22,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                        color: i < block.completedSets
-                            ? color.withValues(alpha: .12)
-                            : theme.scaffoldBackgroundColor,
-                        borderRadius: BorderRadius.circular(6)),
-                    child: i < block.completedSets
-                        ? Icon(Icons.check_rounded, size: 13, color: color)
-                        : Text('${i + 1}',
-                            style: TextStyle(fontSize: 9, color: muted))),
-              if (exercise.sets > 12)
-                Text('${block.completedSets} / ${exercise.sets} 组',
-                    style: TextStyle(fontSize: 10, color: muted))
-            ])),
-            IconButton(
-                key: ValueKey('undo-set-$index'),
-                tooltip: '撤销上一组',
-                visualDensity: VisualDensity.compact,
-                onPressed: _busy || block.completedSets == 0
-                    ? null
-                    : () => _complete(block, undo: true),
-                icon: Icon(Icons.undo_rounded, size: 17, color: muted)),
-            if (parseRestSeconds(exercise.rest) != null)
-              IconButton(
-                  key: ValueKey('start-rest-$index'),
-                  tooltip: '休息 ${exercise.rest}',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: _busy ? null : () => _startTimer(exercise),
-                  icon: Icon(Icons.timer_outlined, size: 18, color: muted)),
-            FilledButton(
-                key: ValueKey('complete-set-$index'),
-                style: FilledButton.styleFrom(
-                    minimumSize: const Size(68, 34),
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    backgroundColor:
-                        complete ? color.withValues(alpha: .1) : color,
-                    foregroundColor:
-                        complete ? color : theme.colorScheme.onPrimary),
-                onPressed: _busy || complete ? null : () => _complete(block),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(complete ? Icons.check_rounded : Icons.add_rounded,
-                      size: 14),
-                  const SizedBox(width: 3),
-                  Text(complete ? '完成' : '记一组',
-                      style: const TextStyle(fontSize: 10)),
+        child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 8, 10),
+            child: Column(children: [
+              Theme(
+                  data: theme.copyWith(
+                      splashFactory: NoSplash.splashFactory,
+                      splashColor: Colors.transparent,
+                      highlightColor: Colors.transparent,
+                      hoverColor: Colors.transparent),
+                  child: ExpansionTile(
+                    key: PageStorageKey(
+                        'exercise-details-${_session.date}-${block.id}'),
+                    minTileHeight: 56,
+                    tilePadding: EdgeInsets.zero,
+                    dense: true,
+                    shape: const Border(),
+                    collapsedShape: const Border(),
+                    leading: ExerciseMark(exercise.name, size: 42),
+                    trailing: _blockMenu(block, index),
+                    title: Text(exercise.name,
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600)),
+                    subtitle: Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                            '${exercise.sets} 组 · ${exercise.reps}${RegExp(r'[a-zA-Z分钟秒]').hasMatch(exercise.reps) ? '' : ' 次'}',
+                            style: TextStyle(fontSize: 10, color: muted))),
+                    childrenPadding: const EdgeInsets.only(bottom: 10),
+                    children: [
+                      Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                              exercise.note?.isNotEmpty == true
+                                  ? exercise.note!
+                                  : '按实际情况完成，可在菜单调整组数与次数。',
+                              style: TextStyle(
+                                  fontSize: 12, height: 1.6, color: muted)))
+                    ],
+                  )),
+              const SizedBox(height: 2),
+              Row(children: [
+                Expanded(
+                    child: Wrap(spacing: 5, runSpacing: 5, children: [
+                  for (var i = 0; i < exercise.sets.clamp(0, 12); i++)
+                    Container(
+                        width: 22,
+                        height: 22,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                            color: i < block.completedSets
+                                ? color.withValues(alpha: .12)
+                                : theme.scaffoldBackgroundColor,
+                            borderRadius: BorderRadius.circular(6)),
+                        child: i < block.completedSets
+                            ? Icon(Icons.check_rounded, size: 13, color: color)
+                            : Text('${i + 1}',
+                                style: TextStyle(fontSize: 9, color: muted))),
+                  if (exercise.sets > 12)
+                    Text('${block.completedSets} / ${exercise.sets} 组',
+                        style: TextStyle(fontSize: 10, color: muted))
                 ])),
-          ]),
-        ]));
+                IconButton(
+                    key: ValueKey('undo-set-$index'),
+                    tooltip: '撤销上一组',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: _busy || block.completedSets == 0
+                        ? null
+                        : () => _complete(block, undo: true),
+                    icon: Icon(Icons.undo_rounded, size: 17, color: muted)),
+                if (parseRestSeconds(exercise.rest) != null)
+                  IconButton(
+                      key: ValueKey('start-rest-$index'),
+                      tooltip: '休息 ${exercise.rest}',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: _busy ? null : () => _startTimer(exercise),
+                      icon: Icon(Icons.timer_outlined, size: 18, color: muted)),
+                FilledButton(
+                    key: ValueKey('complete-set-$index'),
+                    style: FilledButton.styleFrom(
+                        minimumSize: const Size(68, 34),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        backgroundColor:
+                            complete ? color.withValues(alpha: .1) : color,
+                        foregroundColor:
+                            complete ? color : theme.colorScheme.onPrimary),
+                    onPressed:
+                        _busy || complete ? null : () => _complete(block),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(complete ? Icons.check_rounded : Icons.add_rounded,
+                          size: 14),
+                      const SizedBox(width: 3),
+                      Text(complete ? '完成' : '记一组',
+                          style: const TextStyle(fontSize: 10)),
+                    ])),
+              ]),
+            ])));
   }
 
   Widget _blockMenu(WorkoutBlock block, int index) => PopupMenuButton<String>(

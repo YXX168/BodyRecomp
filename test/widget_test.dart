@@ -132,12 +132,12 @@ void main() {
     await tester.ensureVisible(block);
     await tester.pumpAndSettle();
     final before = tester.getRect(block);
-    final dock = tester.getRect(find.byKey(const Key('rest-timer-dock')));
+    final pill = tester.getRect(find.byKey(const Key('rest-timer-pill')));
     await tester.tap(find.byKey(const ValueKey('start-rest-0')));
     await tester.pumpAndSettle();
     expect(tester.getRect(block), before);
-    expect(tester.getRect(find.byKey(const Key('rest-timer-dock'))), dock);
-    expect(tester.getBottomRight(block).dy, lessThanOrEqualTo(dock.top));
+    expect(tester.getRect(find.byKey(const Key('rest-timer-pill'))), pill);
+    expect(pill.bottom, lessThanOrEqualTo(tester.getTopLeft(block).dy));
     now = now.add(const Duration(minutes: 2));
     await tester.pump(const Duration(seconds: 1));
     expect(find.text('休息结束'), findsOneWidget);
@@ -145,7 +145,7 @@ void main() {
     await tester.tap(find.byKey(const Key('rest-timer-dismiss')));
     await tester.pumpAndSettle();
     expect(tester.getRect(block), before);
-    expect(tester.getRect(find.byKey(const Key('rest-timer-dock'))), dock);
+    expect(tester.getRect(find.byKey(const Key('rest-timer-pill'))), pill);
     expect((await loadDailyWorkouts())[dayKey(today)]!.completedSets, 0);
     expect(tester.takeException(), isNull);
   });

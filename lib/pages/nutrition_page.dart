@@ -268,10 +268,13 @@ class _NutritionPageState extends State<NutritionPage>
                                         CrossAxisAlignment.start,
                                     children: [
                                   Row(children: [
-                                    Text(reference.$2,
-                                        style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600)),
+                                    Flexible(
+                                        child: Text(reference.$2,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600))),
                                     const SizedBox(width: 7),
                                     if (meal != null)
                                       Icon(Icons.check_circle,

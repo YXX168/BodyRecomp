@@ -11,12 +11,14 @@ import 'services/data_service.dart';
 import 'services/app_signals.dart';
 import 'services/record_summary_service.dart';
 import 'services/rest_timer_service.dart';
+import 'services/rest_countdown.dart';
 import 'pages/workout_page.dart';
 import 'pages/nutrition_page.dart';
 import 'pages/template_manager_page.dart';
 import 'widgets/app_navigation_bar.dart';
 import 'widgets/sheet_frame.dart';
 import 'widgets/body_editor.dart';
+import 'widgets/rest_timer_pill.dart';
 export 'services/app_signals.dart';
 
 const appVersion = '7.0.0';
@@ -717,22 +719,41 @@ class MainPage extends StatefulWidget {
   State<MainPage> createState() => _MainPageState();
 }
 
-class _MainPageState extends State<MainPage> {
+class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
   int _tab = 0;
+  final _rest = RestCountdown(
+      now: DateTime.now, onFinished: () => HapticFeedback.heavyImpact());
   final _pageModes = <int, AppTheme>{};
   late final List<Widget> _pages = [
-    const WorkoutPage(),
+    WorkoutPage(restController: _rest, showRestTimer: false),
     const NutritionPage(),
     const RecordPage(),
     SettingsPage(onProfileChanged: () {}),
   ];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _rest.setActive(state == AppLifecycleState.resumed);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _rest.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final inh = ThemeInherited.of(context);
     final t = inh.theme;
     _pageModes[_tab] = inh.current;
-    const labels = AppNavigationBar.labels;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
@@ -751,12 +772,11 @@ class _MainPageState extends State<MainPage> {
                             fontWeight: FontWeight.w700,
                             letterSpacing: -.5,
                             color: t.text1)),
-                    const Spacer(),
-                    Text(labels[_tab],
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: t.text3)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: Align(
+                            alignment: Alignment.centerRight,
+                            child: RestTimerPill(controller: _rest))),
                     const SizedBox(width: 8),
                     IconButton(
                         tooltip: '切换主题',
@@ -1011,18 +1031,21 @@ class _RecordPageState extends State<RecordPage> {
                     child: Icon(Icons.chevron_left, size: 20, color: t.primary),
                   ),
                 ),
-                PressScale(
+                Expanded(
+                    child: PressScale(
                   onTap: _goToday,
                   child: Column(
                     children: [
-                      Text(
-                        '$_viewYear年 ${monthNames[_viewMonth - 1]}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: t.text1,
-                        ),
-                      ),
+                      FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '$_viewYear年 ${monthNames[_viewMonth - 1]}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: t.text1,
+                            ),
+                          )),
                       if (isCurrentMonth)
                         Text(
                           '当前月',
@@ -1034,7 +1057,7 @@ class _RecordPageState extends State<RecordPage> {
                         ),
                     ],
                   ),
-                ),
+                )),
                 PressScale(
                   onTap: _nextMonth,
                   child: Container(

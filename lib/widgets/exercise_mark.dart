@@ -10,17 +10,17 @@ class ExerciseMark extends StatelessWidget {
   Widget build(BuildContext context) {
     final kind = _kind(name);
     final colors = [
-      const Color(0xFF497961),
-      const Color(0xFF6586A0),
-      const Color(0xFF887AA0),
-      const Color(0xFFB48C58),
-      const Color(0xFFB57D60),
+      const Color(0xFF518C83),
+      const Color(0xFF7396B8),
+      const Color(0xFF9586B9),
+      const Color(0xFFBD9862),
+      const Color(0xFFC68E7C),
     ];
     final color = colors[switch (kind) {
-      'pull' || 'row' || 'rear' => 1,
+      'pull' || 'row' || 'rear' || 'fly' => 1,
       'leg' || 'hinge' => 2,
-      'core' => 3,
-      'walk' => 4,
+      'core' || 'plank' => 3,
+      'walk' || 'cycle' || 'erg' || 'cardio' || 'stretch' => 4,
       _ => 0,
     }];
     return ExcludeSemantics(
@@ -28,14 +28,19 @@ class ExerciseMark extends StatelessWidget {
           width: size,
           height: size,
           decoration: BoxDecoration(
-              color: color.withValues(alpha: .07),
+              color: color.withValues(alpha: .09),
               borderRadius: BorderRadius.circular(size * .25)),
           child: CustomPaint(painter: _EquipmentPainter(kind, color))),
     );
   }
 
   String _kind(String value) {
-    if (RegExp('走|跑|散步|有氧|椭圆|单车|划船机|放松').hasMatch(value)) return 'walk';
+    if (RegExp('单车|自行车').hasMatch(value)) return 'cycle';
+    if (value.contains('划船机')) return 'erg';
+    if (RegExp('拉伸|放松').hasMatch(value)) return 'stretch';
+    if (RegExp('椭圆|有氧').hasMatch(value)) return 'cardio';
+    if (RegExp('走|跑|散步').hasMatch(value)) return 'walk';
+    if (value.contains('平板支撑')) return 'plank';
     if (RegExp('腹|核心|平板支撑|死虫|鸟狗|举腿').hasMatch(value)) return 'core';
     if (value.contains('硬拉')) return 'hinge';
     if (RegExp('腿|倒蹬|深蹲|臀|提踵|外展').hasMatch(value)) return 'leg';
@@ -45,6 +50,8 @@ class ExerciseMark extends StatelessWidget {
     if (value.contains('侧平举')) return 'raise';
     if (value.contains('弯举')) return 'curl';
     if (value.contains('下压')) return 'cable';
+    if (value.contains('臂屈伸')) return 'triceps';
+    if (value.contains('夹胸')) return 'fly';
     if (value.contains('肩推')) return 'shoulder';
     if (value.contains('上斜')) return 'incline';
     if (value.contains('俯卧撑')) return 'pushup';
@@ -64,150 +71,231 @@ class _EquipmentPainter extends CustomPainter {
     canvas.scale(size.width / 64, size.height / 64);
     final ink = Paint()
       ..color = color
-      ..strokeWidth = 2.2
+      ..strokeWidth = 2.4
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke;
-    final soft = Paint()..color = color.withValues(alpha: .17);
-    void line(double a, double b, double c, double d) =>
-        canvas.drawLine(Offset(a, b), Offset(c, d), ink);
-    void bar(double x, double y, {double angle = 0}) {
+    final fill = Paint()..color = color.withValues(alpha: .22);
+    void line(double x1, double y1, double x2, double y2) =>
+        canvas.drawLine(Offset(x1, y1), Offset(x2, y2), ink);
+    void path(List<Offset> points) {
+      final shape = Path()..moveTo(points.first.dx, points.first.dy);
+      for (final point in points.skip(1)) {
+        shape.lineTo(point.dx, point.dy);
+      }
+      canvas.drawPath(shape, ink);
+    }
+
+    void pad(double x, double y, double w, double h) {
+      final rect = RRect.fromRectAndRadius(
+          Rect.fromLTWH(x, y, w, h), const Radius.circular(2));
+      canvas.drawRRect(rect, fill);
+      canvas.drawRRect(rect, ink);
+    }
+
+    void ring(double x, double y, double r) =>
+        canvas.drawCircle(Offset(x, y), r, ink);
+    void head(double x, double y) => ring(x, y, 3.5);
+    void bar(double x, double y, {double angle = 0, double scale = 1}) {
       canvas.save();
       canvas.translate(x, y);
       canvas.rotate(angle);
-      line(-11, 0, 11, 0);
-      for (final side in [-1.0, 1.0]) {
-        final rect = RRect.fromRectAndRadius(
-            Rect.fromCenter(center: Offset(side * 8, 0), width: 4, height: 12),
-            const Radius.circular(1.5));
-        canvas.drawRRect(rect, soft);
-        canvas.drawRRect(rect, ink);
-      }
+      canvas.scale(scale);
+      line(-14, 0, 14, 0);
+      pad(-11, -6, 4, 12);
+      pad(7, -6, 4, 12);
       canvas.restore();
     }
 
-    void head(double x, double y) => canvas.drawCircle(Offset(x, y), 3.5, ink);
-    canvas.drawOval(const Rect.fromLTWH(10, 49, 44, 4), soft);
+    void mat() => pad(11, 46, 42, 4);
     switch (kind) {
       case 'bench':
+        bar(32, 21);
+        line(15, 16, 15, 45);
+        line(49, 16, 49, 45);
+        pad(19, 34, 26, 5);
+        line(23, 39, 20, 49);
+        line(41, 39, 44, 49);
       case 'incline':
-        final incline = kind == 'incline';
-        canvas.drawRRect(
-            RRect.fromRectAndRadius(Rect.fromLTWH(17, incline ? 34 : 37, 28, 5),
-                const Radius.circular(2)),
-            soft);
-        line(18, 40, 46, 40);
-        line(22, 40, 19, 49);
-        line(42, 40, 46, 49);
-        line(14, 21, 14, 48);
-        line(50, 21, 50, 48);
-        bar(32, 24);
-        if (incline) line(22, 35, 37, 29);
+        bar(34, 18, scale: .85);
+        canvas.save();
+        canvas.translate(28, 34);
+        canvas.rotate(-.65);
+        pad(-9, -2, 23, 5);
+        canvas.restore();
+        pad(17, 39, 12, 4);
+        line(23, 43, 20, 49);
+        line(33, 34, 44, 49);
       case 'shoulder':
-        line(26, 32, 26, 42);
-        line(26, 42, 41, 42);
-        line(29, 43, 25, 50);
-        line(38, 43, 42, 50);
-        head(32, 24);
-        line(32, 29, 32, 38);
-        line(32, 32, 22, 28);
-        line(22, 28, 20, 20);
-        line(32, 32, 42, 28);
-        line(42, 28, 44, 20);
-        bar(18, 17, angle: 1.57);
-        bar(46, 17, angle: 1.57);
+        bar(32, 17, scale: .85);
+        line(23, 20, 23, 28);
+        line(41, 20, 41, 28);
+        line(23, 28, 28, 31);
+        line(41, 28, 36, 31);
+        pad(27, 29, 10, 12);
+        pad(25, 42, 17, 4);
+        line(29, 46, 26, 51);
+        line(38, 46, 42, 51);
       case 'pull':
       case 'cable':
-        line(17, 48, 17, 15);
-        line(17, 15, 46, 15);
-        line(46, 15, 46, 48);
-        canvas.drawRRect(
-            RRect.fromRectAndRadius(
-                const Rect.fromLTWH(39, 30, 6, 14), const Radius.circular(1)),
-            soft);
-        line(31, 16, 31, 27);
-        line(22, 29, 31, 26);
-        line(31, 26, 40, 29);
+        path(const [
+          Offset(16, 49),
+          Offset(16, 14),
+          Offset(48, 14),
+          Offset(48, 49)
+        ]);
+        ring(32, 17, 2);
+        line(32, 20, 32, kind == 'pull' ? 27 : 34);
         if (kind == 'pull') {
-          line(24, 43, 37, 43);
-          line(30, 43, 30, 49);
+          path(const [
+            Offset(22, 30),
+            Offset(27, 27),
+            Offset(37, 27),
+            Offset(42, 30)
+          ]);
+          pad(23, 42, 14, 4);
+          line(30, 46, 30, 50);
         } else {
-          line(24, 37, 37, 37);
-          line(26, 41, 35, 41);
+          path(const [Offset(26, 40), Offset(32, 34), Offset(38, 40)]);
+          ring(25, 41, 1);
+          ring(39, 41, 1);
         }
+        pad(42, 31, 6, 13);
+        line(42, 36, 48, 36);
+        line(42, 40, 48, 40);
       case 'row':
-        line(14, 44, 49, 44);
-        line(18, 44, 16, 49);
-        line(41, 44, 44, 49);
-        canvas.drawRRect(
-            RRect.fromRectAndRadius(
-                const Rect.fromLTWH(19, 37, 14, 5), const Radius.circular(2)),
-            soft);
-        line(47, 43, 47, 21);
-        line(29, 30, 47, 30);
-        line(25, 27, 25, 33);
-        head(22, 21);
-        line(22, 26, 25, 37);
-        line(25, 37, 36, 37);
-        line(36, 37, 40, 43);
+        pad(13, 37, 18, 5);
+        line(18, 42, 15, 49);
+        line(27, 42, 30, 49);
+        line(43, 20, 43, 46);
+        pad(43, 22, 7, 20);
+        line(25, 29, 43, 29);
+        pad(21, 26, 4, 7);
+        line(34, 43, 40, 36);
+        line(13, 49, 51, 49);
       case 'leg':
-        line(16, 43, 27, 43);
-        line(16, 43, 12, 29);
-        line(23, 43, 20, 49);
-        line(29, 43, 49, 18);
-        line(36, 47, 54, 23);
-        line(43, 19, 54, 28);
-        canvas.drawRRect(
-            RRect.fromRectAndRadius(
-                const Rect.fromLTWH(10, 28, 5, 14), const Radius.circular(2)),
-            soft);
-        canvas.drawCircle(const Offset(42, 30), 4, soft);
-        canvas.drawCircle(const Offset(42, 30), 4, ink);
-      case 'core':
-        head(30, 18);
-        line(30, 24, 26, 34);
-        line(26, 34, 35, 39);
-        line(35, 39, 40, 48);
-        line(30, 27, 40, 31);
-        line(40, 31, 44, 24);
-        line(17, 42, 33, 42);
-        line(23, 42, 20, 49);
-        line(18, 23, 18, 40);
-        line(18, 23, 23, 23);
-      case 'walk':
-        head(33, 15);
-        line(32, 21, 29, 33);
-        line(30, 26, 22, 29);
-        line(22, 29, 18, 26);
-        line(31, 24, 39, 28);
-        line(39, 28, 44, 25);
-        line(29, 33, 23, 40);
-        line(23, 40, 17, 46);
-        line(29, 33, 35, 39);
-        line(35, 39, 39, 48);
-        line(11, 50, 52, 50);
+        canvas.save();
+        canvas.translate(22, 36);
+        canvas.rotate(-.75);
+        pad(0, 0, 32, 5);
+        line(2, 9, 33, 9);
+        pad(27, -8, 5, 16);
+        canvas.restore();
+        path(const [Offset(12, 29), Offset(16, 43), Offset(28, 43)]);
+        line(19, 43, 16, 50);
+        line(30, 40, 43, 50);
+        line(12, 50, 50, 50);
+      case 'hinge':
+        head(43, 20);
+        path(const [
+          Offset(38, 24),
+          Offset(25, 32),
+          Offset(27, 42),
+          Offset(23, 50)
+        ]);
+        path(const [Offset(25, 32), Offset(34, 41), Offset(38, 50)]);
+        line(35, 26, 39, 39);
+        bar(40, 43, scale: .65);
+      case 'raise':
       case 'rear':
         head(32, 19);
-        line(32, 25, 32, 42);
-        line(32, 29, 18, 24);
-        line(32, 29, 46, 24);
-        line(32, 42, 23, 49);
-        line(32, 42, 41, 49);
-        bar(16, 23, angle: 1.2);
-        bar(48, 23, angle: -1.2);
-      case 'pushup':
-        head(19, 27);
-        line(24, 30, 43, 34);
-        line(29, 31, 27, 43);
-        line(27, 43, 20, 43);
-        line(43, 34, 50, 43);
-        line(13, 48, 53, 48);
-      case 'weights':
-      case 'raise':
+        line(32, 26, 32, 42);
+        line(32, 42, 25, 50);
+        line(32, 42, 39, 50);
+        final y = kind == 'raise' ? 29.0 : 24.0;
+        path([const Offset(32, 28), Offset(22, y), Offset(14, y - 2)]);
+        path([const Offset(32, 28), Offset(42, y), Offset(50, y - 2)]);
+        if (kind == 'raise') {
+          pad(10, y - 6, 5, 8);
+          pad(49, y - 6, 5, 8);
+        } else {
+          line(11, 34, 17, 31);
+          line(53, 34, 47, 31);
+        }
+      case 'fly':
+        pad(27, 24, 10, 20);
+        pad(23, 44, 18, 4);
+        path(const [Offset(28, 30), Offset(17, 26), Offset(17, 18)]);
+        path(const [Offset(36, 30), Offset(47, 26), Offset(47, 18)]);
+        line(13, 18, 21, 18);
+        line(43, 18, 51, 18);
+        line(31, 48, 31, 52);
       case 'curl':
-      case 'hinge':
-        bar(23, 27, angle: kind == 'hinge' ? -.3 : -.6);
-        bar(42, 38, angle: kind == 'curl' ? -.6 : .6);
+        path(const [Offset(18, 45), Offset(29, 43), Offset(39, 28)]);
+        path(const [Offset(18, 35), Offset(25, 35), Offset(31, 25)]);
+        bar(36, 21, angle: -.5, scale: .8);
+        line(18, 35, 18, 45);
+      case 'triceps':
+        head(30, 31);
+        line(30, 38, 30, 50);
+        path(const [Offset(24, 39), Offset(19, 23), Offset(32, 17)]);
+        path(const [Offset(36, 39), Offset(42, 23), Offset(32, 17)]);
+        bar(32, 16, scale: .65);
+      case 'core':
+        mat();
+        head(17, 35);
+        path(const [
+          Offset(22, 38),
+          Offset(31, 42),
+          Offset(38, 28),
+          Offset(49, 38)
+        ]);
+        path(const [Offset(24, 37), Offset(32, 31), Offset(39, 33)]);
+      case 'pushup':
+      case 'plank':
+        mat();
+        head(16, 28);
+        path(const [Offset(21, 31), Offset(40, 35), Offset(50, 44)]);
+        if (kind == 'pushup') {
+          path(const [Offset(27, 32), Offset(24, 43), Offset(17, 43)]);
+        } else {
+          path(const [Offset(27, 32), Offset(29, 42), Offset(19, 42)]);
+        }
+      case 'walk':
+        head(34, 16);
+        path(const [Offset(33, 23), Offset(29, 35), Offset(20, 48)]);
+        path(const [Offset(29, 35), Offset(38, 41), Offset(42, 49)]);
+        path(const [Offset(32, 26), Offset(23, 31), Offset(19, 28)]);
+        path(const [Offset(32, 26), Offset(40, 30), Offset(46, 26)]);
+      case 'cycle':
+        ring(18, 43, 9);
+        ring(47, 43, 9);
+        path(const [
+          Offset(18, 43),
+          Offset(27, 29),
+          Offset(35, 43),
+          Offset(18, 43)
+        ]);
+        path(const [Offset(35, 43), Offset(42, 27), Offset(47, 43)]);
+        line(24, 26, 31, 26);
+        line(27, 26, 27, 29);
+        path(const [Offset(42, 27), Offset(40, 20), Offset(47, 20)]);
+      case 'erg':
+        ring(16, 35, 8);
+        pad(28, 32, 12, 5);
+        line(23, 40, 52, 40);
+        line(31, 37, 31, 40);
+        line(16, 27, 39, 23);
+        line(39, 20, 39, 26);
+        line(14, 43, 11, 48);
+        line(48, 40, 52, 48);
+      case 'cardio':
+        line(16, 48, 49, 48);
+        canvas.drawOval(const Rect.fromLTWH(20, 34, 27, 11), ink);
+        line(27, 35, 35, 23);
+        line(35, 23, 35, 16);
+        line(42, 35, 46, 19);
+        line(43, 19, 49, 19);
+        line(24, 40, 16, 26);
+        line(13, 26, 19, 26);
+      case 'stretch':
+        mat();
+        head(35, 23);
+        path(const [Offset(33, 29), Offset(27, 39), Offset(43, 43)]);
+        path(const [Offset(28, 36), Offset(39, 36), Offset(48, 42)]);
+        path(const [Offset(27, 39), Offset(18, 43), Offset(13, 43)]);
+      default:
+        bar(32, 32, angle: -.55, scale: 1.3);
     }
     canvas.restore();
   }
