@@ -21,7 +21,7 @@ import 'widgets/body_editor.dart';
 import 'widgets/rest_timer_pill.dart';
 export 'services/app_signals.dart';
 
-const appVersion = '7.0.1';
+const appVersion = '7.0.2';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // THEME SYSTEM — v6.6: profile + chart + settings support

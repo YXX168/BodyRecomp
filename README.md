@@ -45,7 +45,7 @@
 
 ## 下载与升级
 
-当前正式版为 **7.0.1（89）**，适用于 Android 7.0 及以上 ARM64 设备。从 [最新发布页](https://github.com/YXX168/BodyRecomp/releases/latest) 下载 `Qingran-v7.0.1-arm64.apk`；同页附 SHA-256 校验文件。
+当前正式版为 **7.0.2（90）**，适用于 Android 7.0 及以上 ARM64 设备。从 [最新发布页](https://github.com/YXX168/BodyRecomp/releases/latest) 下载 `Qingran-v7.0.2-arm64.apk`，同页附 SHA-256 校验文件。
 
 App 自 7.0.1 起由「青阳」更名为「青燃」。正式应用显示为「青燃」，包名 `com.body.recomp`，沿用原正式签名，可以覆盖旧正式版。升级前先导出 JSON 备份，升级后会自动迁移可还原的旧记录。
 

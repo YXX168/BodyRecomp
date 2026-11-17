@@ -1,10 +1,10 @@
 import '../widgets/loading_view.dart';
 import 'package:flutter/material.dart';
 import '../models/daily_workout.dart';
-import '../models/recomp_models.dart';
 import '../services/app_signals.dart';
 import '../services/nutrition_service.dart';
 import '../widgets/daily_date_bar.dart';
+import '../widgets/daily_record_date.dart';
 import '../widgets/sheet_frame.dart';
 
 class NutritionPage extends StatefulWidget {
@@ -15,11 +15,9 @@ class NutritionPage extends StatefulWidget {
 }
 
 class _NutritionPageState extends State<NutritionPage>
-    with WidgetsBindingObserver {
-  bool _followToday = true;
-  DateTime get _now => widget.now?.call() ?? DateTime.now();
-  late DateTime _date = dateOnly(_now);
-  bool _visible = true;
+    with WidgetsBindingObserver, DailyRecordDate<NutritionPage> {
+  @override
+  DateTime get now => widget.now?.call() ?? DateTime.now();
   Map<String, MealEntry>? _meals;
   String? _error;
   bool _busy = false;
@@ -27,35 +25,14 @@ class _NutritionPageState extends State<NutritionPage>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     workoutDataRevision.addListener(_load);
     _load();
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final visible = TickerMode.valuesOf(context).enabled;
-    if (visible && !_visible && _followToday) {
-      _date = dateOnly(_now);
-    }
-    _visible = visible;
-  }
-
-  @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     workoutDataRevision.removeListener(_load);
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed &&
-        _followToday &&
-        _date != dateOnly(_now)) {
-      setState(() => _date = dateOnly(_now));
-    }
   }
 
   Future<void> _load() async {
@@ -78,7 +55,7 @@ class _NutritionPageState extends State<NutritionPage>
   Future<void> _edit((String, String, String) reference) async {
     if (_busy) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    final date = dayKey(_date);
+    final date = dayKey(recordDate);
     final id = '$date|${reference.$1}';
     final before = _meals![id];
     final result = await showModalBottomSheet<_MealResult>(
@@ -145,7 +122,7 @@ class _NutritionPageState extends State<NutritionPage>
       ]));
     if (_meals == null) return const LoadingView();
     final entries =
-        _meals!.values.where((e) => e.date == dayKey(_date)).toList();
+        _meals!.values.where((e) => e.date == dayKey(recordDate)).toList();
     final calories = entries.where((e) => e.calories != null);
     final protein = entries.where((e) => e.protein != null);
     final theme = Theme.of(context);
@@ -171,155 +148,163 @@ class _NutritionPageState extends State<NutritionPage>
       Color(0xFF7287A1),
       Color(0xFF9984A4)
     ];
-    return ListView(
-        key: PageStorageKey('nutrition-scroll-${dayKey(_date)}'),
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-        children: [
-          DailyDateBar(
-              date: _date,
-              today: _now,
-              enabled: !_busy,
-              onChanged: (date) => setState(() {
-                    _date = date;
-                    _followToday = date == dateOnly(_now);
-                  })),
-          const SizedBox(height: 6),
-          Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(20)),
-              child: Column(children: [
-                Row(children: [
-                  Expanded(
-                      child: _metric(
-                          calories.isEmpty
-                              ? '—'
-                              : calories
-                                  .fold<double>(
-                                      0, (sum, e) => sum + e.calories!)
-                                  .toStringAsFixed(0),
-                          '已填热量',
-                          'kcal',
-                          const Color(0xFFB88A45))),
-                  Container(
-                      width: 1,
-                      height: 32,
-                      color: muted.withValues(alpha: .15)),
-                  Expanded(
-                      child: _metric(
-                          protein.isEmpty
-                              ? '—'
-                              : protein
-                                  .fold<double>(0, (sum, e) => sum + e.protein!)
-                                  .toStringAsFixed(1),
-                          '已填蛋白质',
-                          'g',
-                          const Color(0xFF628269))),
-                ]),
-                const SizedBox(height: 18),
-                Row(children: [
-                  for (final reference in mealReferences)
+    return Column(children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+        child: DailyDateBar(
+          date: recordDate,
+          today: today,
+          enabled: !_busy,
+          onChanged: selectRecordDate,
+        ),
+      ),
+      Expanded(
+          child: ListView(
+              key: PageStorageKey('nutrition-scroll-${dayKey(recordDate)}'),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              children: [
+            Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(20)),
+                child: Column(children: [
+                  Row(children: [
                     Expanded(
-                        child: Container(
-                            height: 4,
-                            margin: const EdgeInsets.symmetric(horizontal: 2),
-                            decoration: BoxDecoration(
-                                color: _meals!.containsKey(
-                                        '${dayKey(_date)}|${reference.$1}')
-                                    ? theme.colorScheme.primary
-                                    : theme.scaffoldBackgroundColor,
-                                borderRadius: BorderRadius.circular(2))))
-                ]),
-                const SizedBox(height: 8),
-                Row(children: [
-                  Text('已记录 ${entries.length} 餐',
-                      style: TextStyle(fontSize: 10, color: muted)),
-                  const Spacer(),
-                  IconButton(
-                      tooltip: '营养汇总说明',
-                      onPressed: () => showDialog(
-                          context: context,
-                          builder: (context) => const AlertDialog(
-                              title: Text('营养汇总'),
-                              content:
-                                  Text('仅汇总手动填写的热量和蛋白质。未填写的餐次不参与计算，也不等于零摄入。'))),
-                      icon: Icon(Icons.info_outline, size: 15, color: muted))
-                ]),
-              ])),
-          const SizedBox(height: 20),
-          const Text('每餐记录',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 12),
-          for (var i = 0; i < mealReferences.length; i++)
-            Builder(builder: (context) {
-              final reference = mealReferences[i];
-              final meal = _meals!['${dayKey(_date)}|${reference.$1}'];
-              return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  decoration: BoxDecoration(
-                      color: theme.colorScheme.surface,
-                      borderRadius: BorderRadius.circular(18)),
-                  child: InkWell(
-                      key: ValueKey('edit-meal-${reference.$1}'),
-                      borderRadius: BorderRadius.circular(18),
-                      onTap: _busy ? null : () => _edit(reference),
-                      child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Row(children: [
-                            Container(
-                                width: 43,
-                                height: 43,
-                                decoration: BoxDecoration(
-                                    color: colors[i].withValues(alpha: .1),
-                                    borderRadius: BorderRadius.circular(14)),
-                                child:
-                                    Icon(icons[i], size: 23, color: colors[i])),
-                            const SizedBox(width: 12),
-                            Expanded(
-                                child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                  Row(children: [
-                                    Flexible(
-                                        child: Text(reference.$2,
-                                            maxLines: 1,
+                        child: _metric(
+                            calories.isEmpty
+                                ? '—'
+                                : calories
+                                    .fold<double>(
+                                        0, (sum, e) => sum + e.calories!)
+                                    .toStringAsFixed(0),
+                            '已填热量',
+                            'kcal',
+                            const Color(0xFFB88A45))),
+                    Container(
+                        width: 1,
+                        height: 32,
+                        color: muted.withValues(alpha: .15)),
+                    Expanded(
+                        child: _metric(
+                            protein.isEmpty
+                                ? '—'
+                                : protein
+                                    .fold<double>(
+                                        0, (sum, e) => sum + e.protein!)
+                                    .toStringAsFixed(1),
+                            '已填蛋白质',
+                            'g',
+                            const Color(0xFF628269))),
+                  ]),
+                  const SizedBox(height: 18),
+                  Row(children: [
+                    for (final reference in mealReferences)
+                      Expanded(
+                          child: Container(
+                              height: 4,
+                              margin: const EdgeInsets.symmetric(horizontal: 2),
+                              decoration: BoxDecoration(
+                                  color: _meals!.containsKey(
+                                          '${dayKey(recordDate)}|${reference.$1}')
+                                      ? theme.colorScheme.primary
+                                      : theme.scaffoldBackgroundColor,
+                                  borderRadius: BorderRadius.circular(2))))
+                  ]),
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    Text('已记录 ${entries.length} 餐',
+                        style: TextStyle(fontSize: 10, color: muted)),
+                    const Spacer(),
+                    IconButton(
+                        tooltip: '营养汇总说明',
+                        onPressed: () => showDialog(
+                            context: context,
+                            builder: (context) => const AlertDialog(
+                                title: Text('营养汇总'),
+                                content: Text(
+                                    '仅汇总手动填写的热量和蛋白质。未填写的餐次不参与计算，也不等于零摄入。'))),
+                        icon: Icon(Icons.info_outline, size: 15, color: muted))
+                  ]),
+                ])),
+            const SizedBox(height: 20),
+            const Text('每餐记录',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            for (var i = 0; i < mealReferences.length; i++)
+              Builder(builder: (context) {
+                final reference = mealReferences[i];
+                final meal = _meals!['${dayKey(recordDate)}|${reference.$1}'];
+                return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Material(
+                        color: theme.colorScheme.surface,
+                        borderRadius: BorderRadius.circular(18),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                            key: ValueKey('edit-meal-${reference.$1}'),
+                            borderRadius: BorderRadius.circular(18),
+                            onTap: _busy ? null : () => _edit(reference),
+                            child: Padding(
+                                padding: const EdgeInsets.all(14),
+                                child: Row(children: [
+                                  Container(
+                                      width: 43,
+                                      height: 43,
+                                      decoration: BoxDecoration(
+                                          color:
+                                              colors[i].withValues(alpha: .1),
+                                          borderRadius:
+                                              BorderRadius.circular(14)),
+                                      child: Icon(icons[i],
+                                          size: 23, color: colors[i])),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                      child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                        Row(children: [
+                                          Flexible(
+                                              child: Text(reference.$2,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                      fontSize: 13,
+                                                      fontWeight:
+                                                          FontWeight.w600))),
+                                          const SizedBox(width: 7),
+                                          if (meal != null)
+                                            Icon(Icons.check_circle,
+                                                size: 12,
+                                                color:
+                                                    theme.colorScheme.primary)
+                                        ]),
+                                        const SizedBox(height: 5),
+                                        Text(
+                                            meal?.actual ??
+                                                '参考 · ${summaries[i]}',
+                                            key: ValueKey(
+                                                'meal-actual-${reference.$1}'),
+                                            maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w600))),
-                                    const SizedBox(width: 7),
-                                    if (meal != null)
-                                      Icon(Icons.check_circle,
-                                          size: 12,
-                                          color: theme.colorScheme.primary)
-                                  ]),
-                                  const SizedBox(height: 5),
-                                  Text(meal?.actual ?? '参考 · ${summaries[i]}',
-                                      key: ValueKey(
-                                          'meal-actual-${reference.$1}'),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                          fontSize: 10,
-                                          height: 1.5,
-                                          color: muted)),
-                                ])),
-                            const SizedBox(width: 8),
-                            Icon(
-                                meal == null
-                                    ? Icons.add_rounded
-                                    : Icons.chevron_right_rounded,
-                                size: 20,
-                                color: muted),
-                          ]))));
-            }),
-          const SizedBox(height: 4),
-          Text('点开餐次，查看份量参考或记录实际饮食。',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 10, color: muted)),
-        ]);
+                                            style: TextStyle(
+                                                fontSize: 10,
+                                                height: 1.5,
+                                                color: muted)),
+                                      ])),
+                                  const SizedBox(width: 8),
+                                  Icon(
+                                      meal == null
+                                          ? Icons.add_rounded
+                                          : Icons.chevron_right_rounded,
+                                      size: 20,
+                                      color: muted),
+                                ])))));
+              }),
+          ])),
+    ]);
   }
 
   Widget _metric(String value, String label, String unit, Color color) =>

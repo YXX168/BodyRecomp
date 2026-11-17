@@ -11,6 +11,7 @@ import '../services/rest_timer_service.dart';
 import '../services/rest_countdown.dart';
 import '../widgets/rest_timer_pill.dart';
 import '../widgets/daily_date_bar.dart';
+import '../widgets/daily_record_date.dart';
 import '../widgets/exercise_editor.dart';
 import '../widgets/exercise_picker.dart';
 import '../widgets/text_prompt.dart';
@@ -27,10 +28,10 @@ class WorkoutPage extends StatefulWidget {
   State<WorkoutPage> createState() => _WorkoutPageState();
 }
 
-class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
-  DateTime get _now => widget.now?.call() ?? DateTime.now();
-  late DateTime _date = dateOnly(_now);
-  bool _followToday = true;
+class _WorkoutPageState extends State<WorkoutPage>
+    with WidgetsBindingObserver, DailyRecordDate<WorkoutPage> {
+  @override
+  DateTime get now => widget.now?.call() ?? DateTime.now();
   Map<String, DailyWorkout> _sessions = {};
   List<WorkoutTemplate> _templates = [];
   List<String> _schedule = List.from(defaultSchedule);
@@ -41,14 +42,12 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
   int _generation = 0;
   int _nextId = 0;
   late final RestCountdown _rest;
-  bool _visible = true;
-  bool _foreground = true;
 
   DailyWorkout get _session =>
-      _sessions[dayKey(_date)] ?? DailyWorkout(date: dayKey(_date));
+      _sessions[dayKey(recordDate)] ?? DailyWorkout(date: dayKey(recordDate));
   WorkoutTemplate? get _suggestion {
-    final matches =
-        _templates.where((value) => value.id == _schedule[_date.weekday - 1]);
+    final matches = _templates
+        .where((value) => value.id == _schedule[recordDate.weekday - 1]);
     return matches.isEmpty ? null : matches.first;
   }
 
@@ -57,8 +56,7 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
     super.initState();
     _rest = widget.restController ??
         RestCountdown(
-            now: () => _now, onFinished: () => HapticFeedback.heavyImpact());
-    WidgetsBinding.instance.addObserver(this);
+            now: () => now, onFinished: () => HapticFeedback.heavyImpact());
     workoutDataRevision.addListener(_reload);
     workoutPlanRevision.addListener(_reload);
     restTimerPreferenceRevision.addListener(_reload);
@@ -68,17 +66,11 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final visible = TickerMode.valuesOf(context).enabled;
-    if (visible && !_visible && _followToday) {
-      _date = dateOnly(_now);
-    }
-    _visible = visible;
-    if (widget.restController == null) _rest.setActive(_visible && _foreground);
+    if (widget.restController == null) _rest.setActive(pageActive);
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     workoutDataRevision.removeListener(_reload);
     workoutPlanRevision.removeListener(_reload);
     restTimerPreferenceRevision.removeListener(_reload);
@@ -88,14 +80,8 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    _foreground = state == AppLifecycleState.resumed;
-    if (widget.restController == null) _rest.setActive(_visible && _foreground);
-    if (_foreground) {
-      _rest.refresh();
-      if (_followToday && dateOnly(_now) != _date) {
-        setState(() => _date = dateOnly(_now));
-      }
-    }
+    super.didChangeAppLifecycleState(state);
+    if (widget.restController == null) _rest.setActive(pageActive);
   }
 
   Future<void> _reload() async {
@@ -169,8 +155,8 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
     if (values != null && mounted) await _add(values, target);
   }
 
-  Future<void> _custom([WorkoutBlock? block]) async {
-    final target = _session;
+  Future<void> _custom({DailyWorkout? session, WorkoutBlock? block}) async {
+    final target = session ?? _session;
     final value = await editExercise(context, initial: block?.exercise);
     if (!mounted || value == null) return;
     if (block == null) {
@@ -201,15 +187,14 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
     // Backdated entries and undo never launch a timer.
     if (!undo &&
         _autoRest &&
-        target.date == dayKey(_now) &&
+        target.date == dayKey(now) &&
         count < block.exercise.sets) {
       _startTimer(block.exercise);
     }
   }
 
-  Future<void> _remove(WorkoutBlock block) async {
-    final target = _session;
-    final index = target.blocks.indexWhere((e) => e.id == block.id);
+  Future<void> _remove(DailyWorkout target, int index) async {
+    final block = target.blocks[index];
     if (!await _save(target.copyWith(
             blocks: target.blocks.where((e) => e.id != block.id).toList())) ||
         !mounted) {
@@ -226,20 +211,24 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
                   _message('正在保存，请稍后重试');
                   return;
                 }
-                final latest =
-                    _sessions[target.date] ?? DailyWorkout(date: target.date);
-                if (latest.blocks.any((e) => e.id == block.id)) return;
+                final latest = _sessions[target.date];
+                if (latest == null ||
+                    latest.blocks.any((e) => e.id == block.id)) {
+                  return;
+                }
                 final blocks = List<WorkoutBlock>.from(latest.blocks)
                   ..insert(index.clamp(0, latest.blocks.length), block);
                 await _save(latest.copyWith(blocks: blocks, rested: false));
               })));
   }
 
-  Future<void> _move(int index, int offset) async {
-    final blocks = List<WorkoutBlock>.from(_session.blocks);
+  Future<void> _move(DailyWorkout target, int index, int offset) async {
+    final destination = index + offset;
+    if (destination < 0 || destination >= target.blocks.length) return;
+    final blocks = List<WorkoutBlock>.from(target.blocks);
     final block = blocks.removeAt(index);
-    blocks.insert(index + offset, block);
-    await _save(_session.copyWith(blocks: blocks));
+    blocks.insert(destination, block);
+    await _save(target.copyWith(blocks: blocks));
   }
 
   Future<void> _saveTemplate() async {
@@ -266,7 +255,8 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
   void _startTimer(Exercise exercise) {
     final seconds = parseRestSeconds(exercise.rest);
     if (seconds != null) {
-      _rest.start(seconds, '${_date.month}/${_date.day} · ${exercise.name}');
+      _rest.start(
+          seconds, '${recordDate.month}/${recordDate.day} · ${exercise.name}');
     }
   }
 
@@ -291,6 +281,7 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
               ])));
     final session = _session;
     final suggestion = _suggestion;
+    final isToday = recordDate == today;
     final theme = Theme.of(context);
     final color = theme.colorScheme.primary;
     final muted = theme.colorScheme.onSurface.withValues(alpha: .45);
@@ -304,20 +295,20 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
             child: Align(
                 alignment: Alignment.centerRight,
                 child: RestTimerPill(controller: _rest))),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+        child: DailyDateBar(
+          date: recordDate,
+          today: today,
+          enabled: !_busy,
+          onChanged: selectRecordDate,
+        ),
+      ),
       Expanded(
           child: ListView(
-              key: PageStorageKey('daily-workout-scroll-${dayKey(_date)}'),
+              key: PageStorageKey('daily-workout-scroll-${dayKey(recordDate)}'),
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
               children: [
-            DailyDateBar(
-                date: _date,
-                today: _now,
-                enabled: !_busy,
-                onChanged: (date) => setState(() {
-                      _date = date;
-                      _followToday = date == dateOnly(_now);
-                    })),
-            const SizedBox(height: 6),
             Container(
                 key: const Key('daily-suggestion'),
                 padding: const EdgeInsets.fromLTRB(14, 8, 8, 12),
@@ -344,7 +335,7 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
                         child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                          Text('当天参考',
+                          Text(isToday ? '今日参考' : '当日参考',
                               style: TextStyle(fontSize: 9, color: muted)),
                           const SizedBox(height: 3),
                           Text(suggestion?.name ?? '休息 / 恢复',
@@ -368,11 +359,11 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
                                   child: Padding(
                                       padding: const EdgeInsets.all(24),
                                       child: Text(
-                                          recoveryNotes[_date.weekday - 1]
+                                          recoveryNotes[recordDate.weekday - 1]
                                                   .isEmpty
                                               ? '按当天状态自由恢复。'
                                               : recoveryNotes[
-                                                  _date.weekday - 1],
+                                                  recordDate.weekday - 1],
                                           style: const TextStyle(
                                               fontSize: 13, height: 1.7))))),
                           icon: Icon(Icons.info_outline_rounded,
@@ -449,7 +440,7 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
                           angle: .12, child: const ExerciseMark('散步', size: 44))
                     ]),
                     const SizedBox(height: 18),
-                    Text(session.rested ? '今天，好好休息' : '选几块，开始今天的训练',
+                    Text(session.rested ? '已标记休息' : '暂无训练项目',
                         style: const TextStyle(
                             fontSize: 13, fontWeight: FontWeight.w600)),
                     TextButton(
@@ -458,14 +449,14 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
                             ? null
                             : () => _save(
                                 session.copyWith(rested: !session.rested)),
-                        child: Text(session.rested ? '取消休息标记' : '今天休息',
+                        child: Text(session.rested ? '取消休息标记' : '标记休息',
                             style: TextStyle(fontSize: 11, color: muted))),
                   ])),
             for (var i = 0; i < session.blocks.length; i++)
               Padding(
                   key: ValueKey('${session.date}-${session.blocks[i].id}'),
                   padding: const EdgeInsets.only(bottom: 10),
-                  child: _blockCard(session.blocks[i], i)),
+                  child: _blockCard(session, i)),
             const SizedBox(height: 6),
             Row(mainAxisAlignment: MainAxisAlignment.center, children: [
               TextButton.icon(
@@ -497,7 +488,8 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
             style: TextStyle(fontSize: 9, color: Theme.of(context).hintColor)),
       ]);
 
-  Widget _blockCard(WorkoutBlock block, int index) {
+  Widget _blockCard(DailyWorkout session, int index) {
+    final block = session.blocks[index];
     final exercise = block.exercise;
     final complete = block.completedSets == exercise.sets;
     final theme = Theme.of(context);
@@ -524,14 +516,14 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
                       hoverColor: Colors.transparent),
                   child: ExpansionTile(
                     key: PageStorageKey(
-                        'exercise-details-${_session.date}-${block.id}'),
+                        'exercise-details-${session.date}-${block.id}'),
                     minTileHeight: 56,
                     tilePadding: EdgeInsets.zero,
                     dense: true,
                     shape: const Border(),
                     collapsedShape: const Border(),
                     leading: ExerciseMark(exercise.name, size: 42),
-                    trailing: _blockMenu(block, index),
+                    trailing: _blockMenu(session, index),
                     title: Text(exercise.name,
                         style: const TextStyle(
                             fontSize: 13, fontWeight: FontWeight.w600)),
@@ -613,25 +605,45 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
             ])));
   }
 
-  Widget _blockMenu(WorkoutBlock block, int index) => PopupMenuButton<String>(
-        key: ValueKey('block-menu-$index'),
-        enabled: !_busy,
-        tooltip: '调整项目',
-        padding: EdgeInsets.zero,
-        icon: Icon(Icons.more_horiz_rounded,
-            size: 19, color: Theme.of(context).hintColor),
-        onSelected: (value) {
-          if (value == 'edit') _custom(block);
-          if (value == 'remove') _remove(block);
-          if (value == 'up') _move(index, -1);
-          if (value == 'down') _move(index, 1);
-        },
-        itemBuilder: (_) => [
-          const PopupMenuItem(value: 'edit', child: Text('修改组数 / 次数 / 说明')),
-          if (index > 0) const PopupMenuItem(value: 'up', child: Text('上移')),
-          if (index < _session.blocks.length - 1)
-            const PopupMenuItem(value: 'down', child: Text('下移')),
-          const PopupMenuItem(value: 'remove', child: Text('移除项目（可撤销）'))
-        ],
-      );
+  Widget _blockMenu(DailyWorkout session, int index) {
+    final id = session.blocks[index].id;
+
+    void handle(String action) {
+      // Actions belong to the date and block that opened the menu, even if
+      // the page rolls over to a new day while the menu is open.
+      final target = _sessions[session.date];
+      if (!mounted || _busy || target == null) return;
+      final position = target.blocks.indexWhere((block) => block.id == id);
+      if (position == -1) return;
+      switch (action) {
+        case 'edit':
+          _custom(session: target, block: target.blocks[position]);
+        case 'remove':
+          _remove(target, position);
+        case 'up':
+          _move(target, position, -1);
+        case 'down':
+          _move(target, position, 1);
+      }
+    }
+
+    return PopupMenuButton<String>(
+      key: ValueKey('block-menu-$index'),
+      enabled: !_busy,
+      tooltip: '调整项目',
+      padding: EdgeInsets.zero,
+      icon: Icon(Icons.more_horiz_rounded,
+          size: 19, color: Theme.of(context).hintColor),
+      itemBuilder: (_) => [
+        PopupMenuItem(
+            onTap: () => handle('edit'), child: const Text('修改组数 / 次数 / 说明')),
+        if (index > 0)
+          PopupMenuItem(onTap: () => handle('up'), child: const Text('上移')),
+        if (index < session.blocks.length - 1)
+          PopupMenuItem(onTap: () => handle('down'), child: const Text('下移')),
+        PopupMenuItem(
+            onTap: () => handle('remove'), child: const Text('移除项目（可撤销）')),
+      ],
+    );
+  }
 }
