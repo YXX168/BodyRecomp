@@ -43,7 +43,10 @@ class AppNavigationBar extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               AnimatedContainer(
-                                  duration: const Duration(milliseconds: 160),
+                                  duration:
+                                      MediaQuery.disableAnimationsOf(context)
+                                          ? Duration.zero
+                                          : const Duration(milliseconds: 160),
                                   curve: Curves.easeOutCubic,
                                   width: 36,
                                   height: 32,

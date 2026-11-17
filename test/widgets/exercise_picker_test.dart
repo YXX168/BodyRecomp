@@ -30,6 +30,36 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('landscape search keeps results usable above the keyboard',
+      (tester) async {
+    tester.view.physicalSize = const Size(568, 320);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    addTearDown(tester.view.resetViewInsets);
+    List<Exercise>? result;
+    await open(tester, result: (values) => result = values);
+    await tester.enterText(find.byKey(const Key('exercise-search')), '宽握高位下拉');
+    tester.view.viewInsets = const FakeViewPadding(bottom: 187);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    final row = find.byKey(const ValueKey('pick_1_0'));
+    await tester.scrollUntilVisible(row, 32,
+        scrollable: find
+            .descendant(
+                of: find.byKey(const ValueKey('picker-compact-scroll')),
+                matching: find.byType(Scrollable))
+            .first);
+    await tester.pumpAndSettle();
+    await tester.tapAt(tester.getTopLeft(row) + const Offset(32, 16));
+    await tester.pumpAndSettle();
+    expect(find.text('加入 1 个项目'), findsOneWidget);
+    await tap(tester, 'add-picked-exercises');
+    expect(result!.single.name, '宽握高位下拉');
+  });
+
   testWidgets(
       'select all toggles the current category and keeps other selections',
       (tester) async {

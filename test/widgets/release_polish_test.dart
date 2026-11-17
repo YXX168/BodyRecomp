@@ -1,6 +1,9 @@
 import 'package:body_recomp/main.dart';
+import 'package:body_recomp/data/workout_templates.dart';
+import 'package:body_recomp/models/daily_workout.dart';
 import 'package:body_recomp/pages/workout_page.dart';
 import 'package:body_recomp/pages/nutrition_page.dart';
+import 'package:body_recomp/services/daily_workout_service.dart';
 import 'package:body_recomp/widgets/daily_date_bar.dart';
 import 'package:body_recomp/widgets/body_editor.dart';
 import 'package:flutter/material.dart';
@@ -43,6 +46,43 @@ void main() {
       });
     }
   }
+
+  testWidgets('the workout menu still edits its own date after midnight',
+      (tester) async {
+    var now = DateTime(2026, 11, 12, 23, 59, 50);
+    final firstDay = dayKey(now);
+    final nextDay = dayKey(DateTime(2026, 11, 13));
+    final exercise = defaultTemplates.first.exercises.first;
+    await saveDailyWorkout(DailyWorkout(date: firstDay, blocks: [
+      WorkoutBlock(id: 'first', exercise: exercise),
+      WorkoutBlock(id: 'second', exercise: exercise),
+    ]));
+    await saveDailyWorkout(DailyWorkout(date: nextDay, blocks: [
+      WorkoutBlock(id: 'tomorrow', exercise: exercise),
+    ]));
+
+    await tester.pumpWidget(
+        MaterialApp(home: Scaffold(body: WorkoutPage(now: () => now))));
+    await tester.pumpAndSettle();
+    final menu = find.byKey(const ValueKey('block-menu-0'));
+    await tester.ensureVisible(menu);
+    await tester.tap(menu);
+    await tester.pumpAndSettle();
+
+    now = DateTime(2026, 11, 13, 0, 0, 1);
+    await tester.pump(const Duration(seconds: 11));
+    await tester.pumpAndSettle();
+    final dateBar = tester.widget<DailyDateBar>(find.byType(DailyDateBar));
+    expect(dayKey(dateBar.date), nextDay);
+    await tester.tap(find.text('下移'));
+    await tester.pumpAndSettle();
+
+    final sessions = await loadDailyWorkouts();
+    expect(sessions[firstDay]!.blocks.map((block) => block.id),
+        ['second', 'first']);
+    expect(sessions[nextDay]!.blocks.single.id, 'tomorrow');
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('all main cards support small screens and double text size',
       (tester) async {
