@@ -6,6 +6,7 @@ import '../services/nutrition_service.dart';
 import '../widgets/daily_date_bar.dart';
 import '../widgets/daily_record_date.dart';
 import '../widgets/sheet_frame.dart';
+import '../widgets/undo_notice.dart';
 
 class NutritionPage extends StatefulWidget {
   final DateTime Function()? now;
@@ -79,28 +80,22 @@ class _NutritionPageState extends State<NutritionPage>
         }
       });
       if (result.entry == null && before != null) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(
-              content: const Text('已清除此餐记录'),
-              action: SnackBarAction(
-                  label: '撤销',
-                  onPressed: () async {
-                    // An old undo must never replace a later record of this meal.
-                    if (!mounted || _busy || _meals!.containsKey(id)) return;
-                    setState(() => _busy = true);
-                    try {
-                      await saveMealEntry(id, before);
-                      await _load();
-                    } catch (_) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('恢复失败，请重试')));
-                      }
-                    } finally {
-                      if (mounted) setState(() => _busy = false);
-                    }
-                  })));
+        showUndoNotice(context, '已清除此餐记录', onUndo: () async {
+          // An old undo must never replace a later record of this meal.
+          if (!mounted || _busy || _meals!.containsKey(id)) return;
+          setState(() => _busy = true);
+          try {
+            await saveMealEntry(id, before);
+            await _load();
+          } catch (_) {
+            if (mounted) {
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(const SnackBar(content: Text('恢复失败，请重试')));
+            }
+          } finally {
+            if (mounted) setState(() => _busy = false);
+          }
+        });
       }
     } catch (_) {
       if (mounted) {

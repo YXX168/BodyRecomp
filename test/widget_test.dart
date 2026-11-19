@@ -221,6 +221,23 @@ void main() {
     expect(block.completedSets, 2);
   });
 
+  testWidgets('removing a workout block leaves a brief undo notice',
+      (tester) async {
+    seed(seeded());
+    await pump(tester, WorkoutPage(now: () => today));
+    await tapVisible(tester, find.byKey(const ValueKey('block-menu-0')));
+    await tester.tap(find.text('移除项目（可撤销）'));
+    await tester.pumpAndSettle();
+    expect(find.text('撤销'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.text('撤销'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    expect(find.byType(SnackBar), findsNothing);
+    expect((await loadDailyWorkouts())[dayKey(today)]!.blocks, isEmpty);
+  });
+
   testWidgets('custom templates validate set counts and save their projects',
       (tester) async {
     await pump(tester, const TemplateManagerPage());

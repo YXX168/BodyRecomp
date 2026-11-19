@@ -10,6 +10,7 @@ import '../widgets/exercise_mark.dart';
 import '../widgets/exercise_picker.dart';
 import '../widgets/text_prompt.dart';
 import '../widgets/sheet_frame.dart';
+import '../widgets/undo_notice.dart';
 
 class TemplateManagerPage extends StatefulWidget {
   const TemplateManagerPage({super.key});
@@ -345,17 +346,11 @@ class _TemplateEditorState extends State<_TemplateEditor> {
   void _remove(int index) {
     final exercise = _exercises[index];
     setState(() => _exercises.removeAt(index));
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-          content: Text('已移除 ${exercise.name}'),
-          action: SnackBarAction(
-              label: '撤销',
-              onPressed: () {
-                if (!mounted) return;
-                setState(() => _exercises.insert(
-                    index.clamp(0, _exercises.length), exercise));
-              })));
+    showUndoNotice(context, '已移除 ${exercise.name}', onUndo: () {
+      if (!mounted) return;
+      setState(
+          () => _exercises.insert(index.clamp(0, _exercises.length), exercise));
+    });
   }
 
   @override
