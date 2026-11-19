@@ -16,6 +16,7 @@ import '../widgets/exercise_editor.dart';
 import '../widgets/exercise_picker.dart';
 import '../widgets/text_prompt.dart';
 import '../widgets/exercise_mark.dart';
+import '../widgets/undo_notice.dart';
 import 'template_manager_page.dart';
 
 class WorkoutPage extends StatefulWidget {
@@ -200,26 +201,20 @@ class _WorkoutPageState extends State<WorkoutPage>
         !mounted) {
       return;
     }
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-          content: Text('已移除 ${block.exercise.name}'),
-          action: SnackBarAction(
-              label: '撤销',
-              onPressed: () async {
-                if (_busy) {
-                  _message('正在保存，请稍后重试');
-                  return;
-                }
-                final latest = _sessions[target.date];
-                if (latest == null ||
-                    latest.blocks.any((e) => e.id == block.id)) {
-                  return;
-                }
-                final blocks = List<WorkoutBlock>.from(latest.blocks)
-                  ..insert(index.clamp(0, latest.blocks.length), block);
-                await _save(latest.copyWith(blocks: blocks, rested: false));
-              })));
+    showUndoNotice(context, '已移除 ${block.exercise.name}', onUndo: () async {
+      if (!mounted) return;
+      if (_busy) {
+        _message('正在保存，请稍后重试');
+        return;
+      }
+      final latest = _sessions[target.date];
+      if (latest == null || latest.blocks.any((e) => e.id == block.id)) {
+        return;
+      }
+      final blocks = List<WorkoutBlock>.from(latest.blocks)
+        ..insert(index.clamp(0, latest.blocks.length), block);
+      await _save(latest.copyWith(blocks: blocks, rested: false));
+    });
   }
 
   Future<void> _move(DailyWorkout target, int index, int offset) async {
