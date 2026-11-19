@@ -1,11 +1,11 @@
-import 'package:body_recomp/main.dart';
 import 'package:body_recomp/data/workout_templates.dart';
+import 'package:body_recomp/main.dart';
 import 'package:body_recomp/models/daily_workout.dart';
-import 'package:body_recomp/pages/workout_page.dart';
 import 'package:body_recomp/pages/nutrition_page.dart';
+import 'package:body_recomp/pages/workout_page.dart';
 import 'package:body_recomp/services/daily_workout_service.dart';
-import 'package:body_recomp/widgets/daily_date_bar.dart';
 import 'package:body_recomp/widgets/body_editor.dart';
+import 'package:body_recomp/widgets/daily_date_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -84,7 +84,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('all main cards support small screens and double text size',
+  testWidgets(
+      'all 5 tabs support small screens and double text size in dark and light themes',
       (tester) async {
     tester.view.physicalSize = const Size(320, 568);
     tester.view.devicePixelRatio = 1;
@@ -92,12 +93,20 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-    await tester.pumpWidget(const ThemeState(child: RecompApp()));
-    await tester.pumpAndSettle();
-    for (final tab in [0, 1, 2, 3]) {
-      await tester.tap(find.byKey(ValueKey('nav-$tab')));
+
+    for (final mode in [AppTheme.blue, AppTheme.green]) {
+      final controller = ThemeController(mode);
+      await tester.pumpWidget(
+        ThemeState(controller: controller, child: const RecompApp()),
+      );
       await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull, reason: 'tab $tab');
+      for (final tab in [0, 1, 2, 3, 4]) {
+        await tester.tap(find.byKey(ValueKey('nav-$tab')));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull,
+            reason: 'theme ${mode.name} tab $tab');
+      }
+      controller.dispose();
     }
   });
 

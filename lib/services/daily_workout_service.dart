@@ -95,6 +95,31 @@ Future<void> saveDailyWorkout(DailyWorkout session) => _serialize(() async {
           {for (final e in sessions.entries) e.key: e.value.toJson()});
     });
 
+/// Removes a day's custom override so it falls back to its weekday fixed template.
+Future<void> deleteDailyWorkout(String date) => _serialize(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final sessions = decodeDailyWorkouts(prefs.getString(dailyWorkoutsKey));
+      if (sessions.remove(date) != null) {
+        await writeJson(prefs, dailyWorkoutsKey,
+            {for (final e in sessions.entries) e.key: e.value.toJson()});
+      }
+    });
+
+List<WorkoutBlock> instantiateTemplateBlocks(
+  WorkoutTemplate template,
+  String date, {
+  int seed = 0,
+}) {
+  final stamp = DateTime.now().microsecondsSinceEpoch;
+  return [
+    for (var i = 0; i < template.exercises.length; i++)
+      WorkoutBlock(
+        id: 'tpl_${date}_${stamp}_${seed}_$i',
+        exercise: template.exercises[i],
+      ),
+  ];
+}
+
 List<WorkoutTemplate> decodeWorkoutTemplates(String? raw) {
   if (raw == null) return List.from(defaultTemplates);
   final values = (jsonDecode(raw) as List)
@@ -122,6 +147,40 @@ Future<void> saveWorkoutTemplates(List<WorkoutTemplate> templates) =>
       await writeJson(prefs, workoutTemplatesKey,
           templates.map((e) => e.toJson()).toList());
     });
+
+/// Atomically deletes a template and clears any weekday binding referencing it.
+Future<void> deleteWorkoutTemplate(String templateId) => _serialize(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final templates =
+          decodeWorkoutTemplates(prefs.getString(workoutTemplatesKey))
+              .where((t) => t.id != templateId)
+              .toList();
+      final schedule = decodeWeeklySchedule(prefs.getString(weeklyScheduleKey))
+          .map((id) => id == templateId ? '' : id)
+          .toList();
+      await writeJson(prefs, workoutTemplatesKey,
+          templates.map((e) => e.toJson()).toList());
+      await writeJson(prefs, weeklyScheduleKey, schedule);
+    });
+
+Future<WorkoutTemplate> duplicateWorkoutTemplate(WorkoutTemplate source) async {
+  late WorkoutTemplate created;
+  await _serialize(() async {
+    final prefs = await SharedPreferences.getInstance();
+    final templates =
+        decodeWorkoutTemplates(prefs.getString(workoutTemplatesKey));
+    created = WorkoutTemplate(
+      id: 'custom_${DateTime.now().microsecondsSinceEpoch}',
+      name: '${source.name} 副本',
+      note: source.note,
+      exercises: List.from(source.exercises),
+    );
+    templates.add(created);
+    await writeJson(
+        prefs, workoutTemplatesKey, templates.map((e) => e.toJson()).toList());
+  });
+  return created;
+}
 
 List<String> decodeWeeklySchedule(String? raw) {
   if (raw == null) return List.from(defaultSchedule);

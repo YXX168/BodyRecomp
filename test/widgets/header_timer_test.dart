@@ -35,12 +35,20 @@ void main() {
     await tester.pumpAndSettle();
     final pill = find.byType(RestTimerPill);
     final rect = tester.getRect(pill);
-    final block = find.byKey(const ValueKey('workout-block-0'));
-    final cardBefore = tester.getRect(block);
     expect(
         rect.bottom,
         lessThan(
             tester.getTopLeft(find.byKey(const Key('daily-suggestion'))).dy));
+    final block = find.byKey(const ValueKey('workout-block-0'));
+    await tester.scrollUntilVisible(
+      block,
+      180,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(block);
+    await tester.ensureVisible(find.byKey(const ValueKey('start-rest-0')));
+    await tester.pumpAndSettle();
+    final cardBefore = tester.getRect(block);
     expect(find.byKey(const Key('rest-timer-panel')), findsNothing);
     await tester.tap(find.byKey(const ValueKey('start-rest-0')));
     for (var frame = 0; frame < 16; frame++) {
@@ -51,7 +59,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.getRect(pill), rect);
     expect(tester.getRect(block), cardBefore);
-    for (final tab in [1, 2, 3, 0]) {
+    for (final tab in [1, 2, 3, 4, 0]) {
       await tester.tap(find.byKey(ValueKey('nav-$tab')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('rest-timer-panel')), findsOneWidget);

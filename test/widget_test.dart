@@ -1,19 +1,19 @@
 import 'dart:convert';
-import 'package:body_recomp/main.dart';
 import 'package:body_recomp/data/workout_templates.dart';
+import 'package:body_recomp/main.dart';
 import 'package:body_recomp/models/daily_workout.dart';
-import 'package:body_recomp/pages/workout_page.dart';
 import 'package:body_recomp/pages/nutrition_page.dart';
 import 'package:body_recomp/pages/template_manager_page.dart';
+import 'package:body_recomp/pages/workout_page.dart';
 import 'package:body_recomp/services/daily_workout_service.dart';
-import 'package:body_recomp/services/rest_timer_service.dart';
 import 'package:body_recomp/services/nutrition_service.dart';
+import 'package:body_recomp/services/rest_timer_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  final today = DateTime(2026, 11, 12, 19);
+  final today = DateTime(2026, 11, 12, 19); // Thursday -> legs
   DailyWorkout seeded({int done = 0}) =>
       DailyWorkout(date: dayKey(today), blocks: [
         WorkoutBlock(
@@ -49,19 +49,20 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets('reference remains separate and supports partial selection',
+  testWidgets('daily fixed template auto-loads and materializes on first set',
       (tester) async {
     await pump(tester, WorkoutPage(now: () => today));
+    // Thursday fixed template auto-loads without manual picking
     expect(find.text('腿 · 核心与肩补强'), findsOneWidget);
-    expect(find.byKey(const ValueKey('workout-block-0')), findsNothing);
-    await tapVisible(tester, find.byKey(const Key('use-suggestion')));
-    await tester.tap(find.byKey(const ValueKey('pick_0_0')));
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('add-picked-exercises')));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('workout-block-0')), findsOneWidget);
+    expect(find.text('倒蹬机'), findsOneWidget);
+    // Still unmaterialized until user logs or edits
+    expect((await loadDailyWorkouts())[dayKey(today)], isNull);
+
+    await tapVisible(tester, find.byKey(const ValueKey('complete-set-0')));
     final session = (await loadDailyWorkouts())[dayKey(today)]!;
-    expect(session.blocks.single.exercise.name, '倒蹬机');
-    expect(session.completedSets, 0);
+    expect(session.blocks.first.exercise.name, '倒蹬机');
+    expect(session.blocks.first.completedSets, 1);
     expect(find.byKey(const Key('rest-timer-panel')), findsNothing);
   });
 
@@ -85,6 +86,8 @@ void main() {
     seed(seeded(done: 2));
     await pump(tester, WorkoutPage(now: () => today));
     await tapVisible(tester, find.byKey(const Key('choose-blocks')));
+    await tester.tap(find.byKey(const ValueKey('picker-source-0')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('pick_0_0')));
     await tester.tap(find.byKey(const ValueKey('picker-template-pull')));
     await tester.pumpAndSettle();
@@ -100,6 +103,7 @@ void main() {
   testWidgets(
       'library search keeps selection across templates and fits keyboard',
       (tester) async {
+    await saveWeeklySchedule(['', '', '', '', '', '', '']);
     await pump(tester, WorkoutPage(now: () => today),
         size: const Size(320, 568), scale: 1.3);
     await tapVisible(tester, find.byKey(const Key('choose-blocks')));
@@ -191,18 +195,17 @@ void main() {
   });
 
   testWidgets(
-      'backdated actual training is independent from rest-day suggestion',
+      'backdated actual training never launches timer and stays independent',
       (tester) async {
     final yesterday = today.subtract(const Duration(days: 1));
     seed(DailyWorkout(date: dayKey(yesterday), blocks: seeded().blocks));
+    await saveWeeklySchedule(['push', 'pull', '', 'legs', '', '', '']);
     await saveAutoRestTimer(true);
     await pump(tester, WorkoutPage(now: () => today));
     await tapVisible(tester, find.byKey(const Key('previous-date')));
     expect(find.text('休息 / 恢复'), findsOneWidget);
     await tapVisible(tester, find.byKey(const ValueKey('complete-set-0')));
     expect(find.byKey(const Key('rest-timer-panel')), findsNothing);
-    await tapVisible(tester, find.byKey(const Key('next-date')));
-    expect(find.byKey(const ValueKey('workout-block-0')), findsNothing);
     expect((await loadDailyWorkouts())[dayKey(yesterday)]!.completedSets, 1);
   });
 
@@ -251,17 +254,16 @@ void main() {
     await tester.enterText(find.byKey(const Key('exercise-sets')), '3');
     await tester.tap(find.text('保存').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('保存'));
+    await tester.tap(find.byKey(const Key('save-template')));
     await tester.pumpAndSettle();
     expect((await loadWorkoutTemplates()).last.exercises.single.name, '自由组合项目');
-    expect(
-        await loadWeeklySchedule(), ['push', 'pull', '', 'legs', '', '', '']);
+    expect(await loadWeeklySchedule(), defaultSchedule);
   });
 
   testWidgets('meal references are not logged until explicitly saved',
       (tester) async {
     await pump(tester, const NutritionPage());
-    expect(find.text('已记录 0 餐'), findsOneWidget);
+    expect(find.text('已记录 0/5 餐'), findsOneWidget);
     await tapVisible(tester, find.byKey(const ValueKey('edit-meal-breakfast')));
     await tester.enterText(
         find.byKey(const Key('meal-actual-input')), '2 个鸡蛋 + 牛奶');
@@ -273,8 +275,8 @@ void main() {
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     expect((await loadMeals()).values.single.actual, '2 个鸡蛋 + 牛奶');
-    await tester.scrollUntilVisible(find.text('已记录 1 餐'), -180);
-    expect(find.text('已记录 1 餐'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('已记录 1/5 餐'), -180);
+    expect(find.text('已记录 1/5 餐'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -286,18 +288,14 @@ void main() {
     await tester.pumpAndSettle();
     await tapVisible(tester, find.byKey(const ValueKey('complete-set-0')));
     await tapVisible(tester, find.byKey(const ValueKey('start-rest-0')));
-    await tester.tap(find.text('饮食'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('训练'));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('rest-timer-panel')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('nav-2')));
     await tester.pumpAndSettle();
-    expect(
-        find.descendant(
-            of: find.byKey(const ValueKey('record-stat-已练项目')),
-            matching: find.text('1')),
-        findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('nav-0')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('rest-timer-panel')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('nav-3')));
+    await tester.pumpAndSettle();
+    expect(find.text('天 · 1 项目'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

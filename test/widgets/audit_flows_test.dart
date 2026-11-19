@@ -1,13 +1,15 @@
 import 'package:body_recomp/main.dart';
-import 'package:body_recomp/pages/nutrition_page.dart';
-import 'package:body_recomp/pages/template_manager_page.dart';
-import 'package:body_recomp/pages/workout_page.dart';
 import 'package:body_recomp/models/daily_workout.dart';
 import 'package:body_recomp/models/recomp_models.dart';
+import 'package:body_recomp/pages/nutrition_page.dart';
+import 'package:body_recomp/pages/profile_page.dart';
+import 'package:body_recomp/pages/template_manager_page.dart';
+import 'package:body_recomp/pages/workout_page.dart';
 import 'package:body_recomp/services/daily_workout_service.dart';
 import 'package:body_recomp/services/data_service.dart';
 import 'package:body_recomp/services/nutrition_service.dart';
 import 'package:body_recomp/widgets/body_editor.dart';
+import 'package:body_recomp/widgets/smooth_trend_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -57,7 +59,7 @@ void main() {
   testWidgets('template removal can be undone before save', (tester) async {
     final original = (await loadWorkoutTemplates()).first.exercises;
     await open(tester, const TemplateManagerPage());
-    await tap(tester, find.text('推 · 胸肩三头').first);
+    await tap(tester, find.byKey(const ValueKey('template-card-push')));
     await tap(tester, find.text('移除').first);
     await tap(tester, find.text('撤销'));
     await tap(tester, find.byKey(const Key('save-template')));
@@ -145,13 +147,11 @@ void main() {
 
   testWidgets('rest marker can be cancelled without logging training',
       (tester) async {
-    await open(tester, const WorkoutPage());
+    await open(tester, WorkoutPage(now: () => DateTime(2026, 11, 12, 19)));
     await tap(tester, find.byKey(const Key('record-rest')));
-    expect((await loadDailyWorkouts())[dayKey(DateTime.now())]!.rested, isTrue);
+    expect((await loadDailyWorkouts())['2026-11-12']!.rested, isTrue);
     await tap(tester, find.text('取消休息标记'));
-    final session = (await loadDailyWorkouts())[dayKey(DateTime.now())]!;
-    expect(session.rested, isFalse);
-    expect(session.completedSets, 0);
+    expect((await loadDailyWorkouts())['2026-11-12'], isNull);
   });
 
   testWidgets('damaged body data offers recovery without replacing it',
@@ -161,10 +161,26 @@ void main() {
     await tester.pumpWidget(const ThemeState(child: RecompApp()));
     await tester.pumpAndSettle();
     await tap(tester, find.byKey(const ValueKey('nav-3')));
-    expect(find.text('身体数据读取失败，原记录已保留。'), findsOneWidget);
-    expect(find.text('导出原数据'), findsOneWidget);
-    expect(find.text('导入备份'), findsOneWidget);
+    expect(find.text('统计数据读取失败，原记录未被覆盖。'), findsOneWidget);
+    expect(find.text('查看原数据'), findsOneWidget);
     expect(prefs.getString(weightHistoryKey), '[damaged');
+    await tap(tester, find.byKey(const ValueKey('nav-4')));
+    final exportBtn = find.text('导出 JSON');
+    await tester.scrollUntilVisible(
+      exportBtn,
+      180,
+      scrollable: find
+          .descendant(
+            of: find.byType(ProfilePage),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.ensureVisible(exportBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(exportBtn);
+    await tester.pumpAndSettle();
+    expect(find.text('数据导出 (JSON)'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -173,9 +189,8 @@ void main() {
       (tester) async {
     await tester.pumpWidget(const ThemeState(child: RecompApp()));
     await tester.pumpAndSettle();
-    await tap(tester, find.byKey(const ValueKey('nav-3')));
-    await tap(tester, find.text('个人资料').first);
-    await tap(tester, find.text('当前体重'));
+    await tap(tester, find.byKey(const ValueKey('nav-4')));
+    await tap(tester, find.text('体重'));
     await tester.enterText(
         find.byKey(const ValueKey('body-value-weight')), '-70');
     await tap(tester, find.byKey(const Key('save-body-values')));
@@ -201,7 +216,9 @@ void main() {
     await tester.pumpWidget(const ThemeState(child: RecompApp()));
     await tester.pumpAndSettle();
     await tap(tester, find.byKey(const ValueKey('nav-3')));
-    expect(tester.getSize(find.byType(MiniTrendChart)).width, greaterThan(280));
+    await tap(tester, find.byKey(const ValueKey('trends-seg-2')));
+    expect(
+        tester.getSize(find.byType(SmoothTrendChart)).width, greaterThan(280));
     expect(tester.takeException(), isNull);
   });
 }

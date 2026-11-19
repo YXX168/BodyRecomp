@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Small equipment illustrations, kept local so the library works offline.
+/// Offline vector equipment & movement badges with muscle-group semantic tints.
 class ExerciseMark extends StatelessWidget {
   final String name;
   final double size;
@@ -9,50 +9,77 @@ class ExerciseMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final kind = _kind(name);
-    final colors = [
-      const Color(0xFF518C83),
-      const Color(0xFF7396B8),
-      const Color(0xFF9586B9),
-      const Color(0xFFBD9862),
-      const Color(0xFFC68E7C),
-    ];
-    final color = colors[switch (kind) {
-      'pull' || 'row' || 'rear' || 'fly' => 1,
-      'leg' || 'hinge' => 2,
-      'core' || 'plank' => 3,
-      'walk' || 'cycle' || 'erg' || 'cardio' || 'stretch' => 4,
-      _ => 0,
-    }];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Muscle-group semantic palette
+    final color = switch (kind) {
+      'bench' ||
+      'incline' ||
+      'fly' ||
+      'pushup' =>
+        const Color(0xFF2EE59D), // 胸部 · 翡翠青
+      'pull' || 'row' => const Color(0xFF38BDF8), // 背部 · 冰川蓝
+      'shoulder' || 'raise' || 'rear' => const Color(0xFFA78BFA), // 肩部 · 星云紫
+      'leg' || 'hinge' => const Color(0xFFFB923C), // 腿臀 · 炽焰橙
+      'curl' || 'triceps' || 'cable' => const Color(0xFF2DD4BF), // 手臂 · 碧玺绿
+      'core' || 'plank' => const Color(0xFFFBBF24), // 核心 · 琥珀金
+      'walk' ||
+      'cycle' ||
+      'erg' ||
+      'cardio' ||
+      'stretch' =>
+        const Color(0xFFFB7185), // 有氧恢复 · 珊瑚红
+      _ => const Color(0xFF60A5FA),
+    };
+    final effectiveInk = isDark
+        ? color
+        : HSLColor.fromColor(color)
+            .withLightness(
+                (HSLColor.fromColor(color).lightness - 0.14).clamp(0.24, 0.52))
+            .toColor();
+
     return ExcludeSemantics(
       child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-              color: color.withValues(alpha: .09),
-              borderRadius: BorderRadius.circular(size * .25)),
-          child: CustomPaint(painter: _EquipmentPainter(kind, color))),
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            center: const Alignment(-0.4, -0.5),
+            radius: 1.15,
+            colors: [
+              effectiveInk.withValues(alpha: isDark ? .24 : .16),
+              effectiveInk.withValues(alpha: isDark ? .09 : .07),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(size * .28),
+          border: Border.all(
+            color: effectiveInk.withValues(alpha: isDark ? .26 : .18),
+            width: 0.9,
+          ),
+        ),
+        child: CustomPaint(painter: _EquipmentPainter(kind, effectiveInk)),
+      ),
     );
   }
 
   String _kind(String value) {
     if (RegExp('单车|自行车').hasMatch(value)) return 'cycle';
     if (value.contains('划船机')) return 'erg';
-    if (RegExp('拉伸|放松').hasMatch(value)) return 'stretch';
-    if (RegExp('椭圆|有氧').hasMatch(value)) return 'cardio';
+    if (RegExp('拉伸|放松|泡沫轴').hasMatch(value)) return 'stretch';
+    if (RegExp('椭圆|有氧|跳绳|波比').hasMatch(value)) return 'cardio';
     if (RegExp('走|跑|散步').hasMatch(value)) return 'walk';
     if (value.contains('平板支撑')) return 'plank';
-    if (RegExp('腹|核心|平板支撑|死虫|鸟狗|举腿').hasMatch(value)) return 'core';
+    if (RegExp('腹|核心|平板支撑|死虫|鸟狗|举腿|悬垂').hasMatch(value)) return 'core';
     if (value.contains('硬拉')) return 'hinge';
-    if (RegExp('腿|倒蹬|深蹲|臀|提踵|外展').hasMatch(value)) return 'leg';
+    if (RegExp('腿|倒蹬|深蹲|臀|提踵|外展|弓步').hasMatch(value)) return 'leg';
     if (RegExp('下拉|引体').hasMatch(value)) return 'pull';
     if (value.contains('划船')) return 'row';
     if (RegExp('飞鸟|面拉').hasMatch(value)) return 'rear';
-    if (value.contains('侧平举')) return 'raise';
+    if (value.contains('侧平举') || value.contains('前平举')) return 'raise';
     if (value.contains('弯举')) return 'curl';
     if (value.contains('下压')) return 'cable';
     if (value.contains('臂屈伸')) return 'triceps';
     if (value.contains('夹胸')) return 'fly';
-    if (value.contains('肩推')) return 'shoulder';
+    if (value.contains('肩推') || value.contains('推举')) return 'shoulder';
     if (value.contains('上斜')) return 'incline';
     if (value.contains('俯卧撑')) return 'pushup';
     if (RegExp('卧推|推胸').hasMatch(value)) return 'bench';
@@ -75,7 +102,7 @@ class _EquipmentPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke;
-    final fill = Paint()..color = color.withValues(alpha: .22);
+    final fill = Paint()..color = color.withValues(alpha: .24);
     void line(double x1, double y1, double x2, double y2) =>
         canvas.drawLine(Offset(x1, y1), Offset(x2, y2), ink);
     void path(List<Offset> points) {

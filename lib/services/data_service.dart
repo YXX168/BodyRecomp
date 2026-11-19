@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/recomp_models.dart';
 import 'daily_workout_service.dart';
+import 'exercise_library_service.dart';
 import 'nutrition_service.dart';
 
 const int currentSchemaVersion = 3;
@@ -338,7 +339,12 @@ void _validateKnownPayloads(Map<String, dynamic> preferences) {
     decodeDailyWorkouts(preferences[dailyWorkoutsKey] as String?);
     decodeWorkoutTemplates(preferences[workoutTemplatesKey] as String?);
     decodeWeeklySchedule(preferences[weeklyScheduleKey] as String?);
+    decodeExerciseLibrary(preferences[exerciseLibraryKey] as String?);
     decodeMeals(preferences[mealsKey] as String?);
+    final theme = preferences['recomp_theme_v6'];
+    if (theme != null && theme is! int) {
+      throw const FormatException('主题设置格式无效');
+    }
     final profile = preferences[profileKey];
     if (profile != null) {
       UserProfile.fromJson(
@@ -420,6 +426,9 @@ Future<ImportResult> importAllData(
       };
       await writeJson(
           prefs, key, templates.values.map((t) => t.toJson()).toList());
+    } else if (mode == ImportMode.merge && key == exerciseLibraryKey) {
+      await prefs.setString(
+          key, mergeExerciseLibrary(prefs.getString(key), value as String));
     } else if (mode == ImportMode.merge && key == weightHistoryKey) {
       await _mergeWeightHistory(prefs, value);
     } else if (mode == ImportMode.merge && key == measurementHistoryKey) {

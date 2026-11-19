@@ -1,11 +1,13 @@
 import 'dart:convert';
-import 'package:body_recomp/main.dart';
 import 'package:body_recomp/data/workout_templates.dart';
+import 'package:body_recomp/main.dart';
 import 'package:body_recomp/models/daily_workout.dart';
+import 'package:body_recomp/pages/main_shell.dart';
 import 'package:body_recomp/pages/template_manager_page.dart';
+import 'package:body_recomp/pages/trends_page.dart';
 import 'package:body_recomp/services/daily_workout_service.dart';
-import 'package:body_recomp/widgets/exercise_editor.dart';
 import 'package:body_recomp/widgets/daily_date_bar.dart';
+import 'package:body_recomp/widgets/exercise_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -124,7 +126,8 @@ void main() {
         isNull);
   });
 
-  testWidgets('theme changes isolate hidden tabs and retain workout and timer',
+  testWidgets(
+      'theme changes isolate hidden tickers and retain workout and timer',
       (tester) async {
     final date = dayKey(DateTime.now());
     final session = DailyWorkout(date: date, blocks: [
@@ -139,38 +142,42 @@ void main() {
     await tester.pumpWidget(const ThemeState(child: RecompApp()));
     await tester.pumpAndSettle();
     await visible(tester, find.byKey(const ValueKey('start-rest-0')));
-    await tester.tap(find.byKey(const ValueKey('nav-2')));
+    await tester.tap(find.byKey(const ValueKey('nav-3')));
     await tester.pumpAndSettle();
-    final hidden = tester.element(find.byType(RecordPage));
+    final hidden = tester.element(find.byType(TrendsPage));
+    expect(TickerMode.valuesOf(hidden).enabled, isTrue);
     await tester.tap(find.byKey(const ValueKey('nav-0')));
     await tester.pumpAndSettle();
     expect(TickerMode.valuesOf(hidden).enabled, isFalse);
+
     await tester.tap(find.byTooltip('切换主题'));
     await tester.pumpAndSettle();
-    await visible(tester, find.byKey(const ValueKey('theme-option-dark')));
-    expect(Theme.of(tester.element(find.byType(MainPage))).brightness,
-        Brightness.dark);
-    expect(Theme.of(hidden).brightness, Brightness.light);
-    expect((await SharedPreferences.getInstance()).getInt('recomp_theme_v6'),
-        AppTheme.dark.index);
-    await tester.tap(find.byKey(const ValueKey('nav-2')));
+    await visible(tester, find.byKey(const ValueKey('theme-option-green')));
+    expect(Theme.of(tester.element(find.byType(MainShell))).brightness,
+        Brightness.light);
+    expect((await SharedPreferences.getInstance()).getInt(themePreferenceKey),
+        AppTheme.green.index);
+
+    await tester.tap(find.byKey(const ValueKey('nav-3')));
     await tester.pumpAndSettle();
-    expect(Theme.of(hidden).brightness, Brightness.dark);
+    expect(Theme.of(hidden).brightness, Brightness.light);
     expect(TickerMode.valuesOf(hidden).enabled, isTrue);
+
     await tester.tap(find.byKey(const ValueKey('nav-0')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('rest-timer-panel')), findsOneWidget);
     expect((await loadDailyWorkouts())[date]!.completedSets, 1);
-    final controller = ThemeInherited.of(tester.element(find.byType(MainPage)));
+
+    final controller = ThemeScope.of(tester.element(find.byType(MainShell)));
     await Future.wait([
       controller.setTheme(AppTheme.purple),
       controller.setTheme(AppTheme.dark),
       controller.setTheme(AppTheme.blue),
     ]);
     await tester.pumpAndSettle();
-    expect(Theme.of(tester.element(find.byType(MainPage))).brightness,
-        Brightness.light);
-    expect((await SharedPreferences.getInstance()).getInt('recomp_theme_v6'),
+    expect(Theme.of(tester.element(find.byType(MainShell))).brightness,
+        Brightness.dark);
+    expect((await SharedPreferences.getInstance()).getInt(themePreferenceKey),
         AppTheme.blue.index);
     expect(tester.takeException(), isNull);
   });

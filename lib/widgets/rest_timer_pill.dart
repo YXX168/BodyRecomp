@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import '../services/rest_countdown.dart';
+import '../theme/app_theme.dart';
+import 'kinetic_ring.dart';
+import 'sheet_frame.dart';
 
-/// The header keeps its height while only the running pill fades in or out.
+/// Header capsule for active rest countdown; keeps fixed size so layouts never jump.
 class RestTimerPill extends StatefulWidget {
   final RestCountdown controller;
   const RestTimerPill({super.key, required this.controller});
@@ -13,13 +16,15 @@ class RestTimerPill extends StatefulWidget {
 class _RestTimerPillState extends State<RestTimerPill>
     with SingleTickerProviderStateMixin {
   late final AnimationController _visibility = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 220),
-      reverseDuration: const Duration(milliseconds: 180));
+    vsync: this,
+    duration: const Duration(milliseconds: 220),
+    reverseDuration: const Duration(milliseconds: 180),
+  );
   late final CurvedAnimation _fade = CurvedAnimation(
-      parent: _visibility,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic);
+    parent: _visibility,
+    curve: Curves.easeOutCubic,
+    reverseCurve: Curves.easeInCubic,
+  );
   RestCountdownState? _face;
   bool _reduceMotion = false;
   bool get _running => (widget.controller.value?.remaining ?? 0) > 0;
@@ -49,7 +54,6 @@ class _RestTimerPillState extends State<RestTimerPill>
       _visibility.value = _running ? 1 : 0;
       if (!_running && _face != null) setState(() => _face = null);
     } else if (_running) {
-      // Continue an interrupted exit instead of painting a second timer face.
       if (_visibility.status != AnimationStatus.completed) {
         _visibility.forward();
       }
@@ -89,27 +93,34 @@ class _RestTimerPillState extends State<RestTimerPill>
   @override
   Widget build(BuildContext context) {
     return MediaQuery.withClampedTextScaling(
-        maxScaleFactor: 1.4,
-        child: SizedBox(
-            key: const Key('rest-timer-pill'),
-            width: 174,
-            height: 40,
-            child: RepaintBoundary(
-                child: ExcludeSemantics(
-                    excluding: !_running,
-                    child: IgnorePointer(
-                        ignoring: !_running,
-                        child: FadeTransition(
-                            opacity: _fade,
-                            child: ScaleTransition(
-                                alignment: Alignment.centerRight,
-                                scale: Tween<double>(begin: .94, end: 1)
-                                    .animate(_fade),
-                                child: _face == null
-                                    ? const SizedBox.shrink()
-                                    : _TimerFace(
-                                        controller: widget.controller,
-                                        state: _face!))))))));
+      maxScaleFactor: 1.4,
+      child: SizedBox(
+        key: const Key('rest-timer-pill'),
+        width: 178,
+        height: 40,
+        child: RepaintBoundary(
+          child: ExcludeSemantics(
+            excluding: !_running,
+            child: IgnorePointer(
+              ignoring: !_running,
+              child: FadeTransition(
+                opacity: _fade,
+                child: ScaleTransition(
+                  alignment: Alignment.centerRight,
+                  scale: Tween<double>(begin: .94, end: 1).animate(_fade),
+                  child: _face == null
+                      ? const SizedBox.shrink()
+                      : _TimerFace(
+                          controller: widget.controller,
+                          state: _face!,
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -118,66 +129,218 @@ class _TimerFace extends StatelessWidget {
   final RestCountdownState state;
   const _TimerFace({required this.controller, required this.state});
 
+  void _openSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _RestTimerSheet(controller: controller),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final ink = colors.primary;
+    final p = context.palette;
+    final ink = p.primary;
+    final progress = state.total <= 0
+        ? 0.0
+        : (state.remaining / state.total).clamp(0.0, 1.0);
     return Material(
-        color: ink.withValues(alpha: .1),
-        shape: const StadiumBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-            padding: const EdgeInsets.only(left: 11, right: 3),
-            child: Row(key: const Key('rest-timer-panel'), children: [
-              Tooltip(
-                  message: state.label,
-                  child: SizedBox(
-                      width: 15,
-                      height: 15,
-                      child: CircularProgressIndicator(
-                          value: (state.remaining / state.total).clamp(0, 1),
-                          strokeWidth: 2,
+      color: ink.withValues(alpha: p.isDark ? .16 : .11),
+      shape: StadiumBorder(
+        side: BorderSide(color: ink.withValues(alpha: .35), width: 1),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 10, right: 3),
+        child: Row(
+          key: const Key('rest-timer-panel'),
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: () => _openSheet(context),
+                borderRadius: BorderRadius.circular(18),
+                child: Row(
+                  children: [
+                    Tooltip(
+                      message: state.label,
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          value: progress,
+                          strokeWidth: 2.2,
+                          strokeCap: StrokeCap.round,
                           color: ink,
-                          backgroundColor: ink.withValues(alpha: .15)))),
-              const SizedBox(width: 6),
-              Expanded(
-                  child: Semantics(
-                      label: '剩余 ${state.remaining} 秒',
-                      child: FittedBox(
+                          backgroundColor: ink.withValues(alpha: .18),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Semantics(
+                        label: '剩余 ${state.remaining} 秒',
+                        child: FittedBox(
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerLeft,
                           child: Text(
-                              '${state.remaining ~/ 60}:${(state.remaining % 60).toString().padLeft(2, '0')}',
-                              maxLines: 1,
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  color: ink,
-                                  fontWeight: FontWeight.w700,
-                                  fontFeatures: const [
-                                    FontFeature.tabularFigures()
-                                  ]))))),
-              SizedBox(
-                  width: 42,
-                  height: 40,
-                  child: TextButton(
-                      key: const Key('rest-timer-add'),
-                      style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          minimumSize: Size.zero,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20))),
-                      onPressed: () => controller.addSeconds(30),
-                      child:
-                          const Text('+30', style: TextStyle(fontSize: 10)))),
-              SizedBox(
-                  width: 32,
-                  height: 40,
-                  child: IconButton(
-                      key: const Key('rest-timer-dismiss'),
-                      padding: EdgeInsets.zero,
-                      tooltip: '结束计时',
-                      onPressed: controller.stop,
-                      icon: Icon(Icons.close_rounded, size: 16, color: ink))),
-            ])));
+                            '${state.remaining ~/ 60}:${(state.remaining % 60).toString().padLeft(2, '0')}',
+                            maxLines: 1,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              color: ink,
+                              fontWeight: FontWeight.w800,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures()
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 42,
+              height: 40,
+              child: TextButton(
+                key: const Key('rest-timer-add'),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                onPressed: () => controller.addSeconds(30),
+                child: Text(
+                  '+30',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: ink,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 32,
+              height: 40,
+              child: IconButton(
+                key: const Key('rest-timer-dismiss'),
+                padding: EdgeInsets.zero,
+                tooltip: '结束计时',
+                onPressed: controller.stop,
+                icon: Icon(Icons.close_rounded, size: 16, color: ink),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RestTimerSheet extends StatelessWidget {
+  final RestCountdown controller;
+  const _RestTimerSheet({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return ValueListenableBuilder<RestCountdownState?>(
+      valueListenable: controller,
+      builder: (context, state, _) {
+        final remaining = state?.remaining ?? 0;
+        final total = state?.total ?? 60;
+        final progress = total <= 0 ? 0.0 : (remaining / total).clamp(0.0, 1.0);
+        final clock =
+            '${remaining ~/ 60}:${(remaining % 60).toString().padLeft(2, '0')}';
+        return SheetFrame(
+          title: '组间休息计时',
+          subtitle: state?.label ?? '已结束',
+          icon: Icons.timer_rounded,
+          body: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              KineticProgressRing(
+                progress: progress,
+                size: 146,
+                strokeWidth: 10,
+                center: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      clock,
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -1,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                        color: p.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      remaining == 0 ? '休息结束' : '恢复中',
+                      style: TextStyle(fontSize: 12, color: p.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  for (final sec in const [30, 60, 90, 120, 180])
+                    ActionChip(
+                      label: Text(sec >= 60 && sec % 60 == 0
+                          ? '${sec ~/ 60}分钟'
+                          : '${sec}s'),
+                      backgroundColor: p.surfaceMuted,
+                      side: BorderSide(color: p.borderSubtle),
+                      labelStyle: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: p.textPrimary,
+                      ),
+                      onPressed: () =>
+                          controller.start(sec, state?.label ?? '自由休息'),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          footer: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style:
+                      OutlinedButton.styleFrom(minimumSize: const Size(0, 46)),
+                  onPressed: () => controller.addSeconds(30),
+                  child: const Text('+30 秒'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 46)),
+                  onPressed: () {
+                    controller.stop();
+                    Navigator.pop(context);
+                  },
+                  child: const Text('结束计时'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
