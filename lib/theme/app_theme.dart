@@ -470,6 +470,15 @@ ThemeData buildThemeData(AppTheme mode) {
         side: BorderSide(color: p.glassRimBright.withValues(alpha: .35)),
       ),
     ),
+    popupMenuTheme: PopupMenuThemeData(
+      color: p.surfaceElevated,
+      surfaceTintColor: Colors.transparent,
+      elevation: 12,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: p.glassRimBright.withValues(alpha: .35)),
+      ),
+    ),
     bottomSheetTheme: const BottomSheetThemeData(
       backgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,

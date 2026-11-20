@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
@@ -462,6 +463,404 @@ class _PressScaleState extends State<PressScale> {
             reduceMotion ? Duration.zero : const Duration(milliseconds: 110),
         curve: Curves.easeOutCubic,
         child: widget.child,
+      ),
+    );
+  }
+}
+
+class GlassMenuItem<T> {
+  final T value;
+  final String label;
+  final IconData icon;
+  final Color? color;
+  final bool isDanger;
+  final bool hasTopDivider;
+
+  const GlassMenuItem({
+    required this.value,
+    required this.label,
+    required this.icon,
+    this.color,
+    this.isDanger = false,
+    this.hasTopDivider = false,
+  });
+}
+
+Future<T?> showGlassMenu<T>({
+  required BuildContext context,
+  BuildContext? anchorContext,
+  RelativeRect? position,
+  String? title,
+  required List<GlassMenuItem<T>> items,
+}) {
+  final navigator = Navigator.of(context);
+  final overlayBox =
+      navigator.overlay?.context.findRenderObject() as RenderBox?;
+  final overlaySize = overlayBox?.size ?? MediaQuery.sizeOf(context);
+
+  Rect anchorRect;
+  final anchorBox = anchorContext?.findRenderObject() as RenderBox?;
+  if (anchorBox != null && anchorBox.hasSize && overlayBox != null) {
+    anchorRect = Rect.fromPoints(
+      anchorBox.localToGlobal(Offset.zero, ancestor: overlayBox),
+      anchorBox.localToGlobal(
+        anchorBox.size.bottomRight(Offset.zero),
+        ancestor: overlayBox,
+      ),
+    );
+  } else if (position != null) {
+    anchorRect = Rect.fromLTRB(
+      position.left,
+      position.top,
+      math.max(position.left, overlaySize.width - position.right),
+      math.max(position.top, overlaySize.height - position.bottom),
+    );
+  } else {
+    anchorRect = Rect.fromLTWH(overlaySize.width - 56, 72, 36, 36);
+  }
+
+  final themes = InheritedTheme.capture(
+    from: context,
+    to: navigator.context,
+  );
+
+  return navigator.push<T>(
+    _GlassMenuRoute<T>(
+      anchorRect: anchorRect,
+      title: title,
+      items: items,
+      themes: themes,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+    ),
+  );
+}
+
+class _GlassMenuRoute<T> extends PopupRoute<T> {
+  final Rect anchorRect;
+  final String? title;
+  final List<GlassMenuItem<T>> items;
+  final CapturedThemes themes;
+
+  _GlassMenuRoute({
+    required this.anchorRect,
+    required this.title,
+    required this.items,
+    required this.themes,
+    required String barrierLabel,
+  }) : _barrierLabel = barrierLabel;
+
+  final String _barrierLabel;
+
+  @override
+  bool get barrierDismissible => true;
+
+  @override
+  String get barrierLabel => _barrierLabel;
+
+  @override
+  Color get barrierColor => Colors.black.withValues(alpha: 0.08);
+
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 160);
+
+  @override
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) {
+    final safePadding = MediaQuery.paddingOf(context);
+    final textDirection = Directionality.of(context);
+    final curved = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+
+    return themes.wrap(
+      SafeArea(
+        bottom: false,
+        top: false,
+        child: CustomSingleChildLayout(
+          delegate: _GlassMenuLayoutDelegate(
+            anchorRect: anchorRect,
+            safePadding: safePadding,
+            textDirection: textDirection,
+          ),
+          child: FadeTransition(
+            opacity: curved,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.92, end: 1.0).animate(curved),
+              alignment: anchorRect.center.dy >
+                      MediaQuery.sizeOf(context).height * 0.62
+                  ? Alignment.bottomRight
+                  : Alignment.topRight,
+              child: _GlassMenuCard<T>(title: title, items: items),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassMenuLayoutDelegate extends SingleChildLayoutDelegate {
+  final Rect anchorRect;
+  final EdgeInsets safePadding;
+  final TextDirection textDirection;
+
+  const _GlassMenuLayoutDelegate({
+    required this.anchorRect,
+    required this.safePadding,
+    required this.textDirection,
+  });
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) {
+    final maxW = math.max(160.0, math.min(256.0, constraints.maxWidth - 24.0));
+    final maxH = math.max(
+      140.0,
+      constraints.maxHeight - safePadding.top - safePadding.bottom - 24.0,
+    );
+    return BoxConstraints(maxWidth: maxW, maxHeight: maxH);
+  }
+
+  @override
+  Offset getPositionForChild(Size size, Size childSize) {
+    final minX = safePadding.left + 12.0;
+    final maxX = math.max(
+      minX,
+      size.width - safePadding.right - 12.0 - childSize.width,
+    );
+    final preferredX = anchorRect.center.dx < size.width * 0.35
+        ? anchorRect.left
+        : anchorRect.right - childSize.width;
+    final x = preferredX.clamp(minX, maxX).toDouble();
+
+    final minY = safePadding.top + 12.0;
+    final maxY = math.max(
+      minY,
+      size.height - safePadding.bottom - 12.0 - childSize.height,
+    );
+    final belowY = anchorRect.bottom + 6.0;
+    final aboveY = anchorRect.top - 6.0 - childSize.height;
+    final fitsBelow = belowY <= maxY;
+    final fitsAbove = aboveY >= minY;
+    final preferredY = fitsBelow || !fitsAbove ? belowY : aboveY;
+    final y = preferredY.clamp(minY, maxY).toDouble();
+
+    return Offset(x, y);
+  }
+
+  @override
+  bool shouldRelayout(covariant _GlassMenuLayoutDelegate oldDelegate) =>
+      anchorRect != oldDelegate.anchorRect ||
+      safePadding != oldDelegate.safePadding ||
+      textDirection != oldDelegate.textDirection;
+}
+
+class _GlassMenuCard<T> extends StatelessWidget {
+  final String? title;
+  final List<GlassMenuItem<T>> items;
+
+  const _GlassMenuCard({
+    this.title,
+    required this.items,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+    final cardWidth = math.min(
+      textScale > 1.3 ? 256.0 : 224.0,
+      math.max(180.0, MediaQuery.sizeOf(context).width - 24.0),
+    );
+
+    return Material(
+      type: MaterialType.transparency,
+      child: SizedBox(
+        width: cardWidth,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: p.isDark ? 0.42 : 0.14),
+                blurRadius: 28,
+                offset: const Offset(0, 12),
+              ),
+              BoxShadow(
+                color: p.primary.withValues(alpha: p.isDark ? 0.12 : 0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color.alphaBlend(
+                        p.primary.withValues(alpha: p.isDark ? 0.14 : 0.08),
+                        p.isDark
+                            ? const Color(0xD8172538)
+                            : const Color(0xEEFFFFFF),
+                      ),
+                      p.isDark
+                          ? const Color(0xE2101A28)
+                          : const Color(0xE0F2FAF7),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: p.glassRimBright
+                        .withValues(alpha: p.isDark ? 0.38 : 0.85),
+                    width: 1.0,
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (title != null && title!.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 11, 14, 8),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: p.primary,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: p.primary.withValues(alpha: 0.45),
+                                    blurRadius: 6,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 7),
+                            Expanded(
+                              child: Text(
+                                title!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: p.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Divider(
+                        height: 1,
+                        thickness: 0.8,
+                        color: p.borderSubtle,
+                      ),
+                    ],
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(6),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            for (final item in items) ...[
+                              if (item.hasTopDivider)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 4,
+                                  ),
+                                  child: Divider(
+                                    height: 1,
+                                    thickness: 0.8,
+                                    color: p.borderSubtle,
+                                  ),
+                                ),
+                              _GlassMenuRow<T>(item: item),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassMenuRow<T> extends StatelessWidget {
+  final GlassMenuItem<T> item;
+
+  const _GlassMenuRow({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final itemTint = item.isDanger ? p.danger : (item.color ?? p.primary);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        highlightColor: itemTint.withValues(alpha: p.isDark ? 0.14 : 0.10),
+        splashColor: itemTint.withValues(alpha: p.isDark ? 0.18 : 0.12),
+        onTap: () => Navigator.of(context).pop(item.value),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  color: itemTint.withValues(alpha: p.isDark ? 0.16 : 0.12),
+                  border: Border.all(
+                    color: itemTint.withValues(alpha: p.isDark ? 0.28 : 0.22),
+                    width: 0.8,
+                  ),
+                ),
+                child: Icon(item.icon, size: 16, color: itemTint),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  item.label,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: item.isDanger ? p.danger : p.textPrimary,
+                  ),
+                ),
+              ),
+              if (!item.isDanger) ...[
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 16,
+                  color: p.textTertiary,
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }

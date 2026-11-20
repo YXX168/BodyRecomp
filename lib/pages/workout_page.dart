@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../models/daily_workout.dart';
@@ -104,47 +105,50 @@ class _WorkoutPageState extends State<WorkoutPage>
     DailyWorkout? existingSession,
     WorkoutTemplate? scheduledTpl,
   ) async {
-    final box = btnContext.findRenderObject() as RenderBox?;
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
-    final position = box != null && overlay != null
-        ? RelativeRect.fromRect(
-            Rect.fromPoints(
-              box.localToGlobal(Offset.zero, ancestor: overlay),
-              box.localToGlobal(box.size.bottomRight(Offset.zero),
-                  ancestor: overlay),
-            ),
-            Offset.zero & overlay.size,
-          )
-        : const RelativeRect.fromLTRB(200, 120, 16, 0);
-
-    final action = await showMenu<String>(
+    final p = context.palette;
+    final action = await showGlassMenu<String>(
       context: context,
-      position: position,
+      anchorContext: btnContext,
+      title: '今日方案操作',
       items: [
-        const PopupMenuItem(value: 'switch', child: Text('切换模板')),
-        const PopupMenuItem(
+        GlassMenuItem(
+          value: 'switch',
+          label: '切换模板',
+          icon: Icons.swap_horiz_rounded,
+          color: p.primary,
+        ),
+        GlassMenuItem(
           value: 'pick_template',
-          child: Text('从模板库挑动作'),
+          label: '从模板库挑动作',
+          icon: Icons.playlist_add_rounded,
+          color: p.accent,
         ),
         if (scheduledTpl != null && (existingSession != null || session.rested))
-          const PopupMenuItem(
+          GlassMenuItem(
             value: 'restore',
-            child: Text('恢复今日固定模板'),
+            label: '恢复今日固定模板',
+            icon: Icons.restart_alt_rounded,
+            color: p.primary,
           ),
         if (!session.rested)
-          const PopupMenuItem(
+          GlassMenuItem(
             value: 'rest',
-            child: Text('标记为休息日'),
+            label: '标记为休息日',
+            icon: Icons.self_improvement_rounded,
+            color: p.warning,
           ),
         if (session.blocks.isNotEmpty)
-          const PopupMenuItem(
+          GlassMenuItem(
             value: 'save_tpl',
-            child: Text('存为新模板'),
+            label: '存为新模板',
+            icon: Icons.bookmark_add_outlined,
+            color: p.accent,
           ),
-        const PopupMenuItem(
+        const GlassMenuItem(
           value: 'schedule',
-          child: Text('编排每周固定模板'),
+          label: '编排每周固定模板',
+          icon: Icons.calendar_view_week_rounded,
+          hasTopDivider: true,
         ),
       ],
     );
@@ -686,32 +690,41 @@ class _WorkoutPageState extends State<WorkoutPage>
     int totalBlocks,
   ) async {
     final p = context.palette;
-    final box = btnContext.findRenderObject() as RenderBox?;
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
-    final position = box != null && overlay != null
-        ? RelativeRect.fromRect(
-            Rect.fromPoints(
-              box.localToGlobal(Offset.zero, ancestor: overlay),
-              box.localToGlobal(box.size.bottomRight(Offset.zero),
-                  ancestor: overlay),
-            ),
-            Offset.zero & overlay.size,
-          )
-        : const RelativeRect.fromLTRB(200, 200, 16, 0);
-
-    final action = await showMenu<String>(
+    final action = await showGlassMenu<String>(
       context: context,
-      position: position,
+      anchorContext: btnContext,
+      title: '第 ${index + 1} 项 · 动作操作',
       items: [
-        const PopupMenuItem(value: 'edit', child: Text('编辑组次')),
-        const PopupMenuItem(value: 'weight', child: Text('记录负重')),
-        if (index > 0) const PopupMenuItem(value: 'up', child: Text('上移')),
+        GlassMenuItem(
+          value: 'edit',
+          label: '编辑组次',
+          icon: Icons.tune_rounded,
+          color: p.primary,
+        ),
+        GlassMenuItem(
+          value: 'weight',
+          label: '记录负重',
+          icon: Icons.fitness_center_rounded,
+          color: p.accent,
+        ),
+        if (index > 0)
+          const GlassMenuItem(
+            value: 'up',
+            label: '上移',
+            icon: Icons.arrow_upward_rounded,
+          ),
         if (index < totalBlocks - 1)
-          const PopupMenuItem(value: 'down', child: Text('下移')),
-        PopupMenuItem(
+          const GlassMenuItem(
+            value: 'down',
+            label: '下移',
+            icon: Icons.arrow_downward_rounded,
+          ),
+        const GlassMenuItem(
           value: 'remove',
-          child: Text('移除项目（可撤销）', style: TextStyle(color: p.danger)),
+          label: '移除项目（可撤销）',
+          icon: Icons.delete_outline_rounded,
+          isDanger: true,
+          hasTopDivider: true,
         ),
       ],
     );
@@ -839,7 +852,6 @@ class _WorkoutPageState extends State<WorkoutPage>
                   pinned: true,
                   delegate: _PinnedHeroHeaderDelegate(
                     extent: heroHeaderExtent,
-                    veilColor: p.canvas,
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
                       onTap: () {
@@ -870,39 +882,41 @@ class _WorkoutPageState extends State<WorkoutPage>
                     ),
                   ),
                 ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 2, 16, 112),
-                  sliver: blocks.isEmpty
-                      ? SliverToBoxAdapter(
-                          child: _buildEmptyOrRestCard(
-                            context: context,
-                            targetDate: currentDate,
-                            rested: session.rested,
-                            hasScheduled: scheduledTpl != null,
-                            isFuture: isFuture,
-                          ),
-                        )
-                      : SliverList(
-                          delegate: SliverChildListDelegate([
-                            for (var i = 0; i < blocks.length; i++)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: _buildBlockCard(
-                                  context: context,
-                                  targetDate: currentDate,
-                                  dateKeyStr: currentKey,
-                                  index: i,
-                                  block: blocks[i],
-                                  totalBlocks: blocks.length,
-                                  isFuture: isFuture,
+                _SliverClipOverlap(
+                  child: SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 2, 16, 112),
+                    sliver: blocks.isEmpty
+                        ? SliverToBoxAdapter(
+                            child: _buildEmptyOrRestCard(
+                              context: context,
+                              targetDate: currentDate,
+                              rested: session.rested,
+                              hasScheduled: scheduledTpl != null,
+                              isFuture: isFuture,
+                            ),
+                          )
+                        : SliverList(
+                            delegate: SliverChildListDelegate([
+                              for (var i = 0; i < blocks.length; i++)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _buildBlockCard(
+                                    context: context,
+                                    targetDate: currentDate,
+                                    dateKeyStr: currentKey,
+                                    index: i,
+                                    block: blocks[i],
+                                    totalBlocks: blocks.length,
+                                    isFuture: isFuture,
+                                  ),
                                 ),
-                              ),
-                            if (!isFuture) ...[
-                              const SizedBox(height: 2),
-                              _buildBottomAddBar(context, currentDate),
-                            ],
-                          ]),
-                        ),
+                              if (!isFuture) ...[
+                                const SizedBox(height: 2),
+                                _buildBottomAddBar(context, currentDate),
+                              ],
+                            ]),
+                          ),
+                  ),
                 ),
               ],
             ),
@@ -1649,12 +1663,10 @@ class _WorkoutPageState extends State<WorkoutPage>
 
 class _PinnedHeroHeaderDelegate extends SliverPersistentHeaderDelegate {
   final double extent;
-  final Color veilColor;
   final Widget child;
 
   const _PinnedHeroHeaderDelegate({
     required this.extent,
-    required this.veilColor,
     required this.child,
   });
 
@@ -1670,29 +1682,12 @@ class _PinnedHeroHeaderDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    final dockT = (shrinkOffset / 24.0).clamp(0.0, 1.0);
     return SizedBox.expand(
-      child: DecoratedBox(
-        decoration: dockT > 0.001
-            ? BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: const [0.0, 0.84, 1.0],
-                  colors: [
-                    veilColor.withValues(alpha: 0.90 * dockT),
-                    veilColor.withValues(alpha: 0.68 * dockT),
-                    veilColor.withValues(alpha: 0.0),
-                  ],
-                ),
-              )
-            : const BoxDecoration(),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-          child: Align(
-            alignment: Alignment.center,
-            child: child,
-          ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+        child: Align(
+          alignment: Alignment.center,
+          child: child,
         ),
       ),
     );
@@ -1700,4 +1695,56 @@ class _PinnedHeroHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _PinnedHeroHeaderDelegate oldDelegate) => true;
+}
+
+class _SliverClipOverlap extends SingleChildRenderObjectWidget {
+  const _SliverClipOverlap({super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderSliverClipOverlap();
+}
+
+class _RenderSliverClipOverlap extends RenderProxySliver {
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final child = this.child;
+    if (child == null || !(child.geometry?.visible ?? false)) {
+      layer = null;
+      return;
+    }
+    final overlap = constraints.overlap;
+    if (overlap <= 0.0) {
+      layer = null;
+      context.paintChild(child, offset);
+      return;
+    }
+    final clipTop = math.max(0.0, overlap - 2.0);
+    final clipBottom = math.max(clipTop, constraints.remainingPaintExtent);
+    layer = context.pushClipRect(
+      needsCompositing,
+      offset,
+      Rect.fromLTRB(0.0, clipTop, constraints.crossAxisExtent, clipBottom),
+      super.paint,
+      clipBehavior: Clip.hardEdge,
+      oldLayer: layer as ClipRectLayer?,
+    );
+  }
+
+  @override
+  bool hitTestChildren(
+    SliverHitTestResult result, {
+    required double mainAxisPosition,
+    required double crossAxisPosition,
+  }) {
+    if (constraints.overlap > 0.0 &&
+        mainAxisPosition < math.max(0.0, constraints.overlap - 2.0)) {
+      return false;
+    }
+    return super.hitTestChildren(
+      result,
+      mainAxisPosition: mainAxisPosition,
+      crossAxisPosition: crossAxisPosition,
+    );
+  }
 }

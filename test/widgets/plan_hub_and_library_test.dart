@@ -9,6 +9,7 @@ import 'package:body_recomp/widgets/app_navigation_bar.dart';
 import 'package:body_recomp/widgets/muscle_body_graphic.dart';
 import 'package:body_recomp/widgets/week_strip_bar.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -254,6 +255,13 @@ void main() {
       expect(tester.getRect(weekFinder).bottom,
           lessThanOrEqualTo(scrollTop + 4.0));
     }
+    expect(
+      tester
+          .firstRenderObject<RenderSliver>(find.byType(SliverPadding))
+          .constraints
+          .overlap,
+      greaterThan(0.0),
+    );
 
     // Small upward drag mid-list keeps HeroCard calmly pinned at the top.
     await tester.drag(scrollFinder, const Offset(0, 60));
@@ -267,6 +275,12 @@ void main() {
     await tester.tap(heroFinder);
     await tester.pumpAndSettle();
     expect(tester.getRect(weekFinder).top, greaterThanOrEqualTo(scrollTop));
+
+    // Tapping block-menu opens the new frosted glass submenu card.
+    await tester.tap(find.byKey(const ValueKey('block-menu-0')));
+    await tester.pumpAndSettle();
+    expect(find.text('第 1 项 · 动作操作'), findsOneWidget);
+    expect(find.text('编辑组次'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

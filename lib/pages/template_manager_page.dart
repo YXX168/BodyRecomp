@@ -708,49 +708,68 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
                             ],
                           ),
                         ),
-                        PopupMenuButton<String>(
-                          enabled: !_busy,
-                          tooltip: '调整动作',
-                          icon: Icon(
-                            Icons.more_horiz_rounded,
-                            size: 19,
-                            color: p.textSecondary,
+                        Builder(
+                          builder: (btnCtx) => IconButton(
+                            tooltip: '调整动作',
+                            onPressed: _busy
+                                ? null
+                                : () async {
+                                    final action = await showGlassMenu<String>(
+                                      context: context,
+                                      anchorContext: btnCtx,
+                                      title: ex.name,
+                                      items: [
+                                        GlassMenuItem(
+                                          value: 'edit',
+                                          label: '编辑组次',
+                                          icon: Icons.tune_rounded,
+                                          color: p.primary,
+                                        ),
+                                        if (i > 0)
+                                          const GlassMenuItem(
+                                            value: 'up',
+                                            label: '上移',
+                                            icon: Icons.arrow_upward_rounded,
+                                          ),
+                                        if (i <
+                                            selectedTemplate.exercises.length -
+                                                1)
+                                          const GlassMenuItem(
+                                            value: 'down',
+                                            label: '下移',
+                                            icon: Icons.arrow_downward_rounded,
+                                          ),
+                                        const GlassMenuItem(
+                                          value: 'remove',
+                                          label: '移除',
+                                          icon: Icons.delete_outline_rounded,
+                                          isDanger: true,
+                                          hasTopDivider: true,
+                                        ),
+                                      ],
+                                    );
+                                    if (!mounted || action == null) return;
+                                    switch (action) {
+                                      case 'edit':
+                                        _editTemplateExercise(
+                                            selectedTemplate, i);
+                                      case 'up':
+                                        _moveTemplateExercise(
+                                            selectedTemplate, i, -1);
+                                      case 'down':
+                                        _moveTemplateExercise(
+                                            selectedTemplate, i, 1);
+                                      case 'remove':
+                                        _removeTemplateExercise(
+                                            selectedTemplate, i);
+                                    }
+                                  },
+                            icon: Icon(
+                              Icons.more_horiz_rounded,
+                              size: 19,
+                              color: p.textSecondary,
+                            ),
                           ),
-                          onSelected: (action) {
-                            switch (action) {
-                              case 'edit':
-                                _editTemplateExercise(selectedTemplate, i);
-                              case 'up':
-                                _moveTemplateExercise(selectedTemplate, i, -1);
-                              case 'down':
-                                _moveTemplateExercise(selectedTemplate, i, 1);
-                              case 'remove':
-                                _removeTemplateExercise(selectedTemplate, i);
-                            }
-                          },
-                          itemBuilder: (_) => [
-                            const PopupMenuItem(
-                              value: 'edit',
-                              child: Text('编辑组次'),
-                            ),
-                            if (i > 0)
-                              const PopupMenuItem(
-                                value: 'up',
-                                child: Text('上移'),
-                              ),
-                            if (i < selectedTemplate.exercises.length - 1)
-                              const PopupMenuItem(
-                                value: 'down',
-                                child: Text('下移'),
-                              ),
-                            PopupMenuItem(
-                              value: 'remove',
-                              child: Text(
-                                '移除',
-                                style: TextStyle(color: p.danger),
-                              ),
-                            ),
-                          ],
                         ),
                       ],
                     ),
@@ -805,52 +824,83 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
                                     size: 36,
                                   ),
                                   const Spacer(),
-                                  PopupMenuButton<String>(
-                                    key: ValueKey(
-                                        'template-menu-${template.id}'),
-                                    enabled: !_busy,
-                                    tooltip: '模板操作',
-                                    constraints: const BoxConstraints(),
-                                    padding: EdgeInsets.zero,
-                                    icon: Icon(
-                                      Icons.more_horiz_rounded,
-                                      size: 19,
-                                      color: p.textSecondary,
-                                    ),
-                                    onSelected: (action) {
-                                      switch (action) {
-                                        case 'bind':
-                                          _setDay(_selectedDay, template.id);
-                                        case 'edit':
-                                          _edit(template);
-                                        case 'duplicate':
-                                          _duplicate(template);
-                                        case 'delete':
-                                          _deleteTemplate(template);
-                                      }
-                                    },
-                                    itemBuilder: (_) => [
-                                      PopupMenuItem(
-                                        value: 'bind',
-                                        child: Text(
-                                            '设为${fullWeekdays[_selectedDay]}固定'),
-                                      ),
-                                      const PopupMenuItem(
-                                        value: 'edit',
-                                        child: Text('编辑模板'),
-                                      ),
-                                      const PopupMenuItem(
-                                        value: 'duplicate',
-                                        child: Text('复制模板'),
-                                      ),
-                                      PopupMenuItem(
-                                        value: 'delete',
-                                        child: Text(
-                                          '删除模板',
-                                          style: TextStyle(color: p.danger),
+                                  Builder(
+                                    builder: (btnCtx) => Tooltip(
+                                      message: '模板操作',
+                                      child: IconButton(
+                                        key: ValueKey(
+                                            'template-menu-${template.id}'),
+                                        constraints:
+                                            const BoxConstraints.tightFor(
+                                          width: 32,
+                                          height: 32,
+                                        ),
+                                        padding: EdgeInsets.zero,
+                                        style: IconButton.styleFrom(
+                                          tapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                        onPressed: _busy
+                                            ? null
+                                            : () async {
+                                                final action =
+                                                    await showGlassMenu<String>(
+                                                  context: context,
+                                                  anchorContext: btnCtx,
+                                                  title: template.name,
+                                                  items: [
+                                                    GlassMenuItem(
+                                                      value: 'bind',
+                                                      label:
+                                                          '设为${fullWeekdays[_selectedDay]}固定',
+                                                      icon: Icons
+                                                          .event_available_rounded,
+                                                      color: p.primary,
+                                                    ),
+                                                    GlassMenuItem(
+                                                      value: 'edit',
+                                                      label: '编辑模板',
+                                                      icon: Icons.edit_outlined,
+                                                      color: p.accent,
+                                                    ),
+                                                    const GlassMenuItem(
+                                                      value: 'duplicate',
+                                                      label: '复制模板',
+                                                      icon: Icons.copy_rounded,
+                                                    ),
+                                                    const GlassMenuItem(
+                                                      value: 'delete',
+                                                      label: '删除模板',
+                                                      icon: Icons
+                                                          .delete_outline_rounded,
+                                                      isDanger: true,
+                                                      hasTopDivider: true,
+                                                    ),
+                                                  ],
+                                                );
+                                                if (!mounted ||
+                                                    action == null) {
+                                                  return;
+                                                }
+                                                switch (action) {
+                                                  case 'bind':
+                                                    _setDay(_selectedDay,
+                                                        template.id);
+                                                  case 'edit':
+                                                    _edit(template);
+                                                  case 'duplicate':
+                                                    _duplicate(template);
+                                                  case 'delete':
+                                                    _deleteTemplate(template);
+                                                }
+                                              },
+                                        icon: Icon(
+                                          Icons.more_horiz_rounded,
+                                          size: 19,
+                                          color: p.textSecondary,
                                         ),
                                       ),
-                                    ],
+                                    ),
                                   ),
                                 ],
                               ),

@@ -385,22 +385,38 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
                         child: const Icon(Icons.add_rounded, size: 22),
                       ),
                     ),
-                    PopupMenuButton<String>(
-                      tooltip: '动作库选项',
-                      constraints:
-                          const BoxConstraints.tightFor(width: 34, height: 44),
-                      padding: EdgeInsets.zero,
-                      icon: Icon(Icons.more_vert_rounded,
-                          size: 20, color: p.textSecondary),
-                      onSelected: (value) {
-                        if (value == 'restore') _restoreDefaults();
-                      },
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(
-                          value: 'restore',
-                          child: Text('恢复内置默认动作'),
+                    Builder(
+                      builder: (btnCtx) => IconButton(
+                        tooltip: '动作库选项',
+                        constraints: const BoxConstraints.tightFor(
+                          width: 34,
+                          height: 44,
                         ),
-                      ],
+                        padding: EdgeInsets.zero,
+                        onPressed: _busy
+                            ? null
+                            : () async {
+                                final value = await showGlassMenu<String>(
+                                  context: context,
+                                  anchorContext: btnCtx,
+                                  title: '动作库选项',
+                                  items: [
+                                    GlassMenuItem(
+                                      value: 'restore',
+                                      label: '恢复内置默认动作',
+                                      icon: Icons.restart_alt_rounded,
+                                      color: p.primary,
+                                    ),
+                                  ],
+                                );
+                                if (value == 'restore') _restoreDefaults();
+                              },
+                        icon: Icon(
+                          Icons.more_vert_rounded,
+                          size: 20,
+                          color: p.textSecondary,
+                        ),
+                      ),
                     ),
                   ],
                 ),

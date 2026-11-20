@@ -7,7 +7,7 @@ import 'theme/app_theme.dart';
 export 'services/app_signals.dart';
 export 'theme/app_theme.dart';
 
-const String appVersion = '7.1.1';
+const String appVersion = '7.1.2';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
