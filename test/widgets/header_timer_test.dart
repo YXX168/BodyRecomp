@@ -241,7 +241,7 @@ void main() {
     await tester.pumpWidget(
         MaterialApp(home: Scaffold(body: WorkoutPage(now: () => today))));
     await tester.pumpAndSettle();
-    final list = find.byType(ListView);
+    final list = find.byType(CustomScrollView);
     double offset() => tester
         .state<ScrollableState>(
             find.descendant(of: list, matching: find.byType(Scrollable)).first)

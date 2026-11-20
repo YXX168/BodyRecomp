@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -55,8 +57,6 @@ class _WorkoutPageState extends State<WorkoutPage>
   final Map<String, double> _scrollOffsets = {};
   String? _activeScrollDateKey;
   bool _restoringScroll = false;
-  bool _showDateBar = true;
-  double _scrollAccumDelta = 0.0;
   final Map<String, String> _selectedTemplateByDate = {};
   final Set<String> _expandedNotes = {};
 
@@ -95,35 +95,6 @@ class _WorkoutPageState extends State<WorkoutPage>
       return;
     }
     _scrollOffsets[_activeScrollDateKey!] = _scrollController.offset;
-  }
-
-  bool _handleScrollNotification(ScrollUpdateNotification notification) {
-    if (_restoringScroll || notification.metrics.axis != Axis.vertical) {
-      return false;
-    }
-    if (notification.metrics.outOfRange) return false;
-    final pixels = notification.metrics.pixels;
-    if (pixels <= 10) {
-      _scrollAccumDelta = 0.0;
-      if (!_showDateBar) setState(() => _showDateBar = true);
-      return false;
-    }
-    final delta = notification.scrollDelta ?? 0.0;
-    if (delta == 0.0) return false;
-    if ((delta > 0 && _scrollAccumDelta < 0) ||
-        (delta < 0 && _scrollAccumDelta > 0)) {
-      _scrollAccumDelta = delta;
-    } else {
-      _scrollAccumDelta += delta;
-    }
-    if (_scrollAccumDelta > 24 && pixels > 32 && _showDateBar) {
-      _scrollAccumDelta = 0.0;
-      setState(() => _showDateBar = false);
-    } else if (_scrollAccumDelta < -14 && !_showDateBar) {
-      _scrollAccumDelta = 0.0;
-      setState(() => _showDateBar = true);
-    }
-    return false;
   }
 
   Future<void> _showHeroMenu(
@@ -786,9 +757,6 @@ class _WorkoutPageState extends State<WorkoutPage>
     final currentKey = dayKey(currentDate);
     if (_activeScrollDateKey != currentKey) {
       _activeScrollDateKey = currentKey;
-      _scrollAccumDelta = 0.0;
-      final savedOffset = _scrollOffsets[currentKey] ?? 0.0;
-      _showDateBar = savedOffset <= 36;
       _restoringScroll = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         try {
@@ -828,6 +796,15 @@ class _WorkoutPageState extends State<WorkoutPage>
     }
 
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final textScaler = MediaQuery.textScalerOf(context);
+    final hasProgress = !session.rested && planned > 0;
+    final row1Height = math.max(28.0, textScaler.scale(17.5) * 1.2 + 2.0);
+    final row2Height = textScaler.scale(hasProgress ? 15.0 : 12.0) * 1.3 + 2.0;
+    final progressHeight = hasProgress ? 12.0 : 0.0;
+    final heroContentHeight =
+        math.max(60.0, row1Height + 6.0 + row2Height + progressHeight);
+    final heroHeaderExtent = (heroContentHeight + 42.0).ceilToDouble();
+
     return Column(
       children: [
         if (widget.showRestTimer)
@@ -838,89 +815,96 @@ class _WorkoutPageState extends State<WorkoutPage>
               children: [RestTimerPill(controller: _rest)],
             ),
           ),
-        ClipRect(
-          child: AnimatedAlign(
-            alignment: Alignment.bottomCenter,
-            heightFactor: _showDateBar ? 1.0 : 0.0,
-            duration: reduceMotion
-                ? Duration.zero
-                : const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            child: AnimatedOpacity(
-              opacity: _showDateBar ? 1.0 : 0.0,
-              duration: reduceMotion
-                  ? Duration.zero
-                  : const Duration(milliseconds: 180),
-              curve: Curves.easeOut,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
-                child: WeekStripBar(
-                  date: currentDate,
-                  today: today,
-                  enabled: !_saving,
-                  allowFutureSelection: true,
-                  statusForDay: _statusForDay,
-                  onChanged: selectRecordDate,
-                ),
-              ),
-            ),
-          ),
-        ),
-        Padding(
-          padding: EdgeInsets.fromLTRB(16, _showDateBar ? 0 : 4, 16, 10),
-          child: _buildHeroCard(
-            context: context,
-            targetDate: currentDate,
-            heroTitle: heroTitle,
-            completed: completed,
-            planned: planned,
-            progress: progress,
-            muscles: muscles,
-            session: session,
-            existingSession: existingSession,
-            scheduledTpl: scheduledTpl,
-            isFuture: isFuture,
-          ),
-        ),
         Expanded(
           child: HorizontalDaySwipe(
             onPrevious: () => stepDate(-1),
             onNext: () => stepDate(1),
-            child: NotificationListener<ScrollUpdateNotification>(
-              onNotification: _handleScrollNotification,
-              child: ListView(
-                controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(16, 2, 16, 112),
-                children: [
-                  if (blocks.isEmpty)
-                    _buildEmptyOrRestCard(
-                      context: context,
-                      targetDate: currentDate,
-                      rested: session.rested,
-                      hasScheduled: scheduledTpl != null,
-                      isFuture: isFuture,
-                    )
-                  else ...[
-                    for (var i = 0; i < blocks.length; i++)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _buildBlockCard(
-                          context: context,
-                          targetDate: currentDate,
-                          dateKeyStr: currentKey,
-                          index: i,
-                          block: blocks[i],
-                          totalBlocks: blocks.length,
-                          isFuture: isFuture,
-                        ),
+            child: CustomScrollView(
+              controller: _scrollController,
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+                    child: WeekStripBar(
+                      date: currentDate,
+                      today: today,
+                      enabled: !_saving,
+                      allowFutureSelection: true,
+                      statusForDay: _statusForDay,
+                      onChanged: selectRecordDate,
+                    ),
+                  ),
+                ),
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _PinnedHeroHeaderDelegate(
+                    extent: heroHeaderExtent,
+                    veilColor: p.canvas,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: () {
+                        if (_scrollController.hasClients &&
+                            _scrollController.offset > 12) {
+                          _scrollController.animateTo(
+                            0,
+                            duration: reduceMotion
+                                ? Duration.zero
+                                : const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                          );
+                        }
+                      },
+                      child: _buildHeroCard(
+                        context: context,
+                        targetDate: currentDate,
+                        heroTitle: heroTitle,
+                        completed: completed,
+                        planned: planned,
+                        progress: progress,
+                        muscles: muscles,
+                        session: session,
+                        existingSession: existingSession,
+                        scheduledTpl: scheduledTpl,
+                        isFuture: isFuture,
                       ),
-                    if (!isFuture) ...[
-                      const SizedBox(height: 2),
-                      _buildBottomAddBar(context, currentDate),
-                    ],
-                  ],
-                ],
-              ),
+                    ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 2, 16, 112),
+                  sliver: blocks.isEmpty
+                      ? SliverToBoxAdapter(
+                          child: _buildEmptyOrRestCard(
+                            context: context,
+                            targetDate: currentDate,
+                            rested: session.rested,
+                            hasScheduled: scheduledTpl != null,
+                            isFuture: isFuture,
+                          ),
+                        )
+                      : SliverList(
+                          delegate: SliverChildListDelegate([
+                            for (var i = 0; i < blocks.length; i++)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _buildBlockCard(
+                                  context: context,
+                                  targetDate: currentDate,
+                                  dateKeyStr: currentKey,
+                                  index: i,
+                                  block: blocks[i],
+                                  totalBlocks: blocks.length,
+                                  isFuture: isFuture,
+                                ),
+                              ),
+                            if (!isFuture) ...[
+                              const SizedBox(height: 2),
+                              _buildBottomAddBar(context, currentDate),
+                            ],
+                          ]),
+                        ),
+                ),
+              ],
             ),
           ),
         ),
@@ -1071,6 +1055,7 @@ class _WorkoutPageState extends State<WorkoutPage>
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 12,
+                                height: 1.25,
                                 fontWeight: FontWeight.w500,
                                 color: p.textSecondary,
                               ),
@@ -1082,6 +1067,7 @@ class _WorkoutPageState extends State<WorkoutPage>
                                     text: '$completed',
                                     style: TextStyle(
                                       fontSize: 15,
+                                      height: 1.25,
                                       fontWeight: FontWeight.w800,
                                       fontFeatures: const [
                                         FontFeature.tabularFigures()
@@ -1095,6 +1081,7 @@ class _WorkoutPageState extends State<WorkoutPage>
                                     text: ' / $planned 组 · $blockCount 动作',
                                     style: TextStyle(
                                       fontSize: 12,
+                                      height: 1.25,
                                       fontWeight: FontWeight.w500,
                                       fontFeatures: const [
                                         FontFeature.tabularFigures()
@@ -1114,6 +1101,7 @@ class _WorkoutPageState extends State<WorkoutPage>
                         '$percent%',
                         style: TextStyle(
                           fontSize: 13,
+                          height: 1.25,
                           fontWeight: FontWeight.w800,
                           fontFeatures: const [FontFeature.tabularFigures()],
                           color: progress >= 1.0 ? p.primary : p.textPrimary,
@@ -1657,4 +1645,59 @@ class _WorkoutPageState extends State<WorkoutPage>
       ],
     );
   }
+}
+
+class _PinnedHeroHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final double extent;
+  final Color veilColor;
+  final Widget child;
+
+  const _PinnedHeroHeaderDelegate({
+    required this.extent,
+    required this.veilColor,
+    required this.child,
+  });
+
+  @override
+  double get minExtent => extent;
+
+  @override
+  double get maxExtent => extent;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    final dockT = (shrinkOffset / 24.0).clamp(0.0, 1.0);
+    return SizedBox.expand(
+      child: DecoratedBox(
+        decoration: dockT > 0.001
+            ? BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: const [0.0, 0.84, 1.0],
+                  colors: [
+                    veilColor.withValues(alpha: 0.90 * dockT),
+                    veilColor.withValues(alpha: 0.68 * dockT),
+                    veilColor.withValues(alpha: 0.0),
+                  ],
+                ),
+              )
+            : const BoxDecoration(),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+          child: Align(
+            alignment: Alignment.center,
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _PinnedHeroHeaderDelegate oldDelegate) => true;
 }

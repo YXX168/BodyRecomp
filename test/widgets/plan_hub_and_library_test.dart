@@ -206,7 +206,7 @@ void main() {
   });
 
   testWidgets(
-      'workout date strip auto-hides on downward scroll and reappears on upward scroll',
+      'workout date bar hides on downward scroll while overview card stays pinned',
       (tester) async {
     tester.view.physicalSize = const Size(390, 640);
     tester.view.devicePixelRatio = 1;
@@ -222,28 +222,51 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final alignFinder = find
-        .ancestor(
-          of: find.byType(WeekStripBar),
-          matching: find.byType(AnimatedAlign),
-        )
-        .first;
-    expect(tester.widget<AnimatedAlign>(alignFinder).heightFactor, 1.0);
+    final scrollFinder = find.byType(CustomScrollView);
+    final weekFinder = find.byType(WeekStripBar);
+    final heroFinder = find.byKey(const Key('daily-suggestion'));
+    final block0Finder = find.byKey(const ValueKey('workout-block-0'));
 
-    final heroBefore =
-        tester.getRect(find.byKey(const Key('daily-suggestion')));
-    await tester.drag(find.byType(ListView), const Offset(0, -260));
-    await tester.pumpAndSettle();
-    expect(tester.widget<AnimatedAlign>(alignFinder).heightFactor, 0.0);
-    // Hero overview card stays pinned at the top after the date strip hides.
-    final heroDocked =
-        tester.getRect(find.byKey(const Key('daily-suggestion')));
-    expect(heroDocked.top, lessThan(heroBefore.top));
-    expect(heroDocked.top, greaterThanOrEqualTo(0));
+    final heroBefore = tester.getRect(heroFinder);
+    final blockBefore = tester.getRect(block0Finder);
 
-    await tester.drag(find.byType(ListView), const Offset(0, 140));
+    // Small downward drag moves WeekStripBar, HeroCard and blocks 1:1 together
+    // (~30px after 18px touch slop) with zero abrupt height-collapse jump.
+    await tester.drag(scrollFinder, const Offset(0, -48));
     await tester.pumpAndSettle();
-    expect(tester.widget<AnimatedAlign>(alignFinder).heightFactor, 1.0);
+
+    final heroMid = tester.getRect(heroFinder);
+    final blockMid = tester.getRect(block0Finder);
+    final heroDelta = heroBefore.top - heroMid.top;
+    final blockDelta = blockBefore.top - blockMid.top;
+    expect(heroDelta, inInclusiveRange(18.0, 42.0));
+    expect((heroDelta - blockDelta).abs(), lessThan(2.0));
+    expect(weekFinder, findsOneWidget);
+
+    // Larger downward drag scrolls WeekStripBar out while HeroCard pins cleanly.
+    await tester.drag(scrollFinder, const Offset(0, -240));
+    await tester.pumpAndSettle();
+
+    final scrollTop = tester.getRect(scrollFinder).top;
+    final heroDocked = tester.getRect(heroFinder);
+    expect(heroDocked.top - scrollTop, inInclusiveRange(0.0, 12.0));
+    if (weekFinder.evaluate().isNotEmpty) {
+      expect(tester.getRect(weekFinder).bottom,
+          lessThanOrEqualTo(scrollTop + 4.0));
+    }
+
+    // Small upward drag mid-list keeps HeroCard calmly pinned at the top.
+    await tester.drag(scrollFinder, const Offset(0, 60));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(heroFinder).top - scrollTop,
+      inInclusiveRange(0.0, 12.0),
+    );
+
+    // Tapping the pinned HeroCard smoothly scrolls back to reveal WeekStripBar.
+    await tester.tap(heroFinder);
+    await tester.pumpAndSettle();
+    expect(tester.getRect(weekFinder).top, greaterThanOrEqualTo(scrollTop));
     expect(tester.takeException(), isNull);
   });
 
