@@ -24,7 +24,13 @@ void main() {
   }
 
   Future<void> tap(WidgetTester tester, Finder finder) async {
-    if (finder.evaluate().isEmpty) await tester.scrollUntilVisible(finder, 180);
+    if (finder.evaluate().isEmpty) {
+      await tester.scrollUntilVisible(
+        finder,
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
+    }
     await tester.ensureVisible(finder);
     await tester.pumpAndSettle();
     await tester.tap(finder);
@@ -148,7 +154,8 @@ void main() {
   testWidgets('rest marker can be cancelled without logging training',
       (tester) async {
     await open(tester, WorkoutPage(now: () => DateTime(2026, 11, 12, 19)));
-    await tap(tester, find.byKey(const Key('record-rest')));
+    await tap(tester, find.byKey(const Key('hero-menu')));
+    await tap(tester, find.text('标记为休息日'));
     expect((await loadDailyWorkouts())['2026-11-12']!.rested, isTrue);
     await tap(tester, find.text('取消休息标记'));
     expect((await loadDailyWorkouts())['2026-11-12'], isNull);
@@ -164,10 +171,9 @@ void main() {
     expect(find.text('统计数据读取失败，原记录未被覆盖。'), findsOneWidget);
     expect(find.text('查看原数据'), findsOneWidget);
     expect(prefs.getString(weightHistoryKey), '[damaged');
-    await tap(tester, find.byKey(const ValueKey('nav-4')));
-    final exportBtn = find.text('导出 JSON');
+    final backupTile = find.byKey(const Key('hub-backup-tile'));
     await tester.scrollUntilVisible(
-      exportBtn,
+      backupTile,
       180,
       scrollable: find
           .descendant(
@@ -176,10 +182,11 @@ void main() {
           )
           .first,
     );
-    await tester.ensureVisible(exportBtn);
+    await tester.ensureVisible(backupTile);
     await tester.pumpAndSettle();
-    await tester.tap(exportBtn);
+    await tester.tap(backupTile);
     await tester.pumpAndSettle();
+    await tap(tester, find.text('导出 JSON'));
     expect(find.text('数据导出 (JSON)'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -189,8 +196,20 @@ void main() {
       (tester) async {
     await tester.pumpWidget(const ThemeState(child: RecompApp()));
     await tester.pumpAndSettle();
-    await tap(tester, find.byKey(const ValueKey('nav-4')));
-    await tap(tester, find.text('体重'));
+    await tap(tester, find.byKey(const ValueKey('nav-3')));
+    final profileTile = find.byKey(const Key('hub-profile-tile'));
+    await tester.scrollUntilVisible(
+      profileTile,
+      180,
+      scrollable: find
+          .descendant(
+            of: find.byType(ProfilePage),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tap(tester, profileTile);
+    await tap(tester, find.byKey(const Key('profile-weight-btn')));
     await tester.enterText(
         find.byKey(const ValueKey('body-value-weight')), '-70');
     await tap(tester, find.byKey(const Key('save-body-values')));
@@ -216,7 +235,8 @@ void main() {
     await tester.pumpWidget(const ThemeState(child: RecompApp()));
     await tester.pumpAndSettle();
     await tap(tester, find.byKey(const ValueKey('nav-3')));
-    await tap(tester, find.byKey(const ValueKey('trends-seg-2')));
+    await tester.ensureVisible(find.byType(SmoothTrendChart));
+    await tester.pumpAndSettle();
     expect(
         tester.getSize(find.byType(SmoothTrendChart)).width, greaterThan(280));
     expect(tester.takeException(), isNull);

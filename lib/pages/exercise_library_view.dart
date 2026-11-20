@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../data/exercise_library.dart';
 import '../models/daily_workout.dart';
@@ -121,7 +122,7 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
         }
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已添加动作「${created.exercise.name}」')),
+        SnackBar(content: Text('已添加「${created.exercise.name}」')),
       );
     } catch (_) {
       if (mounted) {
@@ -185,7 +186,7 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
       setState(() => _items = updated);
       showUndoNotice(
         context,
-        '已删除动作「${item.exercise.name}」',
+        '已删除「${item.exercise.name}」',
         onUndo: () async {
           try {
             await saveExerciseLibrary(previous);
@@ -239,14 +240,15 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
           ),
         );
       await saveDailyWorkout(
-          session.copyWith(blocks: nextBlocks, rested: false));
+        session.copyWith(blocks: nextBlocks, rested: false),
+      );
       workoutDataRevision.value++;
       workoutHistoryRevision.value++;
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          SnackBar(content: Text('已将「${item.exercise.name}」加入今日训练')),
+          SnackBar(content: Text('已加入今日「${item.exercise.name}」')),
         );
     } catch (_) {
       if (mounted) {
@@ -264,7 +266,7 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('恢复内置动作？'),
-        content: const Text('将恢复所有系统内置动作的默认内容，你新增的自定义动作会保留。'),
+        content: const Text('将恢复系统默认动作，自建动作会保留。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -285,7 +287,7 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
       if (!mounted) return;
       setState(() => _items = updated);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已恢复内置动作（自定义动作已保留）')),
+        const SnackBar(content: Text('已恢复内置动作')),
       );
     } catch (_) {
       if (mounted) {
@@ -297,6 +299,9 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
       if (mounted) setState(() => _busy = false);
     }
   }
+
+  String _fmtWeight(double w) =>
+      w == w.roundToDouble() ? w.toStringAsFixed(0) : w.toStringAsFixed(1);
 
   @override
   Widget build(BuildContext context) {
@@ -320,239 +325,315 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
 
     final visible = _filtered;
     final categories = _categories;
+    final scaler = MediaQuery.textScalerOf(context);
+    final cardExtent = 120.0 +
+        scaler.scale(13.5) * 1.45 +
+        math.max(30.0, scaler.scale(11.5) * 1.45);
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 110),
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                key: const Key('library-search'),
-                controller: _searchController,
-                onChanged: (value) => setState(() => _query = value),
-                style: TextStyle(fontSize: 13.5, color: p.textPrimary),
-                decoration: InputDecoration(
-                  hintText: '搜索动作、肌群或要点',
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    size: 19,
-                    color: p.textTertiary,
-                  ),
-                  suffixIcon: _query.isEmpty
-                      ? null
-                      : IconButton(
-                          key: const Key('clear-library-search'),
-                          tooltip: '清除搜索',
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _query = '');
-                          },
-                          icon: const Icon(Icons.close_rounded, size: 18),
-                        ),
-                  isDense: true,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            FilledButton.icon(
-              key: const Key('add-library-exercise'),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 46),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-              ),
-              onPressed: _busy ? null : _addExercise,
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('新增'),
-            ),
-            PopupMenuButton<String>(
-              tooltip: '动作库选项',
-              icon: Icon(Icons.more_vert_rounded, color: p.textSecondary),
-              onSelected: (value) {
-                if (value == 'restore') _restoreDefaults();
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(
-                  value: 'restore',
-                  child: Text('恢复内置默认动作'),
-                ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 38,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            children: [
-              for (final cat in categories)
-                Padding(
-                  padding: const EdgeInsets.only(right: 7),
-                  child: FilterChip(
-                    key: ValueKey('library-cat-$cat'),
-                    selected: _selectedCategory == cat,
-                    showCheckmark: false,
-                    label: Text('$cat ${_countForCategory(cat)}'),
-                    labelStyle: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: _selectedCategory == cat
-                          ? p.onPrimary
-                          : p.textSecondary,
-                    ),
-                    selectedColor: p.primary,
-                    backgroundColor: p.surface,
-                    side: BorderSide(
-                      color:
-                          _selectedCategory == cat ? p.primary : p.borderSubtle,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    onSelected: (_) => setState(() => _selectedCategory = cat),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        if (visible.isEmpty)
-          SurfaceCard(
-            padding: const EdgeInsets.all(28),
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+          sliver: SliverToBoxAdapter(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.fitness_center_rounded,
-                    size: 32, color: p.textTertiary),
-                const SizedBox(height: 10),
-                Text(
-                  _query.isNotEmpty ? '没有匹配的动作' : '该分类下暂无动作',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: p.textPrimary,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        key: const Key('library-search'),
+                        controller: _searchController,
+                        onChanged: (value) => setState(() => _query = value),
+                        style: TextStyle(fontSize: 13.5, color: p.textPrimary),
+                        decoration: InputDecoration(
+                          hintText: '搜索动作',
+                          prefixIcon: Icon(
+                            Icons.search_rounded,
+                            size: 19,
+                            color: p.textTertiary,
+                          ),
+                          suffixIcon: _query.isEmpty
+                              ? null
+                              : IconButton(
+                                  key: const Key('clear-library-search'),
+                                  tooltip: '清除搜索',
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _query = '');
+                                  },
+                                  icon:
+                                      const Icon(Icons.close_rounded, size: 18),
+                                ),
+                          isDense: true,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Tooltip(
+                      message: '新增动作',
+                      child: FilledButton(
+                        key: const Key('add-library-exercise'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(44, 44),
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: _busy ? null : _addExercise,
+                        child: const Icon(Icons.add_rounded, size: 22),
+                      ),
+                    ),
+                    PopupMenuButton<String>(
+                      tooltip: '动作库选项',
+                      constraints:
+                          const BoxConstraints.tightFor(width: 34, height: 44),
+                      padding: EdgeInsets.zero,
+                      icon: Icon(Icons.more_vert_rounded,
+                          size: 20, color: p.textSecondary),
+                      onSelected: (value) {
+                        if (value == 'restore') _restoreDefaults();
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(
+                          value: 'restore',
+                          child: Text('恢复内置默认动作'),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '点击右上角「新增」随时扩充你的个人动作库',
-                  style: TextStyle(fontSize: 12, color: p.textSecondary),
-                ),
-              ],
-            ),
-          ),
-        for (final item in visible)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Builder(
-              builder: (context) {
-                final pr = exercisePersonalRecord(_logs, item.exercise.name);
-                return SurfaceCard(
-                  key: ValueKey('library-item-${item.id}'),
-                  onTap: _busy ? null : () => _editExercise(item),
-                  padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+                const SizedBox(height: 11),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      ExerciseMark(item.exercise.name, size: 46),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      for (final cat in categories)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 7),
+                          child: FilterChip(
+                            key: ValueKey('library-cat-$cat'),
+                            selected: _selectedCategory == cat,
+                            showCheckmark: false,
+                            visualDensity: VisualDensity.compact,
+                            label: Text(
+                              '${cat == '收藏' ? '★ 收藏' : cat} ${_countForCategory(cat)}',
+                            ),
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              fontWeight: _selectedCategory == cat
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: _selectedCategory == cat
+                                  ? p.onPrimary
+                                  : p.textSecondary,
+                            ),
+                            selectedColor: p.primary,
+                            backgroundColor: p.isDark
+                                ? Colors.white.withValues(alpha: .06)
+                                : Colors.white.withValues(alpha: .65),
+                            side: BorderSide(
+                              color: _selectedCategory == cat
+                                  ? p.primary
+                                  : p.borderSubtle,
+                              width: 0.85,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            onSelected: (_) =>
+                                setState(() => _selectedCategory = cat),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (visible.isEmpty)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 112),
+            sliver: SliverToBoxAdapter(
+              child: SurfaceCard(
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  children: [
+                    Icon(Icons.fitness_center_rounded,
+                        size: 34, color: p.textTertiary),
+                    const SizedBox(height: 10),
+                    Text(
+                      _query.isNotEmpty ? '没有匹配的动作' : '该分类暂无动作',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: p.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 112),
+            sliver: SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 11,
+                crossAxisSpacing: 11,
+                mainAxisExtent: cardExtent,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final item = visible[index];
+                  final pr = exercisePersonalRecord(_logs, item.exercise.name);
+                  return SurfaceCard(
+                    key: ValueKey('library-item-${item.id}'),
+                    onTap: _busy ? null : () => _editExercise(item),
+                    radius: 20,
+                    padding: const EdgeInsets.fromLTRB(12, 8, 10, 11),
+                    child: Column(
+                      children: [
+                        Row(
                           children: [
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    item.exercise.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                      color: p.textPrimary,
+                            SizedBox(
+                              width: 26,
+                              height: 26,
+                              child: IconButton(
+                                key: ValueKey('fav-library-${item.id}'),
+                                tooltip: item.isFavorite ? '取消收藏' : '收藏',
+                                style: IconButton.styleFrom(
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                padding: EdgeInsets.zero,
+                                onPressed:
+                                    _busy ? null : () => _toggleFavorite(item),
+                                icon: Icon(
+                                  item.isFavorite
+                                      ? Icons.star_rounded
+                                      : Icons.star_border_rounded,
+                                  size: 17,
+                                  color: item.isFavorite
+                                      ? p.warning
+                                      : p.textTertiary.withValues(alpha: .65),
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            if (!item.isBuiltIn)
+                              Container(
+                                width: 5,
+                                height: 5,
+                                margin: const EdgeInsets.only(right: 4),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: p.accent,
+                                ),
+                              ),
+                            SizedBox(
+                              width: 26,
+                              height: 26,
+                              child: IconButton(
+                                key: ValueKey('delete-library-${item.id}'),
+                                tooltip: '删除动作',
+                                style: IconButton.styleFrom(
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                padding: EdgeInsets.zero,
+                                onPressed:
+                                    _busy ? null : () => _deleteExercise(item),
+                                icon: Icon(
+                                  Icons.close_rounded,
+                                  size: 15,
+                                  color: p.textTertiary.withValues(alpha: .52),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        ExerciseMark(item.exercise.name, size: 48),
+                        const Spacer(),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            item.exercise.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: p.textPrimary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                pr != null
+                                    ? 'PR ${_fmtWeight(pr.weightKg)}kg'
+                                    : '${item.exercise.sets}×${item.exercise.reps}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color:
+                                      pr != null ? p.warning : p.textSecondary,
+                                ),
+                              ),
+                            ),
+                            SizedBox(
+                              width: 30,
+                              height: 30,
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  key: ValueKey('add-today-library-${item.id}'),
+                                  customBorder: const CircleBorder(),
+                                  onTap: _busy
+                                      ? null
+                                      : () => _addToTodayWorkout(item),
+                                  child: Tooltip(
+                                    message: '加入今日训练',
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: p.primary.withValues(
+                                          alpha: p.isDark ? .18 : .12,
+                                        ),
+                                        border: Border.all(
+                                          color:
+                                              p.primary.withValues(alpha: .35),
+                                          width: 0.85,
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        Icons.add_rounded,
+                                        size: 16,
+                                        color: p.primary,
+                                      ),
                                     ),
                                   ),
                                 ),
-                                if (!item.isBuiltIn) ...[
-                                  const SizedBox(width: 6),
-                                  StatusPill(label: '自建', color: p.accent),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Text(
-                                  '${item.category}${item.exercise.muscleTarget.isNotEmpty ? ' · ${item.exercise.muscleTarget}' : ''}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: p.textSecondary,
-                                  ),
-                                ),
-                                Text(
-                                  '· ${item.exercise.sets}组 × ${item.exercise.reps}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: p.textTertiary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (pr != null) ...[
-                              const SizedBox(height: 5),
-                              StatusPill(
-                                label:
-                                    'PR ${pr.weightKg == pr.weightKg.roundToDouble() ? pr.weightKg.toStringAsFixed(0) : pr.weightKg.toStringAsFixed(1)}kg × ${pr.reps}',
-                                icon: Icons.emoji_events_rounded,
-                                color: p.warning,
                               ),
-                            ],
+                            ),
                           ],
                         ),
-                      ),
-                      IconButton(
-                        key: ValueKey('fav-library-${item.id}'),
-                        tooltip: item.isFavorite ? '取消收藏' : '收藏动作',
-                        visualDensity: VisualDensity.compact,
-                        onPressed: _busy ? null : () => _toggleFavorite(item),
-                        icon: Icon(
-                          item.isFavorite
-                              ? Icons.star_rounded
-                              : Icons.star_border_rounded,
-                          size: 20,
-                          color: item.isFavorite ? p.warning : p.textTertiary,
-                        ),
-                      ),
-                      IconButton(
-                        key: ValueKey('add-today-library-${item.id}'),
-                        tooltip: '加入今日训练',
-                        visualDensity: VisualDensity.compact,
-                        onPressed:
-                            _busy ? null : () => _addToTodayWorkout(item),
-                        icon: Icon(
-                          Icons.add_circle_outline_rounded,
-                          size: 20,
-                          color: p.primary,
-                        ),
-                      ),
-                      IconButton(
-                        key: ValueKey('delete-library-${item.id}'),
-                        tooltip: '删除动作',
-                        visualDensity: VisualDensity.compact,
-                        onPressed: _busy ? null : () => _deleteExercise(item),
-                        icon: Icon(
-                          Icons.delete_outline_rounded,
-                          size: 19,
-                          color: p.textTertiary,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
+                      ],
+                    ),
+                  );
+                },
+                childCount: visible.length,
+              ),
             ),
           ),
       ],

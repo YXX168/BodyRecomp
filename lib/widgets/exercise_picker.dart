@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../data/exercise_library.dart';
 import '../models/daily_workout.dart';
@@ -537,44 +538,54 @@ class _ExercisePickerState extends State<_ExercisePicker> {
         heightFactor: 1,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 620),
-          child: Material(
-            color: p.surfaceElevated,
-            shape: RoundedRectangleBorder(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(28)),
-              side: BorderSide(color: p.borderSubtle),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: SizedBox(
-              height: height,
-              child: Column(
-                children: [
-                  if (!short) ...controls,
-                  Expanded(
-                    child: short
-                        ? CustomScrollView(
-                            key: const ValueKey('picker-compact-scroll'),
-                            controller: _scroll,
-                            slivers: [
-                              SliverList.list(children: controls),
-                              if (items.isEmpty)
-                                SliverToBoxAdapter(child: empty)
-                              else
-                                SliverPadding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 20),
-                                  sliver: SliverList.builder(
-                                    itemCount: items.length,
-                                    itemBuilder: (_, index) =>
-                                        _itemTile(items[index], compact: true),
-                                  ),
-                                ),
-                            ],
-                          )
-                        : results,
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              child: Material(
+                color: p.isDark
+                    ? p.surfaceElevated.withValues(alpha: .82)
+                    : Colors.white.withValues(alpha: .84),
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(28)),
+                  side: BorderSide(
+                      color: p.glassRimBright.withValues(alpha: .52)),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: SizedBox(
+                  height: height,
+                  child: Column(
+                    children: [
+                      if (!short) ...controls,
+                      Expanded(
+                        child: short
+                            ? CustomScrollView(
+                                key: const ValueKey('picker-compact-scroll'),
+                                controller: _scroll,
+                                slivers: [
+                                  SliverList.list(children: controls),
+                                  if (items.isEmpty)
+                                    SliverToBoxAdapter(child: empty)
+                                  else
+                                    SliverPadding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 20),
+                                      sliver: SliverList.builder(
+                                        itemCount: items.length,
+                                        itemBuilder: (_, index) => _itemTile(
+                                            items[index],
+                                            compact: true),
+                                      ),
+                                    ),
+                                ],
+                              )
+                            : results,
+                      ),
+                      footer,
+                    ],
                   ),
-                  footer,
-                ],
+                ),
               ),
             ),
           ),

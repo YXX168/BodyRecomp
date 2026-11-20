@@ -7,15 +7,14 @@ import '../widgets/ambient_background.dart';
 import '../widgets/app_navigation_bar.dart';
 import '../widgets/rest_timer_pill.dart';
 import '../widgets/sheet_frame.dart';
-import 'nutrition_page.dart';
-import 'plan_hub_page.dart';
+import 'exercise_library_view.dart';
 import 'profile_page.dart';
-import 'trends_page.dart';
+import 'template_manager_page.dart';
 import 'workout_page.dart';
 
 class MainShell extends StatefulWidget {
   final String appVersion;
-  const MainShell({super.key, this.appVersion = '7.0.2'});
+  const MainShell({super.key, this.appVersion = '7.1.0'});
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -30,9 +29,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
   late final List<Widget> _pages = [
     WorkoutPage(showRestTimer: false, restController: _rest),
-    const PlanHubPage(),
-    const NutritionPage(),
-    const TrendsPage(),
+    const WeeklyTemplatesPage(),
+    const ExerciseLibraryView(),
     ProfilePage(appVersion: widget.appVersion),
   ];
 
@@ -63,8 +61,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => SheetFrame(
-        title: '外观主题工坊',
-        subtitle: '随时切换高定明暗主题与配色风格',
+        title: '流光主题',
         icon: Icons.palette_outlined,
         body: Column(
           mainAxisSize: MainAxisSize.min,
@@ -78,26 +75,26 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                     return SelectionOption(
                       key: ValueKey('theme-option-${item.name}'),
                       title: target.name,
-                      subtitle: item == controller.current
-                          ? '当前主题 · ${target.tagline}'
-                          : target.tagline,
+                      subtitle: target.tagline,
                       leading: Container(
-                        width: 38,
-                        height: 38,
+                        width: 40,
+                        height: 40,
                         decoration: BoxDecoration(
                           color: target.canvas,
                           border: Border.all(
-                            color: target.primary.withValues(alpha: .45),
+                            color: target.primary.withValues(alpha: .50),
                           ),
-                          borderRadius: BorderRadius.circular(11),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Center(
                           child: Container(
-                            width: 18,
-                            height: 18,
+                            width: 20,
+                            height: 20,
                             decoration: BoxDecoration(
-                              gradient: target.primaryGradient,
-                              borderRadius: BorderRadius.circular(6),
+                              gradient: LinearGradient(
+                                colors: [target.orb1, target.orb2],
+                              ),
+                              shape: BoxShape.circle,
                             ),
                           ),
                         ),
@@ -123,13 +120,14 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     return Scaffold(
       backgroundColor: p.canvas,
       extendBody: true,
-      body: AmbientCanvas(
+      body: LiquidBackdrop(
+        pagePhase: _tab,
         child: SafeArea(
           bottom: false,
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(18, 8, 8, 6),
+                padding: const EdgeInsets.fromLTRB(18, 6, 14, 2),
                 child: Row(
                   children: [
                     Expanded(
@@ -141,28 +139,28 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Container(
-                                width: 28,
-                                height: 28,
+                                width: 25,
+                                height: 25,
                                 decoration: BoxDecoration(
                                   gradient: p.primaryGradient,
-                                  borderRadius: BorderRadius.circular(9),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Icon(
                                   Icons.bolt_rounded,
-                                  size: 18,
+                                  size: 16,
                                   color: p.onPrimary,
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 7),
                               ShaderMask(
                                 shaderCallback: (bounds) =>
                                     p.primaryGradient.createShader(bounds),
                                 child: const Text(
                                   '青燃',
                                   style: TextStyle(
-                                    fontSize: 22,
+                                    fontSize: 19,
                                     fontWeight: FontWeight.w800,
-                                    letterSpacing: -0.6,
+                                    letterSpacing: -0.4,
                                     color: Colors.white,
                                   ),
                                 ),
@@ -174,17 +172,33 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                     ),
                     const SizedBox(width: 6),
                     RestTimerPill(controller: _rest),
-                    const SizedBox(width: 2),
-                    IconButton(
-                      tooltip: '切换主题',
-                      onPressed: _showThemeSheet,
-                      constraints:
-                          const BoxConstraints.tightFor(width: 40, height: 40),
-                      padding: EdgeInsets.zero,
-                      icon: Icon(
-                        Icons.palette_outlined,
-                        size: 20,
-                        color: p.textSecondary,
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message: '切换主题',
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: _showThemeSheet,
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [p.glassFillTop, p.glassFillBottom],
+                              ),
+                              border: Border.all(color: p.borderSubtle),
+                            ),
+                            child: Icon(
+                              Icons.palette_outlined,
+                              size: 18,
+                              color: p.textSecondary,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ],

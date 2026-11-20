@@ -3,6 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('UserProfile', () {
+    test('defaults weight to 69kg', () {
+      expect(UserProfile().weightKg, 69.0);
+      expect(UserProfile.fromJson(const {}).weightKg, 69.0);
+    });
+
     test('calculates BMI and survives JSON round-trip', () {
       final profile = UserProfile(
         birthday: '2000-01-01',

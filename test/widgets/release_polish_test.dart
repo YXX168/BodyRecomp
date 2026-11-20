@@ -85,7 +85,7 @@ void main() {
   });
 
   testWidgets(
-      'all 5 tabs support small screens and double text size in dark and light themes',
+      'all 4 tabs support small screens and double text size in dark and light themes',
       (tester) async {
     tester.view.physicalSize = const Size(320, 568);
     tester.view.devicePixelRatio = 1;
@@ -100,7 +100,7 @@ void main() {
         ThemeState(controller: controller, child: const RecompApp()),
       );
       await tester.pumpAndSettle();
-      for (final tab in [0, 1, 2, 3, 4]) {
+      for (final tab in [0, 1, 2, 3]) {
         await tester.tap(find.byKey(ValueKey('nav-$tab')));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull,

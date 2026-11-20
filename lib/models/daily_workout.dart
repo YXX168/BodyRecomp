@@ -97,6 +97,19 @@ class WorkoutTemplate {
       required this.name,
       this.note = '',
       this.exercises = const []});
+
+  WorkoutTemplate copyWith({
+    String? name,
+    String? note,
+    List<Exercise>? exercises,
+  }) =>
+      WorkoutTemplate(
+        id: id,
+        name: name ?? this.name,
+        note: note ?? this.note,
+        exercises: exercises ?? this.exercises,
+      );
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,

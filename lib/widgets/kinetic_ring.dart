@@ -36,36 +36,39 @@ class KineticProgressRing extends StatelessWidget {
       curve: Curves.easeOutCubic,
       builder: (context, value, child) {
         final percent = (value * 100).round();
-        return SizedBox(
-          width: size,
-          height: size,
-          child: CustomPaint(
-            painter: _KineticRingPainter(
-              value: value,
-              strokeWidth: strokeWidth,
-              trackColor: p.surfaceMuted,
-              startColor: c1,
-              endColor: c2,
-              isDark: p.isDark,
-            ),
-            child: Center(
-              child: center ??
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '$percent%',
-                        style: TextStyle(
-                          fontSize: size * 0.23,
-                          fontWeight: FontWeight.w800,
-                          height: 1.0,
-                          letterSpacing: -0.6,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                          color: value >= 1.0 ? c1 : p.textPrimary,
+        return RepaintBoundary(
+          child: SizedBox(
+            width: size,
+            height: size,
+            child: CustomPaint(
+              painter: _KineticRingPainter(
+                value: value,
+                strokeWidth: strokeWidth,
+                trackColor: (p.isDark ? Colors.white : Colors.black)
+                    .withValues(alpha: p.isDark ? .14 : .08),
+                startColor: c1,
+                endColor: c2,
+                isDark: p.isDark,
+              ),
+              child: Center(
+                child: center ??
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '$percent%',
+                          style: TextStyle(
+                            fontSize: size * 0.23,
+                            fontWeight: FontWeight.w800,
+                            height: 1.0,
+                            letterSpacing: -0.6,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                            color: value >= 1.0 ? c1 : p.textPrimary,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+              ),
             ),
           ),
         );

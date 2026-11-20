@@ -1,9 +1,13 @@
 import 'package:body_recomp/main.dart';
 import 'package:body_recomp/models/daily_workout.dart';
+import 'package:body_recomp/pages/template_manager_page.dart';
 import 'package:body_recomp/pages/workout_page.dart';
 import 'package:body_recomp/services/daily_workout_service.dart';
 import 'package:body_recomp/services/data_service.dart';
 import 'package:body_recomp/services/exercise_library_service.dart';
+import 'package:body_recomp/widgets/app_navigation_bar.dart';
+import 'package:body_recomp/widgets/muscle_body_graphic.dart';
+import 'package:body_recomp/widgets/week_strip_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,9 +15,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  Future<void> tapVisible(WidgetTester tester, Finder finder) async {
+  Future<void> tapVisible(WidgetTester tester, Finder finder,
+      {Finder? scrollable}) async {
     if (finder.evaluate().isEmpty) {
-      await tester.scrollUntilVisible(finder, 180);
+      await tester.scrollUntilVisible(
+        finder,
+        180,
+        scrollable: scrollable ?? find.byType(Scrollable).first,
+      );
     }
     await tester.ensureVisible(finder);
     await tester.pumpAndSettle();
@@ -49,12 +58,22 @@ void main() {
     await tester.pumpWidget(const ThemeState(child: RecompApp()));
     await tester.pumpAndSettle();
 
-    // Go to Plan tab (nav-1)
+    // Go to Templates tab (nav-1)
     await tester.tap(find.byKey(const ValueKey('nav-1')));
     await tester.pumpAndSettle();
 
     // Delete 'push' template (bound to Monday)
-    await tapVisible(tester, find.byKey(const ValueKey('template-menu-push')));
+    final templateScroll = find
+        .descendant(
+          of: find.byType(WeeklyTemplatesView),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tapVisible(
+      tester,
+      find.byKey(const ValueKey('template-menu-push')),
+      scrollable: templateScroll,
+    );
     await tester.tap(find.text('删除模板'));
     await tester.pumpAndSettle();
     expect(find.textContaining('周一'), findsWidgets);
@@ -78,9 +97,8 @@ void main() {
     await tester.pumpWidget(const ThemeState(child: RecompApp()));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('nav-1')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('plan-tab-library')));
+    // Go directly to Exercise Library tab (nav-2)
+    await tester.tap(find.byKey(const ValueKey('nav-2')));
     await tester.pumpAndSettle();
 
     // Add a custom exercise
@@ -137,13 +155,119 @@ void main() {
     expect(logs, hasLength(1));
     expect(logs.single.weightKg, 80);
 
-    // Navigate to Trends -> Strength PR segment
+    // Navigate to Profile hub (nav-3) -> open Trends -> Strength PR segment
     await tester.tap(find.byKey(const ValueKey('nav-3')));
     await tester.pumpAndSettle();
+    await tapVisible(tester, find.byKey(const Key('open-trends-btn')));
     await tester.tap(find.byKey(const ValueKey('trends-seg-1')));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('最佳 PR: 80.0kg'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'muscle body graphic renders inferred active groups on workout and templates',
+      (tester) async {
+    final thursday = DateTime(2026, 11, 19, 12);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: RecompApp.themeFor(AppTheme.blue),
+        home: Scaffold(body: WorkoutPage(now: () => thursday)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final workoutGraphic =
+        tester.widget<MuscleBodyGraphic>(find.byType(MuscleBodyGraphic));
+    expect(workoutGraphic.activeGroups, contains('legs'));
+    expect(workoutGraphic.activeGroups, contains('core'));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: RecompApp.themeFor(AppTheme.blue),
+        home: const TemplateManagerPage(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('schedule-day-0')));
+    await tester.pumpAndSettle();
+    var tplGraphic =
+        tester.widget<MuscleBodyGraphic>(find.byType(MuscleBodyGraphic));
+    expect(tplGraphic.activeGroups, contains('chest'));
+
+    await tester.tap(find.byKey(const ValueKey('schedule-day-1')));
+    await tester.pumpAndSettle();
+    tplGraphic =
+        tester.widget<MuscleBodyGraphic>(find.byType(MuscleBodyGraphic));
+    expect(tplGraphic.activeGroups, contains('back'));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'workout date strip auto-hides on downward scroll and reappears on upward scroll',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final thursday = DateTime(2026, 11, 19, 12);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: RecompApp.themeFor(AppTheme.blue),
+        home: Scaffold(body: WorkoutPage(now: () => thursday)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final alignFinder = find
+        .ancestor(
+          of: find.byType(WeekStripBar),
+          matching: find.byType(AnimatedAlign),
+        )
+        .first;
+    expect(tester.widget<AnimatedAlign>(alignFinder).heightFactor, 1.0);
+
+    final heroBefore =
+        tester.getRect(find.byKey(const Key('daily-suggestion')));
+    await tester.drag(find.byType(ListView), const Offset(0, -260));
+    await tester.pumpAndSettle();
+    expect(tester.widget<AnimatedAlign>(alignFinder).heightFactor, 0.0);
+    // Hero overview card stays pinned at the top after the date strip hides.
+    final heroDocked =
+        tester.getRect(find.byKey(const Key('daily-suggestion')));
+    expect(heroDocked.top, lessThan(heroBefore.top));
+    expect(heroDocked.top, greaterThanOrEqualTo(0));
+
+    await tester.drag(find.byType(ListView), const Offset(0, 140));
+    await tester.pumpAndSettle();
+    expect(tester.widget<AnimatedAlign>(alignFinder).heightFactor, 1.0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('bottom navigation droplet supports horizontal swipe switching',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const ThemeState(child: RecompApp()));
+    await tester.pumpAndSettle();
+
+    final navRect = tester.getRect(find.byType(AppNavigationBar));
+    await tester.dragFrom(
+      Offset(navRect.left + navRect.width * 0.14, navRect.center.dy),
+      Offset(navRect.width * 0.50, 0),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).index,
+      greaterThan(0),
+    );
     expect(tester.takeException(), isNull);
   });
 }

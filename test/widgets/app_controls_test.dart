@@ -3,8 +3,8 @@ import 'package:body_recomp/data/workout_templates.dart';
 import 'package:body_recomp/main.dart';
 import 'package:body_recomp/models/daily_workout.dart';
 import 'package:body_recomp/pages/main_shell.dart';
+import 'package:body_recomp/pages/profile_page.dart';
 import 'package:body_recomp/pages/template_manager_page.dart';
-import 'package:body_recomp/pages/trends_page.dart';
 import 'package:body_recomp/services/daily_workout_service.dart';
 import 'package:body_recomp/widgets/daily_date_bar.dart';
 import 'package:body_recomp/widgets/exercise_editor.dart';
@@ -16,7 +16,13 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   Future<void> visible(WidgetTester tester, Finder finder) async {
-    if (finder.evaluate().isEmpty) await tester.scrollUntilVisible(finder, 200);
+    if (finder.evaluate().isEmpty) {
+      await tester.scrollUntilVisible(
+        finder,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+    }
     await tester.ensureVisible(finder);
     await tester.pumpAndSettle();
     await tester.tap(finder);
@@ -77,9 +83,10 @@ void main() {
         home: const TemplateManagerPage()));
     await tester.pumpAndSettle();
     await visible(tester, find.byKey(const ValueKey('schedule-day-0')));
+    await visible(tester, find.byKey(const Key('change-day-template')));
     await visible(tester, find.byKey(const ValueKey('schedule-option-pull')));
     expect((await loadWeeklySchedule()).first, 'pull');
-    await visible(tester, find.byKey(const ValueKey('schedule-day-0')));
+    await visible(tester, find.byKey(const Key('change-day-template')));
     expect(find.text('周一安排'), findsOneWidget);
     await tester.tap(find.byTooltip('关闭'));
     await tester.pumpAndSettle();
@@ -144,7 +151,7 @@ void main() {
     await visible(tester, find.byKey(const ValueKey('start-rest-0')));
     await tester.tap(find.byKey(const ValueKey('nav-3')));
     await tester.pumpAndSettle();
-    final hidden = tester.element(find.byType(TrendsPage));
+    final hidden = tester.element(find.byType(ProfilePage));
     expect(TickerMode.valuesOf(hidden).enabled, isTrue);
     await tester.tap(find.byKey(const ValueKey('nav-0')));
     await tester.pumpAndSettle();

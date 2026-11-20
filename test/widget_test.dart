@@ -295,7 +295,7 @@ void main() {
     expect(find.byKey(const Key('rest-timer-panel')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('nav-3')));
     await tester.pumpAndSettle();
-    expect(find.text('天 · 1 项目'), findsOneWidget);
+    expect(find.text('1 天'), findsAtLeastNWidgets(1));
     expect(tester.takeException(), isNull);
   });
 }

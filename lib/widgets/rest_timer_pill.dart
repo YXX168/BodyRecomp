@@ -147,97 +147,109 @@ class _TimerFace extends StatelessWidget {
         ? 0.0
         : (state.remaining / state.total).clamp(0.0, 1.0);
     return Material(
-      color: ink.withValues(alpha: p.isDark ? .16 : .11),
+      color: Colors.transparent,
       shape: StadiumBorder(
-        side: BorderSide(color: ink.withValues(alpha: .35), width: 1),
+        side: BorderSide(color: ink.withValues(alpha: .42), width: 1.1),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.only(left: 10, right: 3),
-        child: Row(
-          key: const Key('rest-timer-panel'),
-          children: [
-            Expanded(
-              child: InkWell(
-                onTap: () => _openSheet(context),
-                borderRadius: BorderRadius.circular(18),
-                child: Row(
-                  children: [
-                    Tooltip(
-                      message: state.label,
-                      child: SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          value: progress,
-                          strokeWidth: 2.2,
-                          strokeCap: StrokeCap.round,
-                          color: ink,
-                          backgroundColor: ink.withValues(alpha: .18),
+      child: Ink(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              ink.withValues(alpha: p.isDark ? .26 : .18),
+              p.glassFillBottom,
+            ],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.only(left: 10, right: 3),
+          child: Row(
+            key: const Key('rest-timer-panel'),
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () => _openSheet(context),
+                  borderRadius: BorderRadius.circular(18),
+                  child: Row(
+                    children: [
+                      Tooltip(
+                        message: state.label,
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            value: progress,
+                            strokeWidth: 2.2,
+                            strokeCap: StrokeCap.round,
+                            color: ink,
+                            backgroundColor: ink.withValues(alpha: .18),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Semantics(
-                        label: '剩余 ${state.remaining} 秒',
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            '${state.remaining ~/ 60}:${(state.remaining % 60).toString().padLeft(2, '0')}',
-                            maxLines: 1,
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              color: ink,
-                              fontWeight: FontWeight.w800,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures()
-                              ],
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Semantics(
+                          label: '剩余 ${state.remaining} 秒',
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '${state.remaining ~/ 60}:${(state.remaining % 60).toString().padLeft(2, '0')}',
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                color: ink,
+                                fontWeight: FontWeight.w800,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures()
+                                ],
+                              ),
                             ),
                           ),
                         ),
                       ),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 42,
+                height: 40,
+                child: TextButton(
+                  key: const Key('rest-timer-add'),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                  ],
+                  ),
+                  onPressed: () => controller.addSeconds(30),
+                  child: Text(
+                    '+30',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: ink,
+                    ),
+                  ),
                 ),
               ),
-            ),
-            SizedBox(
-              width: 42,
-              height: 40,
-              child: TextButton(
-                key: const Key('rest-timer-add'),
-                style: TextButton.styleFrom(
+              SizedBox(
+                width: 32,
+                height: 40,
+                child: IconButton(
+                  key: const Key('rest-timer-dismiss'),
                   padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-                onPressed: () => controller.addSeconds(30),
-                child: Text(
-                  '+30',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: ink,
-                  ),
+                  tooltip: '结束计时',
+                  onPressed: controller.stop,
+                  icon: Icon(Icons.close_rounded, size: 16, color: ink),
                 ),
               ),
-            ),
-            SizedBox(
-              width: 32,
-              height: 40,
-              child: IconButton(
-                key: const Key('rest-timer-dismiss'),
-                padding: EdgeInsets.zero,
-                tooltip: '结束计时',
-                onPressed: controller.stop,
-                icon: Icon(Icons.close_rounded, size: 16, color: ink),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

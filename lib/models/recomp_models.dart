@@ -7,7 +7,7 @@ class UserProfile {
   UserProfile({
     this.birthday = '',
     this.heightCm = 176.0,
-    this.weightKg = 72.5,
+    this.weightKg = 69.0,
     this.gender = 'male',
   });
 
@@ -41,7 +41,7 @@ class UserProfile {
     final profile = UserProfile(
       birthday: json['birthday'] as String? ?? '',
       heightCm: (json['heightCm'] as num?)?.toDouble() ?? 176.0,
-      weightKg: (json['weightKg'] as num?)?.toDouble() ?? 72.5,
+      weightKg: (json['weightKg'] as num?)?.toDouble() ?? 69.0,
       gender: json['gender'] as String? ?? 'male',
     );
     _requirePositive(profile.heightCm);

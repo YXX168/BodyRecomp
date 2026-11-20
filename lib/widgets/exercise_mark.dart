@@ -42,17 +42,17 @@ class ExerciseMark extends StatelessWidget {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          gradient: RadialGradient(
-            center: const Alignment(-0.4, -0.5),
-            radius: 1.15,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
-              effectiveInk.withValues(alpha: isDark ? .24 : .16),
-              effectiveInk.withValues(alpha: isDark ? .09 : .07),
+              effectiveInk.withValues(alpha: isDark ? .24 : .17),
+              effectiveInk.withValues(alpha: isDark ? .09 : .06),
             ],
           ),
           borderRadius: BorderRadius.circular(size * .28),
           border: Border.all(
-            color: effectiveInk.withValues(alpha: isDark ? .26 : .18),
+            color: effectiveInk.withValues(alpha: isDark ? .30 : .20),
             width: 0.9,
           ),
         ),

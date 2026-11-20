@@ -66,10 +66,10 @@ class _SmoothTrendChartState extends State<SmoothTrendChart> {
 
     if (widget.points.length < 2) {
       return SizedBox(
-        height: 110,
+        height: 54,
         child: Center(
           child: Text(
-            '至少记录 2 次数据后显示平滑趋势图',
+            '记录 2 次后显示趋势曲线',
             style: TextStyle(fontSize: 12, color: p.textTertiary),
           ),
         ),

@@ -51,11 +51,12 @@ class DailyDateBar extends StatelessWidget {
             key: const Key('choose-date'),
             style: TextButton.styleFrom(
               alignment: Alignment.centerLeft,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 6),
               foregroundColor: dateInk,
-              minimumSize: const Size(0, 44),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              minimumSize: const Size(0, 30),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
             onPressed: !enabled
@@ -105,8 +106,9 @@ class DailyDateBar extends StatelessWidget {
             child: TextButton(
               key: const Key('return-today'),
               style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                minimumSize: const Size(0, 36),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 9),
+                minimumSize: const Size(0, 28),
                 backgroundColor:
                     p.primary.withValues(alpha: p.isDark ? .14 : .10),
                 shape: RoundedRectangleBorder(
@@ -127,25 +129,31 @@ class DailyDateBar extends StatelessWidget {
         IconButton(
           key: const Key('previous-date'),
           tooltip: '前一天',
-          constraints: const BoxConstraints.tightFor(width: 40, height: 44),
+          style: IconButton.styleFrom(
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          constraints: const BoxConstraints.tightFor(width: 30, height: 30),
           padding: EdgeInsets.zero,
           onPressed: enabled && date.isAfter(DateTime(2000))
               ? () => onChanged(DateTime(date.year, date.month, date.day - 1))
               : null,
           icon: Icon(Icons.chevron_left_rounded,
-              size: 20, color: p.textSecondary),
+              size: 18, color: p.textSecondary),
         ),
         IconButton(
           key: const Key('next-date'),
           tooltip: '后一天',
-          constraints: const BoxConstraints.tightFor(width: 40, height: 44),
+          style: IconButton.styleFrom(
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          constraints: const BoxConstraints.tightFor(width: 30, height: 30),
           padding: EdgeInsets.zero,
           onPressed: enabled && canGoNext
               ? () => onChanged(DateTime(date.year, date.month, date.day + 1))
               : null,
           icon: Icon(
             Icons.chevron_right_rounded,
-            size: 20,
+            size: 18,
             color: canGoNext
                 ? p.textSecondary
                 : p.textTertiary.withValues(alpha: .35),

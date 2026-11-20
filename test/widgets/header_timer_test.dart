@@ -59,7 +59,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.getRect(pill), rect);
     expect(tester.getRect(block), cardBefore);
-    for (final tab in [1, 2, 3, 4, 0]) {
+    for (final tab in [1, 2, 3, 0]) {
       await tester.tap(find.byKey(ValueKey('nav-$tab')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('rest-timer-panel')), findsOneWidget);

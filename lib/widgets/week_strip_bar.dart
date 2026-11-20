@@ -10,7 +10,7 @@ enum DayStripStatus {
   completed,
 }
 
-/// Interactive Mon-Sun strip paired with the compact [DailyDateBar].
+/// Calm, unified translucent Mon–Sun strip paired with compact [DailyDateBar].
 class WeekStripBar extends StatelessWidget {
   final DateTime date;
   final DateTime today;
@@ -48,31 +48,43 @@ class WeekStripBar extends StatelessWidget {
           onChanged: onChanged,
         ),
         const SizedBox(height: 4),
-        Row(
-          children: [
-            for (var i = 0; i < 7; i++)
-              Expanded(
-                child: Builder(
-                  builder: (context) {
-                    final day = monday.add(Duration(days: i));
-                    final isSelected = day == selected;
-                    final isToday = day == todayDay;
-                    final isFuture = day.isAfter(todayDay);
-                    final canTap =
-                        enabled && (allowFutureSelection || !isFuture);
-                    final status = statusForDay(day);
+        Container(
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [p.glassFillTop, p.glassFillBottom],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: p.borderSubtle, width: 0.9),
+          ),
+          child: Row(
+            children: [
+              for (var i = 0; i < 7; i++)
+                Expanded(
+                  child: Builder(
+                    builder: (context) {
+                      final day = monday.add(Duration(days: i));
+                      final isSelected = day == selected;
+                      final isToday = day == todayDay;
+                      final isFuture = day.isAfter(todayDay);
+                      final canTap =
+                          enabled && (allowFutureSelection || !isFuture);
+                      final status = statusForDay(day);
 
-                    final dotColor = switch (status) {
-                      DayStripStatus.completed => p.primary,
-                      DayStripStatus.partial => p.warning,
-                      DayStripStatus.planned =>
-                        p.textTertiary.withValues(alpha: .55),
-                      DayStripStatus.rest => Colors.transparent,
-                    };
+                      final dotColor = switch (status) {
+                        DayStripStatus.completed =>
+                          isSelected ? p.onPrimary : p.primary,
+                        DayStripStatus.partial =>
+                          isSelected ? p.onPrimary : p.warning,
+                        DayStripStatus.planned => isSelected
+                            ? p.onPrimary.withValues(alpha: .72)
+                            : p.textTertiary.withValues(alpha: .50),
+                        DayStripStatus.rest => Colors.transparent,
+                      };
 
-                    return Padding(
-                      padding: EdgeInsets.only(right: i == 6 ? 0 : 4),
-                      child: Semantics(
+                      return Semantics(
                         selected: isSelected,
                         button: canTap,
                         label: '周${labels[i]} ${day.day}日',
@@ -87,23 +99,22 @@ class WeekStripBar extends StatelessWidget {
                                   ? Duration.zero
                                   : const Duration(milliseconds: 160),
                               curve: Curves.easeOutCubic,
-                              padding: const EdgeInsets.symmetric(vertical: 5),
+                              padding: const EdgeInsets.symmetric(vertical: 4),
                               decoration: BoxDecoration(
+                                gradient: isSelected ? p.primaryGradient : null,
                                 color: isSelected
-                                    ? p.primary
-                                        .withValues(alpha: p.isDark ? .18 : .13)
+                                    ? null
                                     : isToday
-                                        ? p.surfaceElevated
+                                        ? p.primary.withValues(
+                                            alpha: p.isDark ? .12 : .08,
+                                          )
                                         : Colors.transparent,
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: isSelected
-                                      ? p.primary.withValues(alpha: .65)
-                                      : isToday
-                                          ? p.borderHighlight
-                                          : p.borderSubtle.withValues(
-                                              alpha: isFuture ? .35 : .8),
-                                  width: isSelected ? 1.2 : 0.8,
+                                  color: !isSelected && isToday
+                                      ? p.primary.withValues(alpha: .40)
+                                      : Colors.transparent,
+                                  width: 0.9,
                                 ),
                               ),
                               child: Column(
@@ -112,23 +123,28 @@ class WeekStripBar extends StatelessWidget {
                                   Text(
                                     labels[i],
                                     style: TextStyle(
-                                      fontSize: 11,
+                                      fontSize: 10,
+                                      height: 1.15,
                                       fontWeight: isSelected || isToday
                                           ? FontWeight.w700
                                           : FontWeight.w500,
                                       color: isSelected
-                                          ? p.primary
-                                          : isFuture && !allowFutureSelection
-                                              ? p.textTertiary
-                                                  .withValues(alpha: .45)
-                                              : p.textSecondary,
+                                          ? p.onPrimary.withValues(alpha: .88)
+                                          : isToday
+                                              ? p.primary
+                                              : isFuture &&
+                                                      !allowFutureSelection
+                                                  ? p.textTertiary
+                                                      .withValues(alpha: .45)
+                                                  : p.textSecondary,
                                     ),
                                   ),
-                                  const SizedBox(height: 3),
+                                  const SizedBox(height: 1.5),
                                   Text(
                                     '${day.day}',
                                     style: TextStyle(
                                       fontSize: 13,
+                                      height: 1.15,
                                       fontWeight: isSelected || isToday
                                           ? FontWeight.w800
                                           : FontWeight.w600,
@@ -136,29 +152,25 @@ class WeekStripBar extends StatelessWidget {
                                         FontFeature.tabularFigures()
                                       ],
                                       color: isSelected
-                                          ? p.primary
-                                          : isFuture && !allowFutureSelection
-                                              ? p.textTertiary
-                                                  .withValues(alpha: .45)
-                                              : p.textPrimary,
+                                          ? p.onPrimary
+                                          : isToday
+                                              ? p.primary
+                                              : isFuture &&
+                                                      !allowFutureSelection
+                                                  ? p.textTertiary
+                                                      .withValues(alpha: .45)
+                                                  : p.textPrimary,
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 2.5),
                                   Container(
                                     width: status == DayStripStatus.completed
-                                        ? 10
-                                        : 5,
-                                    height: 4,
+                                        ? 9
+                                        : 3.5,
+                                    height: 3,
                                     decoration: BoxDecoration(
                                       color: dotColor,
                                       borderRadius: BorderRadius.circular(99),
-                                      border: status == DayStripStatus.rest
-                                          ? Border.all(
-                                              color: p.textTertiary
-                                                  .withValues(alpha: .28),
-                                              width: 0.8,
-                                            )
-                                          : null,
                                     ),
                                   ),
                                 ],
@@ -166,12 +178,12 @@ class WeekStripBar extends StatelessWidget {
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ],
     );
