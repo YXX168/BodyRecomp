@@ -13,6 +13,7 @@ Future<ExerciseLog?> showWeightLogSheet(
   int defaultReps = 10,
   ExerciseLog? latestLog,
   ExerciseLog? personalRecord,
+  DateTime? logDate,
 }) =>
     showModalBottomSheet<ExerciseLog>(
       context: context,
@@ -25,6 +26,7 @@ Future<ExerciseLog?> showWeightLogSheet(
         defaultReps: defaultReps,
         latestLog: latestLog,
         personalRecord: personalRecord,
+        logDate: logDate,
       ),
     );
 
@@ -34,6 +36,7 @@ class _WeightLogSheet extends StatefulWidget {
   final int defaultReps;
   final ExerciseLog? latestLog;
   final ExerciseLog? personalRecord;
+  final DateTime? logDate;
 
   const _WeightLogSheet({
     required this.exerciseName,
@@ -41,6 +44,7 @@ class _WeightLogSheet extends StatefulWidget {
     required this.defaultReps,
     this.latestLog,
     this.personalRecord,
+    this.logDate,
   });
 
   @override
@@ -64,6 +68,7 @@ class _WeightLogSheetState extends State<_WeightLogSheet> {
   );
   double _rpe = 8;
   bool _saving = false;
+  String? _errorText;
 
   static String _fmtNum(double v) =>
       v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
@@ -78,7 +83,9 @@ class _WeightLogSheetState extends State<_WeightLogSheet> {
     _repsCtrl.addListener(_onChanged);
   }
 
-  void _onChanged() => setState(() {});
+  void _onChanged() => setState(() {
+        if (_errorText != null) _errorText = null;
+      });
 
   @override
   void dispose() {
@@ -110,11 +117,14 @@ class _WeightLogSheetState extends State<_WeightLogSheet> {
 
   Future<void> _save() async {
     if (_saving || !_form.currentState!.validate()) return;
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _errorText = null;
+    });
     try {
       final log = ExerciseLog(
         exerciseName: widget.exerciseName,
-        date: DateTime.now(),
+        date: widget.logDate ?? DateTime.now(),
         weightKg: double.parse(_weightCtrl.text.trim()),
         sets: int.parse(_setsCtrl.text.trim()),
         reps: int.parse(_repsCtrl.text.trim()),
@@ -125,9 +135,7 @@ class _WeightLogSheetState extends State<_WeightLogSheet> {
       if (mounted) Navigator.pop(context, log);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('负重记录保存失败，请重试')),
-        );
+        setState(() => _errorText = '负重记录保存失败，请重试');
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -226,15 +234,28 @@ class _WeightLogSheetState extends State<_WeightLogSheet> {
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
+                          fontFeatures: const [FontFeature.tabularFigures()],
                           color: p.textPrimary,
                         ),
                         decoration: InputDecoration(
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 12),
+                          prefixIconConstraints: const BoxConstraints.tightFor(
+                            width: 34,
+                            height: 40,
+                          ),
+                          suffixIconConstraints: const BoxConstraints.tightFor(
+                            width: 34,
+                            height: 40,
+                          ),
                           prefixIcon: IconButton(
+                            padding: EdgeInsets.zero,
                             onPressed: () => _stepInt(_setsCtrl, -1, 1, 100),
                             icon: Icon(Icons.remove_rounded,
                                 size: 18, color: p.primary),
                           ),
                           suffixIcon: IconButton(
+                            padding: EdgeInsets.zero,
                             onPressed: () => _stepInt(_setsCtrl, 1, 1, 100),
                             icon: Icon(Icons.add_rounded,
                                 size: 18, color: p.primary),
@@ -272,15 +293,28 @@ class _WeightLogSheetState extends State<_WeightLogSheet> {
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
+                          fontFeatures: const [FontFeature.tabularFigures()],
                           color: p.textPrimary,
                         ),
                         decoration: InputDecoration(
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 12),
+                          prefixIconConstraints: const BoxConstraints.tightFor(
+                            width: 34,
+                            height: 40,
+                          ),
+                          suffixIconConstraints: const BoxConstraints.tightFor(
+                            width: 34,
+                            height: 40,
+                          ),
                           prefixIcon: IconButton(
+                            padding: EdgeInsets.zero,
                             onPressed: () => _stepInt(_repsCtrl, -1, 1, 200),
                             icon: Icon(Icons.remove_rounded,
                                 size: 18, color: p.primary),
                           ),
                           suffixIcon: IconButton(
+                            padding: EdgeInsets.zero,
                             onPressed: () => _stepInt(_repsCtrl, 1, 1, 200),
                             icon: Icon(Icons.add_rounded,
                                 size: 18, color: p.primary),
@@ -372,6 +406,17 @@ class _WeightLogSheetState extends State<_WeightLogSheet> {
                       ),
                     ),
                   ],
+                ),
+              ),
+            ],
+            if (_errorText != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _errorText!,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: p.danger,
                 ),
               ),
             ],

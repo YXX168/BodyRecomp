@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/daily_workout.dart';
@@ -32,8 +33,17 @@ class TemplateManagerPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(title: const Text('每日固定模板')),
-      body: const LiquidBackdrop(child: WeeklyTemplatesView()),
+      body: const LiquidBackdrop(
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: EdgeInsets.only(top: kToolbarHeight),
+            child: WeeklyTemplatesView(),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -45,33 +55,78 @@ class WeeklyTemplatesView extends StatefulWidget {
   State<WeeklyTemplatesView> createState() => _WeeklyTemplatesViewState();
 }
 
-class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
+class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView>
+    with WidgetsBindingObserver {
   List<WorkoutTemplate>? _templates;
   List<String> _schedule = [];
   int _selectedDay = DateTime.now().weekday - 1;
+  int _todayWeekday = DateTime.now().weekday - 1;
   String? _error;
   bool _busy = false;
+  int _loadGeneration = 0;
+  bool _pageVisible = true;
+  bool _foreground = true;
+  Timer? _midnightTimer;
+
+  bool get _pageActive => _pageVisible && _foreground;
 
   @override
   void initState() {
     super.initState();
+    final state = WidgetsBinding.instance.lifecycleState;
+    _foreground = state == null || state == AppLifecycleState.resumed;
+    WidgetsBinding.instance.addObserver(this);
     workoutPlanRevision.addListener(_load);
-    workoutDataRevision.addListener(_load);
     _load();
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _pageVisible = TickerMode.valuesOf(context).enabled;
+    if (_pageVisible) _syncTodayWeekday();
+    _scheduleMidnight();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    if (_pageActive) _syncTodayWeekday();
+    _scheduleMidnight();
+  }
+
+  void _syncTodayWeekday() {
+    final nextWeekday = DateTime.now().weekday - 1;
+    if (nextWeekday != _todayWeekday && mounted) {
+      setState(() => _todayWeekday = nextWeekday);
+    }
+  }
+
+  void _scheduleMidnight() {
+    _midnightTimer?.cancel();
+    if (!_pageActive) return;
+    final current = DateTime.now();
+    final nextDay = DateTime(current.year, current.month, current.day + 1);
+    _midnightTimer = Timer(nextDay.difference(current), () {
+      _syncTodayWeekday();
+      _scheduleMidnight();
+    });
+  }
+
+  @override
   void dispose() {
+    _midnightTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     workoutPlanRevision.removeListener(_load);
-    workoutDataRevision.removeListener(_load);
     super.dispose();
   }
 
   Future<void> _load() async {
+    final generation = ++_loadGeneration;
     try {
       final templates = await loadWorkoutTemplates();
       final schedule = await loadWeeklySchedule();
-      if (mounted) {
+      if (mounted && generation == _loadGeneration) {
         setState(() {
           _templates = templates;
           _schedule = schedule;
@@ -79,22 +134,28 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _error = '模板读取失败，原数据未被覆盖。');
+      if (mounted && generation == _loadGeneration) {
+        setState(() => _error = '模板读取失败，原数据未被覆盖。');
+      }
     }
   }
 
-  WorkoutTemplate? _templateForDay(int day) {
-    if (_templates == null || day < 0 || day >= _schedule.length) return null;
-    final id = _schedule[day];
-    if (id.isEmpty) return null;
-    for (final t in _templates!) {
+  WorkoutTemplate? _templateById(String id) {
+    final list = _templates;
+    if (list == null || id.isEmpty) return null;
+    for (final t in list) {
       if (t.id == id) return t;
     }
     return null;
   }
 
-  Future<void> _saveTemplateUpdate(WorkoutTemplate updated) async {
-    if (_busy) return;
+  WorkoutTemplate? _templateForDay(int day) {
+    if (_templates == null || day < 0 || day >= _schedule.length) return null;
+    return _templateById(_schedule[day]);
+  }
+
+  Future<bool> _saveTemplateUpdate(WorkoutTemplate updated) async {
+    if (_busy) return false;
     setState(() => _busy = true);
     try {
       final next = List<WorkoutTemplate>.from(_templates ?? []);
@@ -107,18 +168,19 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
       await saveWorkoutTemplates(next);
       workoutPlanRevision.value++;
       if (mounted) setState(() => _templates = next);
+      return true;
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('模板保存失败，请重试')));
+        showGlassNotice(context, '模板保存失败，请重试', isError: true);
       }
+      return false;
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _edit(WorkoutTemplate? template,
-      {bool bindSelected = false}) async {
+  Future<void> _edit(WorkoutTemplate? template) async {
+    if (_busy) return;
     final library = _templates ?? [];
     final result = await Navigator.push<WorkoutTemplate>(
       context,
@@ -131,9 +193,6 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
     );
     if (result == null || !mounted) return;
     await _saveTemplateUpdate(result);
-    if (bindSelected && template == null && mounted) {
-      await _setDay(_selectedDay, result.id);
-    }
   }
 
   Future<void> _duplicate(WorkoutTemplate template) async {
@@ -144,14 +203,11 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
       workoutPlanRevision.value++;
       await _load();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('已复制「${template.name}」')),
-        );
+        showGlassNotice(context, '已复制「${template.name}」');
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('模板复制失败，请重试')));
+        showGlassNotice(context, '模板复制失败，请重试', isError: true);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -167,31 +223,21 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
     ];
     final dayNames = boundDays.map((d) => weekdays[d]).join('、');
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('删除「${template.name}」？'),
-        content: Text(
-          boundDays.isEmpty
-              ? '删除后不会改变已保存的历史训练记录。'
-              : '$dayNames 当前绑定了此模板，删除后将转为休息日，不影响历史记录。',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+      title: '删除「${template.name}」？',
+      message: boundDays.isEmpty
+          ? '删除后不会改变已保存的历史训练记录。'
+          : '$dayNames 当前绑定了此模板，删除后将转为休息日，不影响历史记录。',
+      cancelLabel: '取消',
+      confirmLabel: '删除',
+      isDanger: true,
     );
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !mounted || _busy) return;
 
-    final previousTemplates = List<WorkoutTemplate>.from(_templates ?? []);
-    final previousSchedule = List<String>.from(_schedule);
+    final deletedTemplate = template;
+    final originalIndex =
+        (_templates ?? []).indexWhere((t) => t.id == template.id);
 
     setState(() => _busy = true);
     try {
@@ -203,24 +249,48 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
         context,
         '已删除模板「${template.name}」',
         onUndo: () async {
+          if (!mounted || _busy) return;
+          setState(() => _busy = true);
           try {
-            await saveWorkoutTemplates(previousTemplates);
-            await saveWeeklySchedule(previousSchedule);
+            final latestTemplates =
+                List<WorkoutTemplate>.from(await loadWorkoutTemplates());
+            if (!latestTemplates.any((t) => t.id == deletedTemplate.id)) {
+              final insertAt = originalIndex < 0
+                  ? latestTemplates.length
+                  : originalIndex.clamp(0, latestTemplates.length);
+              latestTemplates.insert(insertAt, deletedTemplate);
+              await saveWorkoutTemplates(latestTemplates);
+            }
+            if (boundDays.isNotEmpty) {
+              final latestSchedule =
+                  List<String>.from(await loadWeeklySchedule());
+              var changed = false;
+              for (final d in boundDays) {
+                if (d >= 0 &&
+                    d < latestSchedule.length &&
+                    latestSchedule[d].isEmpty) {
+                  latestSchedule[d] = deletedTemplate.id;
+                  changed = true;
+                }
+              }
+              if (changed) {
+                await saveWeeklySchedule(latestSchedule);
+              }
+            }
             workoutPlanRevision.value++;
             await _load();
           } catch (_) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('恢复模板失败，请重试')),
-              );
+              showGlassNotice(context, '恢复模板失败，请重试', isError: true);
             }
+          } finally {
+            if (mounted) setState(() => _busy = false);
           }
         },
       );
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('删除模板失败，请重试')));
+        showGlassNotice(context, '删除模板失败，请重试', isError: true);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -228,6 +298,7 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
   }
 
   Future<void> _setDay(int day, String value) async {
+    if (_busy || day < 0 || day >= _schedule.length) return;
     setState(() => _busy = true);
     try {
       final next = List<String>.from(_schedule)..[day] = value;
@@ -236,8 +307,7 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
       if (mounted) setState(() => _schedule = next);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('每日模板保存失败，请重试')));
+        showGlassNotice(context, '每日模板保存失败，请重试', isError: true);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -245,6 +315,9 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
   }
 
   Future<void> _chooseDay(int day) async {
+    if (_busy || _templates == null || day < 0 || day >= _schedule.length) {
+      return;
+    }
     const weekdays = ['一', '二', '三', '四', '五', '六', '日'];
     final value = await showModalBottomSheet<String>(
       context: context,
@@ -284,20 +357,25 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
         ),
       ),
     );
-    if (value != null && mounted && value != _schedule[day]) {
+    if (value != null &&
+        mounted &&
+        day < _schedule.length &&
+        value != _schedule[day]) {
       await _setDay(day, value);
     }
   }
 
   Future<void> _addExerciseToTemplate(WorkoutTemplate template) async {
+    if (_busy) return;
     final values = await pickExercises(
       context,
       _templates ?? [],
       initialSource: 1,
     );
     if (values == null || values.isEmpty || !mounted) return;
+    final fresh = _templateById(template.id) ?? template;
     await _saveTemplateUpdate(
-      template.copyWith(exercises: [...template.exercises, ...values]),
+      fresh.copyWith(exercises: [...fresh.exercises, ...values]),
     );
   }
 
@@ -305,14 +383,17 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
     WorkoutTemplate template,
     int index,
   ) async {
+    if (_busy || index < 0 || index >= template.exercises.length) return;
     final edited = await editExercise(
       context,
       initial: template.exercises[index],
     );
     if (edited == null || !mounted) return;
-    final nextExercises = List<Exercise>.from(template.exercises)
+    final fresh = _templateById(template.id);
+    if (fresh == null || index < 0 || index >= fresh.exercises.length) return;
+    final nextExercises = List<Exercise>.from(fresh.exercises)
       ..[index] = edited;
-    await _saveTemplateUpdate(template.copyWith(exercises: nextExercises));
+    await _saveTemplateUpdate(fresh.copyWith(exercises: nextExercises));
   }
 
   Future<void> _moveTemplateExercise(
@@ -320,25 +401,43 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
     int index,
     int delta,
   ) async {
+    if (_busy) return;
+    final fresh = _templateById(template.id);
+    if (fresh == null) return;
     final target = index + delta;
-    if (target < 0 || target >= template.exercises.length) return;
-    final list = List<Exercise>.from(template.exercises);
+    if (index < 0 ||
+        index >= fresh.exercises.length ||
+        target < 0 ||
+        target >= fresh.exercises.length) {
+      return;
+    }
+    final list = List<Exercise>.from(fresh.exercises);
     final item = list.removeAt(index);
     list.insert(target, item);
-    await _saveTemplateUpdate(template.copyWith(exercises: list));
+    await _saveTemplateUpdate(fresh.copyWith(exercises: list));
   }
 
   Future<void> _removeTemplateExercise(
     WorkoutTemplate template,
     int index,
   ) async {
-    final removed = template.exercises[index];
-    final previous = template;
-    final nextList = List<Exercise>.from(template.exercises)..removeAt(index);
-    await _saveTemplateUpdate(template.copyWith(exercises: nextList));
-    if (!mounted) return;
+    if (_busy) return;
+    final fresh = _templateById(template.id);
+    if (fresh == null || index < 0 || index >= fresh.exercises.length) return;
+    final removed = fresh.exercises[index];
+    final tplId = fresh.id;
+    final removedIndex = index;
+    final nextList = List<Exercise>.from(fresh.exercises)..removeAt(index);
+    final saved =
+        await _saveTemplateUpdate(fresh.copyWith(exercises: nextList));
+    if (!saved || !mounted) return;
     showUndoNotice(context, '已从模板移除 ${removed.name}', onUndo: () async {
-      await _saveTemplateUpdate(previous);
+      if (!mounted || _busy) return;
+      final latest = _templateById(tplId);
+      if (latest == null) return;
+      final restored = List<Exercise>.from(latest.exercises)
+        ..insert(removedIndex.clamp(0, latest.exercises.length), removed);
+      await _saveTemplateUpdate(latest.copyWith(exercises: restored));
     });
   }
 
@@ -377,7 +476,7 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
 
     const shortWeekdays = ['一', '二', '三', '四', '五', '六', '日'];
     const fullWeekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-    final todayWeekday = DateTime.now().weekday - 1;
+    final todayWeekday = _todayWeekday;
     final selectedTemplate = _templateForDay(_selectedDay);
     final totalSets =
         selectedTemplate?.exercises.fold<int>(0, (sum, e) => sum + e.sets) ?? 0;
@@ -714,6 +813,7 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
                             onPressed: _busy
                                 ? null
                                 : () async {
+                                    final tplId = selectedTemplate.id;
                                     final action = await showGlassMenu<String>(
                                       context: context,
                                       anchorContext: btnCtx,
@@ -749,19 +849,23 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
                                       ],
                                     );
                                     if (!mounted || action == null) return;
+                                    final fresh = _templateById(tplId);
+                                    if (fresh == null ||
+                                        i < 0 ||
+                                        i >= fresh.exercises.length) {
+                                      return;
+                                    }
                                     switch (action) {
                                       case 'edit':
-                                        _editTemplateExercise(
-                                            selectedTemplate, i);
+                                        await _editTemplateExercise(fresh, i);
                                       case 'up':
-                                        _moveTemplateExercise(
-                                            selectedTemplate, i, -1);
+                                        await _moveTemplateExercise(
+                                            fresh, i, -1);
                                       case 'down':
-                                        _moveTemplateExercise(
-                                            selectedTemplate, i, 1);
+                                        await _moveTemplateExercise(
+                                            fresh, i, 1);
                                       case 'remove':
-                                        _removeTemplateExercise(
-                                            selectedTemplate, i);
+                                        await _removeTemplateExercise(fresh, i);
                                     }
                                   },
                             icon: Icon(
@@ -783,7 +887,7 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
           title: '全部模板',
           trailing: TextButton.icon(
             key: const Key('create-template'),
-            onPressed: _busy ? null : () => _edit(null, bindSelected: false),
+            onPressed: _busy ? null : () => _edit(null),
             icon: const Icon(Icons.add_rounded, size: 17),
             label: const Text('新建模板'),
           ),
@@ -799,13 +903,17 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
                 Padding(
                   padding: const EdgeInsets.only(right: 10),
                   child: SizedBox(
-                    width: 154,
+                    width: 158,
                     child: Builder(
                       builder: (context) {
                         final tplSets = template.exercises
                             .fold<int>(0, (s, e) => s + e.sets);
                         final boundCurrentDay =
                             selectedTemplate?.id == template.id;
+                        final boundDays = <String>[
+                          for (var d = 0; d < _schedule.length; d++)
+                            if (_schedule[d] == template.id) fullWeekdays[d],
+                        ];
                         return SurfaceCard(
                           key: ValueKey('template-card-${template.id}'),
                           highlighted: boundCurrentDay,
@@ -843,6 +951,8 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
                                         onPressed: _busy
                                             ? null
                                             : () async {
+                                                final tplId = template.id;
+                                                final targetDay = _selectedDay;
                                                 final action =
                                                     await showGlassMenu<String>(
                                                   context: context,
@@ -852,7 +962,7 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
                                                     GlassMenuItem(
                                                       value: 'bind',
                                                       label:
-                                                          '设为${fullWeekdays[_selectedDay]}固定',
+                                                          '设为${fullWeekdays[targetDay]}固定',
                                                       icon: Icons
                                                           .event_available_rounded,
                                                       color: p.primary,
@@ -882,16 +992,20 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
                                                     action == null) {
                                                   return;
                                                 }
+                                                final fresh =
+                                                    _templateById(tplId);
+                                                if (fresh == null) return;
                                                 switch (action) {
                                                   case 'bind':
-                                                    _setDay(_selectedDay,
-                                                        template.id);
+                                                    await _setDay(
+                                                        targetDay, fresh.id);
                                                   case 'edit':
-                                                    _edit(template);
+                                                    await _edit(fresh);
                                                   case 'duplicate':
-                                                    _duplicate(template);
+                                                    await _duplicate(fresh);
                                                   case 'delete':
-                                                    _deleteTemplate(template);
+                                                    await _deleteTemplate(
+                                                        fresh);
                                                 }
                                               },
                                         icon: Icon(
@@ -924,6 +1038,23 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView> {
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.w600,
                                   color: p.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                boundDays.isNotEmpty
+                                    ? boundDays.join('、')
+                                    : '未绑定固定日',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: boundDays.isNotEmpty
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: boundDays.isNotEmpty
+                                      ? p.primary
+                                      : p.textTertiary,
                                 ),
                               ),
                             ],
@@ -1008,26 +1139,30 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
       return;
     }
     _leaving = true;
-    final save = await showDialog<bool>(
+    final save = await showGlassDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('模板有未保存的修改'),
-        content: const Text('返回前是否保存这次修改？'),
-        actions: [
+      title: '模板有未保存的修改',
+      message: '返回前是否保存这次修改？',
+      icon: Icons.save_outlined,
+      actionsBuilder: (ctx) {
+        final p = ctx.palette;
+        return [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
+            style: TextButton.styleFrom(foregroundColor: p.textSecondary),
             child: const Text('继续编辑'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
+            style: TextButton.styleFrom(foregroundColor: p.danger),
             child: const Text('放弃修改'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('保存并返回'),
           ),
-        ],
-      ),
+        ];
+      },
     );
     _leaving = false;
     if (save != null && mounted) await _finish(save: save);
@@ -1075,7 +1210,15 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
           ),
         );
         exerciseLibraryRevision.value++;
-      } catch (_) {}
+      } catch (_) {
+        if (mounted) {
+          showGlassNotice(
+            context,
+            '动作已加入模板，但同步到动作库失败',
+            isError: true,
+          );
+        }
+      }
     }
   }
 
@@ -1088,6 +1231,7 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
         if (!didPop) _leave();
       },
       child: Scaffold(
+        extendBodyBehindAppBar: true,
         appBar: AppBar(
           title: const Text('编辑模板'),
           actions: [
@@ -1106,200 +1250,261 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
           ],
         ),
         body: LiquidBackdrop(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(18, 10, 18, 36),
-            children: [
-              SurfaceCard(
-                onTap: () async {
-                  final value =
-                      await promptText(context, '模板名称', initial: _name);
-                  if (value != null && mounted) setState(() => _name = value);
-                },
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '模板名称',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: p.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _name,
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: p.textPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.edit_outlined, color: p.primary),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _note,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: '备注',
-                  hintText: '可选备注…',
-                ),
-              ),
-              const SizedBox(height: 18),
-              SectionTitleBar(title: '动作列表 (${_exercises.length})'),
-              const SizedBox(height: 10),
-              if (_exercises.isEmpty)
-                SurfaceCard(
-                  padding: const EdgeInsets.all(22),
-                  child: Center(
-                    child: Text(
-                      '从动作库挑选或自建动作',
-                      style: TextStyle(fontSize: 13, color: p.textSecondary),
-                    ),
-                  ),
-                ),
-              for (var i = 0; i < _exercises.length; i++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: SurfaceCard(
-                    onTap: () => _custom(i),
-                    padding: const EdgeInsets.fromLTRB(12, 12, 8, 8),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            ExerciseMark(_exercises[i].name, size: 42),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _exercises[i].name,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                      color: p.textPrimary,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${_exercises[i].sets}×${_exercises[i].reps}'
-                                    '${_exercises[i].rest.isNotEmpty ? ' · ${_exercises[i].rest}' : ''}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: p.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              tooltip: '编辑动作',
-                              onPressed: () => _custom(i),
-                              icon: Icon(
-                                Icons.edit_outlined,
-                                size: 19,
-                                color: p.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            IconButton(
-                              tooltip: '上移',
-                              onPressed: i == 0
-                                  ? null
-                                  : () => setState(() {
-                                        final e = _exercises.removeAt(i);
-                                        _exercises.insert(i - 1, e);
-                                      }),
-                              icon: const Icon(Icons.arrow_upward_rounded,
-                                  size: 18),
-                            ),
-                            IconButton(
-                              tooltip: '下移',
-                              onPressed: i == _exercises.length - 1
-                                  ? null
-                                  : () => setState(() {
-                                        final e = _exercises.removeAt(i);
-                                        _exercises.insert(i + 1, e);
-                                      }),
-                              icon: const Icon(Icons.arrow_downward_rounded,
-                                  size: 18),
-                            ),
-                            TextButton(
-                              onPressed: () => _remove(i),
-                              child: Text(
-                                '移除',
-                                style: TextStyle(color: p.danger),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 12),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final scale = MediaQuery.textScalerOf(context).scale(13);
-                  final pickBtn = OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 46),
-                    ),
-                    onPressed: () async {
-                      final values = await pickExercises(
-                        context,
-                        widget.library,
-                        initialSource: 1,
-                      );
-                      if (values != null && mounted) {
-                        setState(() => _exercises.addAll(values));
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.only(top: kToolbarHeight),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(18, 10, 18, 36),
+                children: [
+                  SurfaceCard(
+                    onTap: () async {
+                      final value =
+                          await promptText(context, '模板名称', initial: _name);
+                      if (value != null && mounted) {
+                        setState(() => _name = value);
                       }
                     },
-                    icon: const Icon(Icons.view_module_outlined, size: 18),
-                    label: const Text('动作库挑选'),
-                  );
-                  final customBtn = FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 46),
-                    ),
-                    onPressed: () => _custom(),
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('自定义项目'),
-                  );
-                  if (constraints.maxWidth < 260 || scale > 20) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
                       children: [
-                        pickBtn,
-                        const SizedBox(height: 8),
-                        customBtn,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '模板名称',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: p.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _name,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: p.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.edit_outlined, color: p.primary),
                       ],
-                    );
-                  }
-                  return Row(
-                    children: [
-                      Expanded(child: pickBtn),
-                      const SizedBox(width: 10),
-                      Expanded(child: customBtn),
-                    ],
-                  );
-                },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _note,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: '备注',
+                      hintText: '可选备注…',
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  SectionTitleBar(title: '动作列表 (${_exercises.length})'),
+                  const SizedBox(height: 10),
+                  if (_exercises.isEmpty)
+                    SurfaceCard(
+                      padding: const EdgeInsets.all(22),
+                      child: Center(
+                        child: Text(
+                          '从动作库挑选或自建动作',
+                          style:
+                              TextStyle(fontSize: 13, color: p.textSecondary),
+                        ),
+                      ),
+                    ),
+                  for (var i = 0; i < _exercises.length; i++)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: SurfaceCard(
+                        radius: 20,
+                        onTap: () => _custom(i),
+                        padding: const EdgeInsets.fromLTRB(12, 11, 10, 7),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                ExerciseMark(_exercises[i].name, size: 40),
+                                const SizedBox(width: 11),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _exercises[i].name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: p.textPrimary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${_exercises[i].sets}×${_exercises[i].reps}'
+                                        '${_exercises[i].rest.isNotEmpty ? ' · ${_exercises[i].rest}' : ''}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: p.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.chevron_right_rounded,
+                                  size: 18,
+                                  color: p.textTertiary,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 7),
+                            Divider(
+                              height: 1,
+                              thickness: 0.7,
+                              color: p.borderSubtle,
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                IconButton(
+                                  tooltip: '上移',
+                                  constraints: const BoxConstraints.tightFor(
+                                    width: 32,
+                                    height: 30,
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  style: IconButton.styleFrom(
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  onPressed: i == 0
+                                      ? null
+                                      : () => setState(() {
+                                            final e = _exercises.removeAt(i);
+                                            _exercises.insert(i - 1, e);
+                                          }),
+                                  icon: Icon(
+                                    Icons.arrow_upward_rounded,
+                                    size: 17,
+                                    color: i == 0
+                                        ? p.textTertiary.withValues(alpha: .35)
+                                        : p.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(width: 2),
+                                IconButton(
+                                  tooltip: '下移',
+                                  constraints: const BoxConstraints.tightFor(
+                                    width: 32,
+                                    height: 30,
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  style: IconButton.styleFrom(
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  onPressed: i == _exercises.length - 1
+                                      ? null
+                                      : () => setState(() {
+                                            final e = _exercises.removeAt(i);
+                                            _exercises.insert(i + 1, e);
+                                          }),
+                                  icon: Icon(
+                                    Icons.arrow_downward_rounded,
+                                    size: 17,
+                                    color: i == _exercises.length - 1
+                                        ? p.textTertiary.withValues(alpha: .35)
+                                        : p.textSecondary,
+                                  ),
+                                ),
+                                const Spacer(),
+                                TextButton(
+                                  style: TextButton.styleFrom(
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    minimumSize: const Size(0, 30),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                  ),
+                                  onPressed: () => _remove(i),
+                                  child: Text(
+                                    '移除',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: p.danger,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final scale = MediaQuery.textScalerOf(context).scale(13);
+                      final pickBtn = OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 46),
+                        ),
+                        onPressed: () async {
+                          final values = await pickExercises(
+                            context,
+                            widget.library,
+                            initialSource: 1,
+                          );
+                          if (values != null && mounted) {
+                            setState(() => _exercises.addAll(values));
+                          }
+                        },
+                        icon: const Icon(Icons.view_module_outlined, size: 18),
+                        label: const Text('动作库挑选'),
+                      );
+                      final customBtn = FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 46),
+                        ),
+                        onPressed: () => _custom(),
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text('自定义项目'),
+                      );
+                      if (constraints.maxWidth < 260 || scale > 20) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            pickBtn,
+                            const SizedBox(height: 8),
+                            customBtn,
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(child: pickBtn),
+                          const SizedBox(width: 10),
+                          Expanded(child: customBtn),
+                        ],
+                      );
+                    },
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

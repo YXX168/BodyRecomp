@@ -3,40 +3,99 @@ import 'package:flutter/material.dart';
 import '../models/recomp_models.dart';
 import '../theme/app_theme.dart';
 
+Set<String> _matchMuscleTag(String raw) {
+  final t = raw.trim().toLowerCase();
+  if (t.isEmpty || t == '其他' || t == 'other') return const {};
+  final matched = <String>{};
+  if (RegExp(r'胸|\b(chest|pec|pecs)\b').hasMatch(t)) matched.add('chest');
+  if (RegExp(r'背|背阔|斜方|菱形|\b(back|lat|lats)\b').hasMatch(t)) {
+    matched.add('back');
+  }
+  if (RegExp(r'肩|三角肌|\b(shoulder|shoulders|delt|delts)\b').hasMatch(t)) {
+    matched.add('shoulders');
+  }
+  if (RegExp(r'臂|二头|三头|肱|腕|\b(arm|arms|bicep|biceps|tricep|triceps)\b')
+      .hasMatch(t)) {
+    matched.add('arms');
+  }
+  if (RegExp(r'腹|核心|\b(core|abs)\b').hasMatch(t)) matched.add('core');
+  if (RegExp(
+    r'腿|臀|股四|腘绳|小腿|\b(leg|legs|glute|glutes|quad|quads|hamstring|calf|calves)\b',
+  ).hasMatch(t)) {
+    matched.add('legs');
+  }
+  if (RegExp(r'有氧|心肺|恢复|拉伸|放松|\b(cardio|hiit|recovery|stretch)\b')
+      .hasMatch(t)) {
+    matched.add('cardio');
+  }
+  return matched;
+}
+
 /// Infers normalized anatomical group keys (`chest`, `back`, `shoulders`,
 /// `arms`, `core`, `legs`, `cardio`) from a collection of [Exercise]s.
 Set<String> inferMuscleGroups(Iterable<Exercise> exercises) {
   final groups = <String>{};
   for (final ex in exercises) {
-    final buf = StringBuffer()
-      ..write(ex.name)
-      ..write(' ')
-      ..write(ex.muscleTarget)
-      ..write(' ')
-      ..writeAll(ex.muscles, ' ');
-    final text = buf.toString().toLowerCase();
+    final explicit = <String>{};
+    for (final tag in ex.muscles) {
+      explicit.addAll(_matchMuscleTag(tag));
+    }
+    if (explicit.isNotEmpty) {
+      groups.addAll(explicit);
+      continue;
+    }
 
-    if (RegExp('胸|卧推|推胸|夹胸|俯卧撑|chest|pec|bench').hasMatch(text)) {
+    var text = '${ex.name} ${ex.muscleTarget}'.toLowerCase();
+
+    // Disambiguate compound phrases before broader keyword matching.
+    if (RegExp(r'划船机|\browing\s*machine\b').hasMatch(text)) {
+      groups.add('cardio');
+      text = text.replaceAll(RegExp(r'划船机|\browing\s*machine\b'), ' ');
+    }
+    if (RegExp(r'(俯卧|坐姿)?腿弯举|\bleg\s*curls?\b').hasMatch(text)) {
+      groups.add('legs');
+      text = text.replaceAll(RegExp(r'(俯卧|坐姿)?腿弯举|\bleg\s*curls?\b'), ' ');
+    }
+    if (RegExp(r'(仰卧|悬垂)?举腿|\bleg\s*raises?\b').hasMatch(text)) {
+      groups.add('core');
+      text = text.replaceAll(RegExp(r'(仰卧|悬垂)?举腿|\bleg\s*raises?\b'), ' ');
+    }
+    if (text.contains('直臂下压')) {
+      groups.add('back');
+      text = text.replaceAll('直臂下压', ' ');
+    }
+
+    if (RegExp(r'胸|卧推|推胸|夹胸|俯卧撑|\b(chest|pec|pecs|bench)\b').hasMatch(text)) {
       groups.add('chest');
     }
-    if (RegExp('背|下拉|引体|划船|背阔|斜方|菱形|山羊挺身|back|lat|row|pull').hasMatch(text)) {
+    if (RegExp(
+      r'背|下拉|引体|划船|背阔|斜方|菱形|山羊挺身|\b(back|lat|lats|row|rows|pull-?ups?|pulldowns?)\b',
+    ).hasMatch(text)) {
       groups.add('back');
     }
-    if (RegExp('肩|三角肌|侧平举|前平举|推举|面拉|shoulder|delt|overhead').hasMatch(text)) {
+    if (RegExp(
+      r'肩|三角肌|侧平举|前平举|推举|面拉|飞鸟|\b(shoulder|shoulders|delt|delts|overhead|lateral\s*raises?)\b',
+    ).hasMatch(text)) {
       groups.add('shoulders');
     }
-    if (RegExp('臂|二头|三头|弯举|下压|臂屈伸|腕|bicep|tricep|arm|curl').hasMatch(text)) {
+    final armText = text.replaceAll(RegExp(r'直臂|单臂|双臂'), ' ');
+    if (RegExp(
+      r'臂|二头|三头|肱二|肱三|肱肌|弯举|下压|臂屈伸|腕|\b(bicep|biceps|tricep|triceps|arm|arms|curl|curls)\b',
+    ).hasMatch(armText)) {
       groups.add('arms');
     }
-    if (RegExp('腹|核心|平板支撑|死虫|鸟狗|举腿|悬垂|俄罗斯转体|core|abs|plank').hasMatch(text)) {
+    if (RegExp(r'腹|核心|平板支撑|死虫|鸟狗|悬垂|俄罗斯转体|\b(core|abs|plank|crunch|crunches)\b')
+        .hasMatch(text)) {
       groups.add('core');
     }
-    if (RegExp('腿|臀|深蹲|硬拉|倒蹬|弓步|腿举|弯举|腿屈伸|提踵|外展|股四|腘绳|leg|glute|squat|deadlift')
-        .hasMatch(text)) {
+    if (RegExp(
+      r'腿|臀|深蹲|硬拉|倒蹬|弓步|腿举|腿屈伸|提踵|外展|股四|腘绳|小腿|\b(leg|legs|glute|glutes|squat|squats|deadlift|lunge|lunges|calf|calves)\b',
+    ).hasMatch(text)) {
       groups.add('legs');
     }
-    if (RegExp('有氧|心肺|单车|跑|走|划船机|椭圆|跳绳|波比|拉伸|恢复|放松|泡沫轴|cardio|hiit|walk|run')
-        .hasMatch(text)) {
+    if (RegExp(
+      r'有氧|心肺|单车|跑|走|椭圆|跳绳|波比|拉伸|恢复|放松|泡沫轴|\b(cardio|hiit|walk|walking|run|running|cycle|cycling|stretch|stretching)\b',
+    ).hasMatch(text)) {
       groups.add('cardio');
     }
   }
@@ -69,7 +128,7 @@ class MuscleBodyGraphic extends StatelessWidget {
         accent: p.accent,
         inactiveColor: p.isDark
             ? Colors.white.withValues(alpha: .16)
-            : const Color(0xFF1E293B).withValues(alpha: .13),
+            : p.textPrimary.withValues(alpha: .13),
         isDark: p.isDark,
       ),
     );

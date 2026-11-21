@@ -40,9 +40,12 @@ class DailyDateBar extends StatelessWidget {
     final label =
         '$prefix${date.year != today.year ? '${date.year}年' : ''}${date.month}月${date.day}日 周${weekdays[date.weekday - 1]}';
 
-    final canGoNext = allowFutureNext
-        ? day.isBefore(todayDay.add(const Duration(days: 6)))
-        : day.isBefore(todayDay);
+    final firstDate = DateTime(2000);
+    final lastDate = allowFutureNext
+        ? DateTime(todayDay.year + 1, todayDay.month, todayDay.day)
+        : todayDay;
+    final canGoNext = day.isBefore(lastDate);
+    final canGoPrev = day.isAfter(firstDate);
 
     return Row(
       children: [
@@ -62,13 +65,16 @@ class DailyDateBar extends StatelessWidget {
             onPressed: !enabled
                 ? null
                 : () async {
-                    final clampedInitial =
-                        day.isAfter(todayDay) ? todayDay : day;
+                    final clampedInitial = day.isBefore(firstDate)
+                        ? firstDate
+                        : day.isAfter(lastDate)
+                            ? lastDate
+                            : day;
                     final value = await showDatePicker(
                       context: context,
                       initialDate: clampedInitial,
-                      firstDate: DateTime(2000),
-                      lastDate: todayDay,
+                      firstDate: firstDate,
+                      lastDate: lastDate,
                       helpText: '选择记录日期',
                     );
                     if (value != null && context.mounted) onChanged(value);
@@ -134,11 +140,16 @@ class DailyDateBar extends StatelessWidget {
           ),
           constraints: const BoxConstraints.tightFor(width: 30, height: 30),
           padding: EdgeInsets.zero,
-          onPressed: enabled && date.isAfter(DateTime(2000))
-              ? () => onChanged(DateTime(date.year, date.month, date.day - 1))
+          onPressed: enabled && canGoPrev
+              ? () => onChanged(DateTime(day.year, day.month, day.day - 1))
               : null,
-          icon: Icon(Icons.chevron_left_rounded,
-              size: 18, color: p.textSecondary),
+          icon: Icon(
+            Icons.chevron_left_rounded,
+            size: 18,
+            color: canGoPrev
+                ? p.textSecondary
+                : p.textTertiary.withValues(alpha: .35),
+          ),
         ),
         IconButton(
           key: const Key('next-date'),
@@ -149,7 +160,7 @@ class DailyDateBar extends StatelessWidget {
           constraints: const BoxConstraints.tightFor(width: 30, height: 30),
           padding: EdgeInsets.zero,
           onPressed: enabled && canGoNext
-              ? () => onChanged(DateTime(date.year, date.month, date.day + 1))
+              ? () => onChanged(DateTime(day.year, day.month, day.day + 1))
               : null,
           icon: Icon(
             Icons.chevron_right_rounded,

@@ -24,11 +24,12 @@ class ExerciseLibraryView extends StatefulWidget {
 
 class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
   List<LibraryExercise>? _items;
-  List<ExerciseLog> _logs = [];
+  Map<String, ExerciseLog> _prByName = {};
   String _selectedCategory = '全部';
   String _query = '';
   String? _error;
   bool _busy = false;
+  int _loadGeneration = 0;
   final _searchController = TextEditingController();
 
   @override
@@ -36,7 +37,6 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
     super.initState();
     exerciseLibraryRevision.addListener(_load);
     exerciseLogsRevision.addListener(_load);
-    workoutDataRevision.addListener(_load);
     _load();
   }
 
@@ -44,23 +44,45 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
   void dispose() {
     exerciseLibraryRevision.removeListener(_load);
     exerciseLogsRevision.removeListener(_load);
-    workoutDataRevision.removeListener(_load);
     _searchController.dispose();
     super.dispose();
   }
 
+  static Map<String, ExerciseLog> _buildPrCache(List<ExerciseLog> logs) {
+    final map = <String, ExerciseLog>{};
+    for (final log in logs) {
+      final prev = map[log.exerciseName];
+      if (prev == null ||
+          log.estimated1RM > prev.estimated1RM ||
+          (log.estimated1RM == prev.estimated1RM &&
+              log.date.isAfter(prev.date))) {
+        map[log.exerciseName] = log;
+      }
+    }
+    return map;
+  }
+
+  void _ensureValidCategory(List<LibraryExercise> items) {
+    if (_selectedCategory == '全部' || _selectedCategory == '收藏') return;
+    if (!items.any((e) => e.category == _selectedCategory)) {
+      _selectedCategory = '全部';
+    }
+  }
+
   Future<void> _load() async {
+    final generation = ++_loadGeneration;
     try {
       final items = await loadExerciseLibrary();
       final logs = await loadExerciseLogs();
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _items = items;
-        _logs = logs;
+        _prByName = _buildPrCache(logs);
+        _ensureValidCategory(items);
         _error = null;
       });
     } catch (_) {
-      if (mounted) {
+      if (mounted && generation == _loadGeneration) {
         setState(() => _error = '动作库读取失败，原数据未被覆盖。');
       }
     }
@@ -121,14 +143,10 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
           _selectedCategory = created.category;
         }
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已添加「${created.exercise.name}」')),
-      );
+      showGlassNotice(context, '已添加「${created.exercise.name}」');
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('添加动作失败，请重试')),
-        );
+        showGlassNotice(context, '添加动作失败，请重试', isError: true);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -138,17 +156,20 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
   Future<void> _editExercise(LibraryExercise item) async {
     if (_busy) return;
     final edited = await editLibraryExercise(context, initial: item);
-    if (edited == null || !mounted) return;
+    if (edited == null || !mounted || _busy) return;
     setState(() => _busy = true);
     try {
       final updated = await updateLibraryExercise(edited);
       exerciseLibraryRevision.value++;
-      if (mounted) setState(() => _items = updated);
+      if (mounted) {
+        setState(() {
+          _items = updated;
+          _ensureValidCategory(updated);
+        });
+      }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('更新动作失败，请重试')),
-        );
+        showGlassNotice(context, '更新动作失败，请重试', isError: true);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -166,9 +187,7 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
       if (mounted) setState(() => _items = updated);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('收藏更新失败，请重试')),
-        );
+        showGlassNotice(context, '收藏更新失败，请重试', isError: true);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -177,35 +196,48 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
 
   Future<void> _deleteExercise(LibraryExercise item) async {
     if (_busy) return;
-    final previous = List<LibraryExercise>.from(_items ?? []);
+    final deletedItem = item;
+    final deletedIndex = (_items ?? []).indexWhere((e) => e.id == item.id);
     setState(() => _busy = true);
     try {
       final updated = await deleteLibraryExercise(item.id);
       exerciseLibraryRevision.value++;
       if (!mounted) return;
-      setState(() => _items = updated);
+      setState(() {
+        _items = updated;
+        _ensureValidCategory(updated);
+      });
       showUndoNotice(
         context,
         '已删除「${item.exercise.name}」',
         onUndo: () async {
+          if (!mounted || _busy) return;
+          setState(() => _busy = true);
           try {
-            await saveExerciseLibrary(previous);
-            exerciseLibraryRevision.value++;
-            if (mounted) setState(() => _items = previous);
+            final latest = List<LibraryExercise>.from(
+              await loadExerciseLibrary(),
+            );
+            if (!latest.any((e) => e.id == deletedItem.id)) {
+              final insertAt = deletedIndex < 0
+                  ? latest.length
+                  : deletedIndex.clamp(0, latest.length);
+              latest.insert(insertAt, deletedItem);
+              await saveExerciseLibrary(latest);
+              exerciseLibraryRevision.value++;
+              if (mounted) setState(() => _items = latest);
+            }
           } catch (_) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('恢复动作失败，请重试')),
-              );
+              showGlassNotice(context, '恢复动作失败，请重试', isError: true);
             }
+          } finally {
+            if (mounted) setState(() => _busy = false);
           }
         },
       );
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('删除动作失败，请重试')),
-        );
+        showGlassNotice(context, '删除动作失败，请重试', isError: true);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -219,23 +251,31 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
       final todayDate = dateOnly(DateTime.now());
       final key = dayKey(todayDate);
       final sessions = await loadDailyWorkouts();
-      var session = sessions[key];
+      final existingSession = sessions[key];
+      var session = existingSession;
 
       if (session == null) {
         final templates = await loadWorkoutTemplates();
         final schedule = await loadWeeklySchedule();
         final boundId = schedule[todayDate.weekday - 1];
         final matched = templates.where((t) => t.id == boundId);
-        final initialBlocks = matched.isNotEmpty
-            ? instantiateTemplateBlocks(matched.first, key)
+        final tpl = matched.isEmpty ? null : matched.first;
+        final initialBlocks = tpl != null
+            ? instantiateTemplateBlocks(tpl, key)
             : <WorkoutBlock>[];
-        session = DailyWorkout(date: key, blocks: initialBlocks);
+        session = DailyWorkout(
+          date: key,
+          blocks: initialBlocks,
+          templateId: tpl?.id,
+          templateName: tpl?.name,
+        );
       }
 
+      final insertedId = 'block_${DateTime.now().microsecondsSinceEpoch}';
       final nextBlocks = List<WorkoutBlock>.from(session.blocks)
         ..add(
           WorkoutBlock(
-            id: 'block_${DateTime.now().microsecondsSinceEpoch}',
+            id: insertedId,
             exercise: item.exercise,
           ),
         );
@@ -245,16 +285,41 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
       workoutDataRevision.value++;
       workoutHistoryRevision.value++;
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text('已加入今日「${item.exercise.name}」')),
-        );
+      final wasNewEmptySession =
+          existingSession == null && session.blocks.isEmpty;
+      showGlassNotice(
+        context,
+        '已加入今日「${item.exercise.name}」',
+        onUndo: () async {
+          if (!mounted || _busy) return;
+          setState(() => _busy = true);
+          try {
+            final latestSessions = await loadDailyWorkouts();
+            final latest = latestSessions[key];
+            if (latest == null) return;
+            final remaining = latest.blocks
+                .where((b) => b.id != insertedId)
+                .toList(growable: false);
+            if (remaining.length == latest.blocks.length) return;
+            if (wasNewEmptySession && remaining.isEmpty) {
+              await deleteDailyWorkout(key);
+            } else {
+              await saveDailyWorkout(latest.copyWith(blocks: remaining));
+            }
+            workoutDataRevision.value++;
+            workoutHistoryRevision.value++;
+          } catch (_) {
+            if (mounted) {
+              showGlassNotice(context, '撤销失败，请重试', isError: true);
+            }
+          } finally {
+            if (mounted) setState(() => _busy = false);
+          }
+        },
+      );
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('加入今日训练失败，请重试')),
-        );
+        showGlassNotice(context, '加入今日训练失败，请重试', isError: true);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -262,38 +327,29 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
   }
 
   Future<void> _restoreDefaults() async {
-    final confirmed = await showDialog<bool>(
+    if (_busy) return;
+    final confirmed = await showGlassConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('恢复内置动作？'),
-        content: const Text('将恢复系统默认动作，自建动作会保留。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('恢复内置'),
-          ),
-        ],
-      ),
+      title: '恢复内置动作？',
+      message: '将恢复系统默认动作，自建动作会保留。',
+      icon: Icons.restart_alt_rounded,
+      cancelLabel: '取消',
+      confirmLabel: '恢复内置',
     );
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !mounted || _busy) return;
     setState(() => _busy = true);
     try {
       final updated = await restoreDefaultExerciseLibrary(keepCustom: true);
       exerciseLibraryRevision.value++;
       if (!mounted) return;
-      setState(() => _items = updated);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已恢复内置动作')),
-      );
+      setState(() {
+        _items = updated;
+        _ensureValidCategory(updated);
+      });
+      showGlassNotice(context, '已恢复内置动作');
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('恢复内置动作失败，请重试')),
-        );
+        showGlassNotice(context, '恢复内置动作失败，请重试', isError: true);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -409,7 +465,10 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
                                     ),
                                   ],
                                 );
-                                if (value == 'restore') _restoreDefaults();
+                                if (!mounted || value == null) return;
+                                if (value == 'restore') {
+                                  await _restoreDefaults();
+                                }
                               },
                         icon: Icon(
                           Icons.more_vert_rounded,
@@ -428,37 +487,12 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
                       for (final cat in categories)
                         Padding(
                           padding: const EdgeInsets.only(right: 7),
-                          child: FilterChip(
+                          child: _LibraryCategoryPill(
                             key: ValueKey('library-cat-$cat'),
+                            label: cat == '收藏' ? '★ 收藏' : cat,
+                            count: _countForCategory(cat),
                             selected: _selectedCategory == cat,
-                            showCheckmark: false,
-                            visualDensity: VisualDensity.compact,
-                            label: Text(
-                              '${cat == '收藏' ? '★ 收藏' : cat} ${_countForCategory(cat)}',
-                            ),
-                            labelStyle: TextStyle(
-                              fontSize: 12,
-                              fontWeight: _selectedCategory == cat
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              color: _selectedCategory == cat
-                                  ? p.onPrimary
-                                  : p.textSecondary,
-                            ),
-                            selectedColor: p.primary,
-                            backgroundColor: p.isDark
-                                ? Colors.white.withValues(alpha: .06)
-                                : Colors.white.withValues(alpha: .65),
-                            side: BorderSide(
-                              color: _selectedCategory == cat
-                                  ? p.primary
-                                  : p.borderSubtle,
-                              width: 0.85,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            onSelected: (_) =>
+                            onTap: () =>
                                 setState(() => _selectedCategory = cat),
                           ),
                         ),
@@ -506,7 +540,7 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final item = visible[index];
-                  final pr = exercisePersonalRecord(_logs, item.exercise.name);
+                  final pr = _prByName[item.exercise.name];
                   return SurfaceCard(
                     key: ValueKey('library-item-${item.id}'),
                     onTap: _busy ? null : () => _editExercise(item),
@@ -566,8 +600,8 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
                                     _busy ? null : () => _deleteExercise(item),
                                 icon: Icon(
                                   Icons.close_rounded,
-                                  size: 15,
-                                  color: p.textTertiary.withValues(alpha: .52),
+                                  size: 14.5,
+                                  color: p.textTertiary.withValues(alpha: .38),
                                 ),
                               ),
                             ),
@@ -653,6 +687,72 @@ class _ExerciseLibraryViewState extends State<ExerciseLibraryView> {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _LibraryCategoryPill extends StatelessWidget {
+  final String label;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _LibraryCategoryPill({
+    super.key,
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    return Semantics(
+      selected: selected,
+      button: true,
+      label: '$label $count',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: selected ? null : onTap,
+          borderRadius: BorderRadius.circular(999),
+          splashFactory: NoSplash.splashFactory,
+          highlightColor: Colors.transparent,
+          child: AnimatedContainer(
+            duration: reduceMotion
+                ? Duration.zero
+                : const Duration(milliseconds: 140),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              gradient: selected
+                  ? p.primaryGradient
+                  : LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [p.glassFillTop, p.glassFillBottom],
+                    ),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: selected ? p.primary : p.borderSubtle,
+                width: 0.9,
+              ),
+            ),
+            child: Text(
+              '$label $count',
+              maxLines: 1,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                fontFeatures: const [FontFeature.tabularFigures()],
+                color: selected ? p.onPrimary : p.textSecondary,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

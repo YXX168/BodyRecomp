@@ -6,25 +6,40 @@ import '../models/recomp_models.dart';
 
 int isoWeekYear(DateTime date) {
   final day = dateOnly(date);
-  return day.add(Duration(days: 4 - day.weekday)).year;
+  return DateTime(day.year, day.month, day.day + (4 - day.weekday)).year;
 }
 
 int isoWeekNumber(DateTime date) {
   final day = dateOnly(date);
-  final thursday = day.add(Duration(days: 4 - day.weekday));
+  final thursday = DateTime(day.year, day.month, day.day + (4 - day.weekday));
   final firstThursday = DateTime(thursday.year, 1, 4);
-  final firstIsoThursday = firstThursday.add(
-    Duration(days: 4 - firstThursday.weekday),
+  final firstIsoThursday = DateTime(
+    firstThursday.year,
+    firstThursday.month,
+    firstThursday.day + (4 - firstThursday.weekday),
   );
-  return 1 + (thursday.difference(firstIsoThursday).inDays ~/ 7);
+  final diffDays = DateTime.utc(thursday.year, thursday.month, thursday.day)
+      .difference(
+        DateTime.utc(
+          firstIsoThursday.year,
+          firstIsoThursday.month,
+          firstIsoThursday.day,
+        ),
+      )
+      .inDays;
+  return 1 + (diffDays ~/ 7);
 }
 
 DateTime startOfIsoWeek(DateTime date) =>
-    dateOnly(date).subtract(Duration(days: date.weekday - 1));
+    DateTime(date.year, date.month, date.day - (date.weekday - 1));
 
 DateTime startOfIsoWeekByYearWeek(int isoYear, int isoWeek) {
   final firstMonday = startOfIsoWeek(DateTime(isoYear, 1, 4));
-  return firstMonday.add(Duration(days: (isoWeek - 1) * 7));
+  return DateTime(
+    firstMonday.year,
+    firstMonday.month,
+    firstMonday.day + (isoWeek - 1) * 7,
+  );
 }
 
 String historyKey(int year, int month) =>
@@ -54,7 +69,7 @@ Map<DateTime, int> countByActualDate(
   final monday = startOfIsoWeekByYearWeek(isoYear, isoWeek);
   return {
     for (final entry in countByWeekday(done).entries)
-      dateOnly(monday.add(Duration(days: entry.key))): entry.value,
+      DateTime(monday.year, monday.month, monday.day + entry.key): entry.value,
   };
 }
 
@@ -157,7 +172,10 @@ Future<void> saveWeekDoneToHistory(
   final counts = countByActualDate(done, isoYear, isoWeek);
   final monday = startOfIsoWeekByYearWeek(isoYear, isoWeek);
   for (var i = 0; i < 7; i++) {
-    counts.putIfAbsent(dateOnly(monday.add(Duration(days: i))), () => 0);
+    counts.putIfAbsent(
+      DateTime(monday.year, monday.month, monday.day + i),
+      () => 0,
+    );
   }
   await saveActualDateCountsToHistory(preferences, counts);
 }

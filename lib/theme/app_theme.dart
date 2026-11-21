@@ -74,7 +74,10 @@ class AppPalette extends ThemeExtension<AppPalette> {
   LinearGradient get primaryGradient => LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [primary, primaryBright],
+        colors: [
+          primary,
+          isDark ? primaryBright : Color.lerp(primary, primaryBright, 0.38)!,
+        ],
       );
 
   static const Map<AppTheme, AppPalette> presets = {
@@ -557,8 +560,94 @@ ThemeData buildThemeData(AppTheme mode) {
         borderSide: BorderSide(color: p.danger, width: 1.4),
       ),
     ),
+    datePickerTheme: DatePickerThemeData(
+      backgroundColor: p.surfaceElevated,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(26),
+        side: BorderSide(
+          color: p.glassRimBright.withValues(alpha: p.isDark ? .42 : .85),
+          width: 1.0,
+        ),
+      ),
+      headerBackgroundColor: Color.alphaBlend(
+        p.primary.withValues(alpha: p.isDark ? .14 : .08),
+        p.surfaceElevated,
+      ),
+      headerForegroundColor: p.textPrimary,
+      headerHeadlineStyle: TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 22,
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.4,
+        color: p.textPrimary,
+      ),
+      headerHelpStyle: TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+        color: p.primary,
+      ),
+      weekdayStyle: TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+        color: p.textSecondary,
+      ),
+      dayStyle: const TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        fontFeatures: [FontFeature.tabularFigures()],
+      ),
+      dayForegroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.disabled)) {
+          return p.textTertiary.withValues(alpha: .42);
+        }
+        if (states.contains(WidgetState.selected)) return p.onPrimary;
+        return p.textPrimary;
+      }),
+      dayBackgroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return p.primary;
+        return Colors.transparent;
+      }),
+      todayForegroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return p.onPrimary;
+        return p.primary;
+      }),
+      todayBackgroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return p.primary;
+        return p.primary.withValues(alpha: p.isDark ? .14 : .10);
+      }),
+      todayBorder: BorderSide(
+        color: p.primary.withValues(alpha: .65),
+        width: 1.1,
+      ),
+      yearForegroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.disabled)) {
+          return p.textTertiary.withValues(alpha: .42);
+        }
+        if (states.contains(WidgetState.selected)) return p.onPrimary;
+        return p.textPrimary;
+      }),
+      yearBackgroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return p.primary;
+        return Colors.transparent;
+      }),
+      dividerColor: p.borderSubtle,
+      cancelButtonStyle: TextButton.styleFrom(
+        foregroundColor: p.textSecondary,
+      ),
+      confirmButtonStyle: FilledButton.styleFrom(
+        backgroundColor: p.primary,
+        foregroundColor: p.onPrimary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: p.surfaceElevated,
+      elevation: 0,
       contentTextStyle: TextStyle(
         fontFamily: 'Inter',
         fontSize: 13,
@@ -566,8 +655,10 @@ ThemeData buildThemeData(AppTheme mode) {
       ),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: p.borderSubtle),
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(
+          color: p.glassRimBright.withValues(alpha: p.isDark ? .34 : .78),
+        ),
       ),
     ),
   );

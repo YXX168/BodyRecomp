@@ -25,6 +25,10 @@ class _RestTimerPillState extends State<RestTimerPill>
     curve: Curves.easeOutCubic,
     reverseCurve: Curves.easeInCubic,
   );
+  late final Animation<double> _idleFade =
+      Tween<double>(begin: 1.0, end: 0.0).animate(_fade);
+  late final Animation<double> _panelScale =
+      Tween<double>(begin: 0.94, end: 1.0).animate(_fade);
   RestCountdownState? _face;
   bool _reduceMotion = false;
   bool get _running => (widget.controller.value?.remaining ?? 0) > 0;
@@ -90,8 +94,19 @@ class _RestTimerPillState extends State<RestTimerPill>
     super.dispose();
   }
 
+  void _openSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _RestTimerSheet(controller: widget.controller),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return MediaQuery.withClampedTextScaling(
       maxScaleFactor: 1.4,
       child: SizedBox(
@@ -99,24 +114,67 @@ class _RestTimerPillState extends State<RestTimerPill>
         width: 178,
         height: 40,
         child: RepaintBoundary(
-          child: ExcludeSemantics(
-            excluding: !_running,
-            child: IgnorePointer(
-              ignoring: !_running,
-              child: FadeTransition(
-                opacity: _fade,
-                child: ScaleTransition(
-                  alignment: Alignment.centerRight,
-                  scale: Tween<double>(begin: .94, end: 1).animate(_fade),
-                  child: _face == null
-                      ? const SizedBox.shrink()
-                      : _TimerFace(
-                          controller: widget.controller,
-                          state: _face!,
+          child: Stack(
+            alignment: Alignment.centerRight,
+            children: [
+              ExcludeSemantics(
+                excluding: _running,
+                child: IgnorePointer(
+                  ignoring: _running,
+                  child: FadeTransition(
+                    opacity: _idleFade,
+                    child: Tooltip(
+                      message: '组间休息计时',
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          key: const Key('rest-timer-idle-btn'),
+                          customBorder: const CircleBorder(),
+                          onTap: () => _openSheet(context),
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [p.glassFillTop, p.glassFillBottom],
+                              ),
+                              border: Border.all(color: p.borderSubtle),
+                            ),
+                            child: Icon(
+                              Icons.timer_outlined,
+                              size: 18,
+                              color: p.textSecondary,
+                            ),
+                          ),
                         ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              ExcludeSemantics(
+                excluding: !_running,
+                child: IgnorePointer(
+                  ignoring: !_running,
+                  child: FadeTransition(
+                    opacity: _fade,
+                    child: ScaleTransition(
+                      alignment: Alignment.centerRight,
+                      scale: _panelScale,
+                      child: _face == null
+                          ? const SizedBox.shrink()
+                          : _TimerFace(
+                              controller: widget.controller,
+                              state: _face!,
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -266,6 +324,7 @@ class _RestTimerSheet extends StatelessWidget {
     return ValueListenableBuilder<RestCountdownState?>(
       valueListenable: controller,
       builder: (context, state, _) {
+        final isRunning = (state?.remaining ?? 0) > 0;
         final remaining = state?.remaining ?? 0;
         final total = state?.total ?? 60;
         final progress = total <= 0 ? 0.0 : (remaining / total).clamp(0.0, 1.0);
@@ -273,7 +332,7 @@ class _RestTimerSheet extends StatelessWidget {
             '${remaining ~/ 60}:${(remaining % 60).toString().padLeft(2, '0')}';
         return SheetFrame(
           title: '组间休息计时',
-          subtitle: state?.label ?? '已结束',
+          subtitle: state?.label ?? '选择时长开始倒计时',
           icon: Icons.timer_rounded,
           body: Column(
             mainAxisSize: MainAxisSize.min,
@@ -296,7 +355,9 @@ class _RestTimerSheet extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      remaining == 0 ? '休息结束' : '恢复中',
+                      state == null
+                          ? '点击下方开始'
+                          : (remaining == 0 ? '休息结束' : '恢复中'),
                       style: TextStyle(fontSize: 12, color: p.textSecondary),
                     ),
                   ],
@@ -333,8 +394,10 @@ class _RestTimerSheet extends StatelessWidget {
                 child: OutlinedButton(
                   style:
                       OutlinedButton.styleFrom(minimumSize: const Size(0, 46)),
-                  onPressed: () => controller.addSeconds(30),
-                  child: const Text('+30 秒'),
+                  onPressed: isRunning
+                      ? () => controller.addSeconds(30)
+                      : () => Navigator.pop(context),
+                  child: Text(isRunning ? '+30 秒' : '关闭'),
                 ),
               ),
               const SizedBox(width: 10),
@@ -342,11 +405,13 @@ class _RestTimerSheet extends StatelessWidget {
                 flex: 2,
                 child: FilledButton(
                   style: FilledButton.styleFrom(minimumSize: const Size(0, 46)),
-                  onPressed: () {
-                    controller.stop();
-                    Navigator.pop(context);
-                  },
-                  child: const Text('结束计时'),
+                  onPressed: isRunning
+                      ? () {
+                          controller.stop();
+                          Navigator.pop(context);
+                        }
+                      : () => controller.start(60, state?.label ?? '自由休息'),
+                  child: Text(isRunning ? '结束计时' : '开始 60 秒'),
                 ),
               ),
             ],

@@ -63,7 +63,9 @@ class _AppNavigationBarState extends State<AppNavigationBar>
   @override
   void didUpdateWidget(AppNavigationBar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.index != oldWidget.index && !_dragging) {
+    if (widget.index != oldWidget.index &&
+        !_dragging &&
+        _toPos != widget.index.toDouble()) {
       _animateTo(widget.index.toDouble());
     }
   }

@@ -48,8 +48,13 @@ class WorkoutPage extends StatefulWidget {
 
 class _WorkoutPageState extends State<WorkoutPage>
     with WidgetsBindingObserver, DailyRecordDate {
+  static final DateTime _minDate = DateTime(2000);
+
   @override
   DateTime get now => (widget.now ?? DateTime.now)();
+
+  @override
+  bool get allowFutureRecordDate => true;
 
   RestCountdown? _ownedRest;
   RestCountdown get _rest => widget.restController ?? _ownedRest!;
@@ -64,11 +69,19 @@ class _WorkoutPageState extends State<WorkoutPage>
   bool _loading = true;
   bool _saving = false;
   String? _loadError;
+  int _loadGeneration = 0;
+  int _sessionsGeneration = 0;
+  int _planGeneration = 0;
+  int _logsGeneration = 0;
+  int _autoRestGeneration = 0;
+  int _suppressOwnHistoryReload = 0;
+  int _suppressOwnPlanReload = 0;
 
   Map<String, DailyWorkout> _sessions = {};
   List<WorkoutTemplate> _templates = [];
   List<String> _schedule = List.filled(7, '');
-  List<ExerciseLog> _exerciseLogs = [];
+  Map<String, ExerciseLog> _latestLogByExercise = {};
+  Map<String, ExerciseLog> _prByExercise = {};
   bool _autoRest = false;
 
   @override
@@ -81,12 +94,57 @@ class _WorkoutPageState extends State<WorkoutPage>
       );
     }
     workoutDataRevision.addListener(_loadAll);
-    workoutHistoryRevision.addListener(_loadAll);
-    workoutPlanRevision.addListener(_loadAll);
-    exerciseLogsRevision.addListener(_loadAll);
-    restTimerPreferenceRevision.addListener(_loadAll);
+    workoutHistoryRevision.addListener(_onHistoryRevision);
+    workoutPlanRevision.addListener(_onPlanRevision);
+    exerciseLogsRevision.addListener(_loadLogsOnly);
+    restTimerPreferenceRevision.addListener(_loadAutoRestOnly);
     _scrollController.addListener(_onScrollChanged);
     _loadAll();
+  }
+
+  void _rebuildLogCaches(List<ExerciseLog> logs) {
+    final latest = <String, ExerciseLog>{};
+    final pr = <String, ExerciseLog>{};
+    for (final log in logs) {
+      final existingLatest = latest[log.exerciseName];
+      if (existingLatest == null || log.date.isAfter(existingLatest.date)) {
+        latest[log.exerciseName] = log;
+      }
+      final existingPr = pr[log.exerciseName];
+      if (existingPr == null || log.estimated1RM > existingPr.estimated1RM) {
+        pr[log.exerciseName] = log;
+      }
+    }
+    _latestLogByExercise = latest;
+    _prByExercise = pr;
+  }
+
+  void _notifyHistoryChanged() {
+    _suppressOwnHistoryReload++;
+    try {
+      workoutHistoryRevision.value++;
+    } finally {
+      if (_suppressOwnHistoryReload > 0) _suppressOwnHistoryReload--;
+    }
+  }
+
+  void _notifyPlanChanged() {
+    _suppressOwnPlanReload++;
+    try {
+      workoutPlanRevision.value++;
+    } finally {
+      if (_suppressOwnPlanReload > 0) _suppressOwnPlanReload--;
+    }
+  }
+
+  void _onHistoryRevision() {
+    if (_suppressOwnHistoryReload > 0) return;
+    _loadSessionsOnly();
+  }
+
+  void _onPlanRevision() {
+    if (_suppressOwnPlanReload > 0) return;
+    _loadPlanOnly();
   }
 
   void _onScrollChanged() {
@@ -193,10 +251,10 @@ class _WorkoutPageState extends State<WorkoutPage>
   @override
   void dispose() {
     workoutDataRevision.removeListener(_loadAll);
-    workoutHistoryRevision.removeListener(_loadAll);
-    workoutPlanRevision.removeListener(_loadAll);
-    exerciseLogsRevision.removeListener(_loadAll);
-    restTimerPreferenceRevision.removeListener(_loadAll);
+    workoutHistoryRevision.removeListener(_onHistoryRevision);
+    workoutPlanRevision.removeListener(_onPlanRevision);
+    exerciseLogsRevision.removeListener(_loadLogsOnly);
+    restTimerPreferenceRevision.removeListener(_loadAutoRestOnly);
     _scrollController
       ..removeListener(_onScrollChanged)
       ..dispose();
@@ -205,29 +263,101 @@ class _WorkoutPageState extends State<WorkoutPage>
   }
 
   Future<void> _loadAll() async {
+    final gen = ++_loadGeneration;
+    _sessionsGeneration++;
+    _planGeneration++;
+    _logsGeneration++;
+    _autoRestGeneration++;
     try {
       final sessions = await loadDailyWorkouts();
       final templates = await loadWorkoutTemplates();
       final schedule = await loadWeeklySchedule();
       final logs = await loadExerciseLogs();
       final autoRest = await loadAutoRestTimer();
-      if (!mounted) return;
+      if (!mounted || gen != _loadGeneration) return;
       setState(() {
         _sessions = sessions;
         _templates = templates;
         _schedule = schedule;
-        _exerciseLogs = logs;
+        _rebuildLogCaches(logs);
         _autoRest = autoRest;
         _loading = false;
         _loadError = null;
       });
     } catch (_) {
-      if (mounted) {
+      if (mounted && gen == _loadGeneration) {
         setState(() {
           _loading = false;
           _loadError = '训练记录读取失败，本地数据未被覆盖。';
         });
       }
+    }
+  }
+
+  Future<void> _loadSessionsOnly() async {
+    final gen = ++_sessionsGeneration;
+    final fullGen = _loadGeneration;
+    try {
+      final sessions = await loadDailyWorkouts();
+      if (!mounted ||
+          gen != _sessionsGeneration ||
+          fullGen != _loadGeneration) {
+        return;
+      }
+      setState(() {
+        _sessions = sessions;
+        _loadError = null;
+      });
+    } catch (_) {
+      // Preserve last valid in-memory state if a background refresh fails.
+    }
+  }
+
+  Future<void> _loadPlanOnly() async {
+    final gen = ++_planGeneration;
+    final fullGen = _loadGeneration;
+    try {
+      final templates = await loadWorkoutTemplates();
+      final schedule = await loadWeeklySchedule();
+      if (!mounted || gen != _planGeneration || fullGen != _loadGeneration) {
+        return;
+      }
+      setState(() {
+        _templates = templates;
+        _schedule = schedule;
+      });
+    } catch (_) {
+      // Preserve last valid templates/schedule on transient read failure.
+    }
+  }
+
+  Future<void> _loadLogsOnly() async {
+    final gen = ++_logsGeneration;
+    final fullGen = _loadGeneration;
+    try {
+      final logs = await loadExerciseLogs();
+      if (!mounted || gen != _logsGeneration || fullGen != _loadGeneration) {
+        return;
+      }
+      setState(() => _rebuildLogCaches(logs));
+    } catch (_) {
+      // Keep last known weight/PR badges on transient read failure.
+    }
+  }
+
+  Future<void> _loadAutoRestOnly() async {
+    final gen = ++_autoRestGeneration;
+    final fullGen = _loadGeneration;
+    try {
+      final autoRest = await loadAutoRestTimer();
+      if (!mounted ||
+          gen != _autoRestGeneration ||
+          fullGen != _loadGeneration) {
+        return;
+      }
+      setState(() => _autoRest = autoRest);
+    } catch (_) {
+      // Keep last known auto-rest preference on transient read failure.
     }
   }
 
@@ -258,7 +388,9 @@ class _WorkoutPageState extends State<WorkoutPage>
     if (tpl != null) {
       return DailyWorkout(
         date: key,
-        blocks: instantiateTemplateBlocks(tpl, key),
+        blocks: instantiateTemplateBlocks(tpl, key, preview: true),
+        templateId: tpl.id,
+        templateName: tpl.name,
       );
     }
     return DailyWorkout(date: key, rested: false);
@@ -282,23 +414,48 @@ class _WorkoutPageState extends State<WorkoutPage>
     return scheduled == null ? DayStripStatus.rest : DayStripStatus.planned;
   }
 
-  Future<void> _saveSession(DailyWorkout next) async {
+  Future<bool> _saveSession(DailyWorkout next) async {
     final parsed = DateTime.tryParse(next.date);
-    if (_saving || (parsed != null && !_isDateEditable(parsed))) return;
+    if (_saving || (parsed != null && !_isDateEditable(parsed))) return false;
     setState(() => _saving = true);
     try {
       await saveDailyWorkout(next);
-      workoutDataRevision.value++;
-      workoutHistoryRevision.value++;
       if (mounted) {
         setState(() => _sessions[next.date] = next);
       }
+      _notifyHistoryChanged();
+      return true;
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('保存训练失败，请重试')),
-        );
+        showGlassNotice(context, '保存训练失败，请重试', isError: true);
       }
+      return false;
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<bool> _deleteSessionForDate(
+    String key, {
+    String errorMessage = '恢复模板失败，请重试',
+  }) async {
+    if (_saving) return false;
+    setState(() => _saving = true);
+    try {
+      await deleteDailyWorkout(key);
+      if (mounted) {
+        setState(() {
+          _sessions.remove(key);
+          _selectedTemplateByDate.remove(key);
+        });
+      }
+      _notifyHistoryChanged();
+      return true;
+    } catch (_) {
+      if (mounted) {
+        showGlassNotice(context, errorMessage, isError: true);
+      }
+      return false;
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -309,48 +466,27 @@ class _WorkoutPageState extends State<WorkoutPage>
     final key = dayKey(targetDate);
     final previous = _sessions[key];
     final previousTplId = _selectedTemplateByDate[key];
-    setState(() => _saving = true);
-    try {
-      await deleteDailyWorkout(key);
-      workoutDataRevision.value++;
-      workoutHistoryRevision.value++;
-      if (!mounted) return;
-      setState(() {
-        _sessions.remove(key);
-        _selectedTemplateByDate.remove(key);
-      });
-      if (previous != null) {
-        showUndoNotice(context, '已恢复当日固定模板', onUndo: () async {
-          await saveDailyWorkout(previous);
-          workoutDataRevision.value++;
-          workoutHistoryRevision.value++;
-          if (mounted) {
-            setState(() {
-              _sessions[key] = previous;
-              if (previousTplId != null) {
-                _selectedTemplateByDate[key] = previousTplId;
-              }
-            });
-          }
-        });
+    final removed = await _deleteSessionForDate(
+      key,
+      errorMessage: '恢复模板失败，请重试',
+    );
+    if (!removed || !mounted || previous == null) return;
+    showUndoNotice(context, '已恢复当日固定模板', onUndo: () async {
+      if (!mounted || _saving || _sessions.containsKey(key)) return;
+      final restored = await _saveSession(previous);
+      if (restored && mounted && previousTplId != null) {
+        setState(() => _selectedTemplateByDate[key] = previousTplId);
       }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('恢复模板失败，请重试')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
+    });
   }
 
   Future<void> _switchTemplate(DateTime targetDate) async {
     if (_saving || !_isDateEditable(targetDate)) return;
     final key = dayKey(targetDate);
     final current = _effectiveSession(targetDate);
-    final activeId =
-        _selectedTemplateByDate[key] ?? _scheduledTemplate(targetDate)?.id;
+    final activeId = current.templateId ??
+        _selectedTemplateByDate[key] ??
+        _scheduledTemplate(targetDate)?.id;
     final picked = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -385,14 +521,18 @@ class _WorkoutPageState extends State<WorkoutPage>
     if (picked == null || !mounted) return;
     final tpl = _templateById(picked);
     if (tpl == null) return;
-    setState(() => _selectedTemplateByDate[key] = tpl.id);
-    await _saveSession(
+    final saved = await _saveSession(
       DailyWorkout(
         date: key,
         rested: false,
         blocks: instantiateTemplateBlocks(tpl, key),
+        templateId: tpl.id,
+        templateName: tpl.name,
       ),
     );
+    if (saved && mounted) {
+      setState(() => _selectedTemplateByDate[key] = tpl.id);
+    }
   }
 
   Future<void> _applyScheduledNow(DateTime targetDate) async {
@@ -402,66 +542,55 @@ class _WorkoutPageState extends State<WorkoutPage>
       return;
     }
     final key = dayKey(targetDate);
-    setState(() => _selectedTemplateByDate[key] = scheduled.id);
-    await _saveSession(
+    final saved = await _saveSession(
       DailyWorkout(
         date: key,
         rested: false,
         blocks: instantiateTemplateBlocks(scheduled, key),
+        templateId: scheduled.id,
+        templateName: scheduled.name,
       ),
     );
+    if (saved && mounted) {
+      setState(() => _selectedTemplateByDate[key] = scheduled.id);
+    }
   }
 
   Future<void> _markRest(DateTime targetDate) async {
     if (_saving || !_isDateEditable(targetDate)) return;
     final key = dayKey(targetDate);
     final previous = _sessions[key];
-    await _saveSession(
+    final previousTplId = _selectedTemplateByDate[key];
+    final saved = await _saveSession(
       DailyWorkout(
         date: key,
         rested: true,
         blocks: const [],
       ),
     );
-    if (!mounted) return;
+    if (!saved || !mounted) return;
+    setState(() => _selectedTemplateByDate.remove(key));
     showUndoNotice(context, '已标记今日休息', onUndo: () async {
+      if (!mounted || _saving) return;
+      final latest = _sessions[key];
+      if (latest == null || !latest.rested) return;
       if (previous == null) {
-        await deleteDailyWorkout(key);
-        workoutDataRevision.value++;
-        workoutHistoryRevision.value++;
-        if (mounted) setState(() => _sessions.remove(key));
+        await _deleteSessionForDate(key, errorMessage: '恢复训练失败，请重试');
       } else {
-        await saveDailyWorkout(previous);
-        workoutDataRevision.value++;
-        workoutHistoryRevision.value++;
-        if (mounted) setState(() => _sessions[key] = previous);
+        final ok = await _saveSession(previous);
+        if (ok && mounted && previousTplId != null) {
+          setState(() => _selectedTemplateByDate[key] = previousTplId);
+        }
       }
     });
   }
 
   Future<void> _cancelRest(DateTime targetDate) async {
     if (_saving || !_isDateEditable(targetDate)) return;
-    final key = dayKey(targetDate);
-    setState(() => _saving = true);
-    try {
-      await deleteDailyWorkout(key);
-      workoutDataRevision.value++;
-      workoutHistoryRevision.value++;
-      if (mounted) {
-        setState(() {
-          _sessions.remove(key);
-          _selectedTemplateByDate.remove(key);
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('取消休息失败，请重试')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
+    await _deleteSessionForDate(
+      dayKey(targetDate),
+      errorMessage: '取消休息失败，请重试',
+    );
   }
 
   Future<void> _addFromPicker(
@@ -501,13 +630,13 @@ class _WorkoutPageState extends State<WorkoutPage>
       id: 'blk_${DateTime.now().microsecondsSinceEpoch}',
       exercise: res.exercise,
     );
-    await _saveSession(
+    final saved = await _saveSession(
       current.copyWith(
         rested: false,
         blocks: [...current.blocks, block],
       ),
     );
-    if (res.saveToLibrary) {
+    if (saved && res.saveToLibrary) {
       try {
         await addLibraryExercise(
           LibraryExercise(
@@ -517,41 +646,51 @@ class _WorkoutPageState extends State<WorkoutPage>
           ),
         );
         exerciseLibraryRevision.value++;
-      } catch (_) {}
+      } catch (_) {
+        if (mounted) {
+          showGlassNotice(context, '动作已加入训练，但保存到动作库失败', isError: true);
+        }
+      }
     }
   }
 
   Future<void> _saveCurrentAsTemplate(DateTime targetDate) async {
+    if (_saving) return;
     final session = _effectiveSession(targetDate);
     if (session.blocks.isEmpty) return;
     final key = dayKey(targetDate);
-    final activeTpl = _templateById(_selectedTemplateByDate[key]) ??
+    final activeTpl = _templateById(session.templateId) ??
+        _templateById(_selectedTemplateByDate[key]) ??
         _scheduledTemplate(targetDate);
     final name = await promptText(
       context,
       '存为训练模板',
-      initial: activeTpl?.name ?? '我的自定义训练',
+      initial: activeTpl?.name ?? session.templateName ?? '我的自定义训练',
     );
-    if (name == null || name.trim().isEmpty || !mounted) return;
+    if (name == null || name.trim().isEmpty || !mounted || _saving) return;
+    setState(() => _saving = true);
     try {
+      final latestTemplates = await loadWorkoutTemplates();
       final created = WorkoutTemplate(
         id: 'tpl_${DateTime.now().microsecondsSinceEpoch}',
         name: name.trim(),
         exercises: [for (final b in session.blocks) b.exercise],
       );
-      final next = List<WorkoutTemplate>.from(_templates)..add(created);
+      final next = List<WorkoutTemplate>.from(latestTemplates)..add(created);
       await saveWorkoutTemplates(next);
-      workoutPlanRevision.value++;
-      if (!mounted) return;
-      setState(() => _templates = next);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已保存模板「${created.name}」')),
-      );
+      if (mounted) {
+        setState(() => _templates = next);
+      }
+      _notifyPlanChanged();
+      if (mounted) {
+        showGlassNotice(context, '已保存模板「${created.name}」');
+      }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('保存模板失败，请重试')));
+        showGlassNotice(context, '保存模板失败，请重试', isError: true);
       }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -569,12 +708,22 @@ class _WorkoutPageState extends State<WorkoutPage>
     if (clamped == block.completedSets) return;
 
     final increasing = clamped > block.completedSets;
+    final wasComplete =
+        current.plannedSets > 0 && current.completedSets >= current.plannedSets;
     final blocks = List<WorkoutBlock>.from(current.blocks)
       ..[index] = block.copyWith(completedSets: clamped);
-    HapticFeedback.lightImpact();
-    await _saveSession(current.copyWith(rested: false, blocks: blocks));
+    final nextSession = current.copyWith(rested: false, blocks: blocks);
+    final nowComplete = nextSession.plannedSets > 0 &&
+        nextSession.completedSets >= nextSession.plannedSets;
+    if (!wasComplete && nowComplete) {
+      HapticFeedback.mediumImpact();
+    } else {
+      HapticFeedback.lightImpact();
+    }
+    final saved = await _saveSession(nextSession);
 
-    if (dateOnly(targetDate) == dateOnly(today) &&
+    if (saved &&
+        dateOnly(targetDate) == dateOnly(today) &&
         increasing &&
         _autoRest &&
         clamped < block.exercise.sets) {
@@ -604,35 +753,37 @@ class _WorkoutPageState extends State<WorkoutPage>
     final current = _effectiveSession(targetDate);
     if (index < 0 || index >= current.blocks.length) return;
     final block = current.blocks[index];
-    final history = exerciseHistory(_exerciseLogs, block.exercise.name);
-    final pr = exercisePersonalRecord(_exerciseLogs, block.exercise.name);
+    final name = block.exercise.name;
+    final latest = _latestLogByExercise[name];
+    final pr = _prByExercise[name];
+    final currentClock = now;
+    final logDate = dateOnly(targetDate) == dateOnly(today)
+        ? currentClock
+        : DateTime(
+            targetDate.year,
+            targetDate.month,
+            targetDate.day,
+            currentClock.hour,
+            currentClock.minute,
+            currentClock.second,
+          );
     final logged = await showWeightLogSheet(
       context,
-      exerciseName: block.exercise.name,
+      exerciseName: name,
       defaultSets: block.exercise.sets,
       defaultReps: _parseDefaultReps(block.exercise.reps),
-      latestLog: history.isEmpty ? null : history.first,
+      latestLog: latest,
       personalRecord: pr,
+      logDate: logDate,
     );
     if (logged == null || !mounted) return;
-    try {
-      final updated = await saveExerciseLog(
-        block.exercise.name,
-        logged,
+    await _loadLogsOnly();
+    if (mounted) {
+      showGlassNotice(
+        context,
+        '已记录 $name ${_fmtWeight(logged.weightKg)}kg',
+        icon: Icons.fitness_center_rounded,
       );
-      exerciseLogsRevision.value++;
-      workoutDataRevision.value++;
-      if (mounted) {
-        setState(() => _exerciseLogs = updated);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('已记录 ${block.exercise.name} 负重')),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('负重保存失败，请重试')));
-      }
     }
   }
 
@@ -674,12 +825,18 @@ class _WorkoutPageState extends State<WorkoutPage>
     final current = _effectiveSession(targetDate);
     if (index < 0 || index >= current.blocks.length) return;
     final removed = current.blocks[index];
-    final previous = current;
     final blocks = List<WorkoutBlock>.from(current.blocks)..removeAt(index);
-    await _saveSession(current.copyWith(blocks: blocks));
-    if (!mounted) return;
+    final saved = await _saveSession(current.copyWith(blocks: blocks));
+    if (!saved || !mounted) return;
     showUndoNotice(context, '已移除 ${removed.exercise.name}', onUndo: () async {
-      await _saveSession(previous);
+      if (!mounted || _saving) return;
+      final latest = _effectiveSession(targetDate);
+      if (latest.rested || latest.blocks.any((b) => b.id == removed.id)) {
+        return;
+      }
+      final restored = List<WorkoutBlock>.from(latest.blocks)
+        ..insert(index.clamp(0, latest.blocks.length), removed);
+      await _saveSession(latest.copyWith(rested: false, blocks: restored));
     });
   }
 
@@ -773,20 +930,30 @@ class _WorkoutPageState extends State<WorkoutPage>
       _restoringScroll = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         try {
-          if (!mounted || !_scrollController.hasClients) return;
+          if (!mounted ||
+              _activeScrollDateKey != currentKey ||
+              !_scrollController.hasClients) {
+            return;
+          }
           final target = _scrollOffsets[currentKey] ?? 0.0;
           final max = _scrollController.position.maxScrollExtent;
           _scrollController.jumpTo(target.clamp(0.0, max));
         } finally {
-          _restoringScroll = false;
+          if (_activeScrollDateKey == currentKey) {
+            _restoringScroll = false;
+          }
         }
       });
     }
     final existingSession = _sessions[currentKey];
     final session = _effectiveSession(currentDate);
     final scheduledTpl = _scheduledTemplate(currentDate);
-    final activeTpl =
-        _templateById(_selectedTemplateByDate[currentKey]) ?? scheduledTpl;
+    final persistedTpl = _templateById(session.templateId);
+    final selectedTpl = _templateById(_selectedTemplateByDate[currentKey]);
+    final activeTpl = persistedTpl ??
+        (session.templateName != null ? null : (selectedTpl ?? scheduledTpl));
+    final resolvedTplName =
+        persistedTpl?.name ?? session.templateName ?? activeTpl?.name;
     final isFuture = !_isDateEditable(currentDate);
     final blocks = session.blocks;
     final planned = session.plannedSets;
@@ -801,22 +968,32 @@ class _WorkoutPageState extends State<WorkoutPage>
         ? const <String>{}
         : inferMuscleGroups(blocks.map((b) => b.exercise));
 
-    final heroTitle = session.rested ? '今日休整' : (activeTpl?.name ?? '休息 / 恢复');
+    final heroTitle = session.rested
+        ? '今日休整'
+        : (resolvedTplName ?? (blocks.isNotEmpty ? '自由训练' : '未排计划'));
 
     void stepDate(int delta) {
-      final target = dateOnly(currentDate).add(Duration(days: delta));
+      if (_saving) return;
+      final d = dateOnly(currentDate);
+      final target = DateTime(d.year, d.month, d.day + delta);
+      if (target.isBefore(_minDate)) return;
       selectRecordDate(target);
     }
 
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     final textScaler = MediaQuery.textScalerOf(context);
     final hasProgress = !session.rested && planned > 0;
-    final row1Height = math.max(28.0, textScaler.scale(17.5) * 1.2 + 2.0);
-    final row2Height = textScaler.scale(hasProgress ? 15.0 : 12.0) * 1.3 + 2.0;
+    final futurePillHeight =
+        isFuture ? textScaler.scale(11.0) * 1.45 + 10.0 : 0.0;
+    final row1Height = math.max(
+      28.0,
+      math.max(textScaler.scale(17.5) * 1.32, futurePillHeight) + 2.0,
+    );
+    final row2Height = textScaler.scale(hasProgress ? 15.0 : 12.0) * 1.38 + 2.0;
     final progressHeight = hasProgress ? 12.0 : 0.0;
     final heroContentHeight =
         math.max(60.0, row1Height + 6.0 + row2Height + progressHeight);
-    final heroHeaderExtent = (heroContentHeight + 42.0).ceilToDouble();
+    final heroHeaderExtent = (heroContentHeight + 44.0).ceilToDouble();
 
     return Column(
       children: [
@@ -963,6 +1140,7 @@ class _WorkoutPageState extends State<WorkoutPage>
                 Row(
                   children: [
                     Expanded(
+                      flex: 3,
                       child: Text(
                         heroTitle,
                         maxLines: 1,
@@ -978,39 +1156,9 @@ class _WorkoutPageState extends State<WorkoutPage>
                     ),
                     if (isFuture) ...[
                       const SizedBox(width: 6),
-                      StatusPill(label: '未来日期预览', color: p.accent),
-                    ],
-                    if (existingSession != null &&
-                        scheduledTpl != null &&
-                        !isFuture) ...[
-                      const SizedBox(width: 6),
-                      Tooltip(
-                        message: '恢复固定模板',
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            key: const Key('restore-template'),
-                            customBorder: const CircleBorder(),
-                            onTap: _saving
-                                ? null
-                                : () => _restoreFixedTemplate(targetDate),
-                            child: Container(
-                              width: 26,
-                              height: 26,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: p.isDark
-                                    ? Colors.white.withValues(alpha: .07)
-                                    : Colors.black.withValues(alpha: .045),
-                              ),
-                              child: Icon(
-                                Icons.restart_alt_rounded,
-                                size: 14.5,
-                                color: p.textSecondary,
-                              ),
-                            ),
-                          ),
-                        ),
+                      Flexible(
+                        flex: 2,
+                        child: StatusPill(label: '未来日期预览', color: p.accent),
                       ),
                     ],
                     if (!isFuture) ...[
@@ -1112,13 +1260,14 @@ class _WorkoutPageState extends State<WorkoutPage>
                     if (!session.rested && planned > 0) ...[
                       const SizedBox(width: 8),
                       Text(
-                        '$percent%',
+                        completed >= planned ? '✓ 已完成' : '$percent%',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: completed >= planned ? 12.5 : 13,
                           height: 1.25,
                           fontWeight: FontWeight.w800,
                           fontFeatures: const [FontFeature.tabularFigures()],
-                          color: progress >= 1.0 ? p.primary : p.textPrimary,
+                          color:
+                              completed >= planned ? p.primary : p.textPrimary,
                         ),
                       ),
                     ],
@@ -1258,16 +1407,22 @@ class _WorkoutPageState extends State<WorkoutPage>
     required bool isFuture,
   }) {
     final p = context.palette;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
     final ex = block.exercise;
     final done = block.completedSets;
     final total = ex.sets;
     final allDone = total > 0 && done >= total;
-    final pr = exercisePersonalRecord(_exerciseLogs, ex.name);
+    final latestLog = _latestLogByExercise[ex.name];
+    final pr = _prByExercise[ex.name];
+    final displayWeight = latestLog ?? pr;
+    final isPrWeight = latestLog != null &&
+        pr != null &&
+        latestLog.estimated1RM >= pr.estimated1RM;
     final restSec = parseRestSeconds(ex.rest);
     final noteKey = '$dateKeyStr|${block.id}';
     final noteText = ex.note?.trim() ?? '';
-    final isNoteExpanded =
-        _expandedNotes.contains(noteKey) && noteText.isNotEmpty;
+    final hasNote = noteText.isNotEmpty;
+    final isNoteExpanded = hasNote && _expandedNotes.contains(noteKey);
 
     Widget buildSetPill(int s, {required bool expanded}) {
       final active = s < done;
@@ -1340,43 +1495,55 @@ class _WorkoutPageState extends State<WorkoutPage>
                   children: [
                     GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onTap: () => setState(() {
-                        if (!_expandedNotes.add(noteKey)) {
-                          _expandedNotes.remove(noteKey);
-                        }
-                      }),
-                      child: Text(
-                        ex.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w700,
-                          color: p.textPrimary,
-                        ),
+                      onTap: !hasNote
+                          ? null
+                          : () => setState(() {
+                                if (!_expandedNotes.add(noteKey)) {
+                                  _expandedNotes.remove(noteKey);
+                                }
+                              }),
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              ex.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.w700,
+                                color: p.textPrimary,
+                              ),
+                            ),
+                          ),
+                          if (hasNote) ...[
+                            const SizedBox(width: 3),
+                            AnimatedRotation(
+                              turns: isNoteExpanded ? 0.5 : 0.0,
+                              duration: reduceMotion
+                                  ? Duration.zero
+                                  : const Duration(milliseconds: 180),
+                              curve: Curves.easeOutCubic,
+                              child: Icon(
+                                Icons.expand_more_rounded,
+                                size: 15,
+                                color: p.textTertiary,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text(
-                          '${ex.sets} 组 × ${ex.reps}${ex.rest.isNotEmpty ? ' · 休 ${ex.rest}' : ''}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: p.textSecondary,
-                          ),
-                        ),
-                        if (pr != null)
-                          StatusPill(
-                            label: '${_fmtWeight(pr.weightKg)}kg',
-                            icon: Icons.emoji_events_rounded,
-                            color: p.warning,
-                          ),
-                      ],
+                    Text(
+                      '${ex.sets} 组 × ${ex.reps}${ex.rest.isNotEmpty ? ' · 休 ${ex.rest}' : ''}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: p.textSecondary,
+                      ),
                     ),
                     if (isNoteExpanded) ...[
                       const SizedBox(height: 6),
@@ -1452,25 +1619,31 @@ class _WorkoutPageState extends State<WorkoutPage>
                         runSpacing: 6,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          _miniActionChip(
-                            key: ValueKey('undo-set-$index'),
-                            tooltip: '撤销一组',
-                            icon: Icons.undo_rounded,
-                            label: null,
-                            color: done > 0
-                                ? p.textSecondary
-                                : p.textTertiary.withValues(alpha: .35),
-                            onTap: done > 0 && !_saving
-                                ? () => _undoSet(targetDate, index)
-                                : null,
-                            p: p,
-                          ),
+                          if (done > 0)
+                            _miniActionChip(
+                              key: ValueKey('undo-set-$index'),
+                              tooltip: '撤销一组',
+                              icon: Icons.undo_rounded,
+                              label: null,
+                              color: p.textSecondary,
+                              onTap: _saving
+                                  ? null
+                                  : () => _undoSet(targetDate, index),
+                              p: p,
+                            ),
                           _miniActionChip(
                             key: ValueKey('log-weight-$index'),
                             tooltip: '记负重',
-                            icon: Icons.monitor_weight_outlined,
-                            label: compact ? null : '负重',
-                            color: p.textSecondary,
+                            icon: isPrWeight
+                                ? Icons.emoji_events_rounded
+                                : Icons.monitor_weight_outlined,
+                            label: displayWeight != null
+                                ? '${_fmtWeight(displayWeight.weightKg)}kg'
+                                : (compact ? null : '记负重'),
+                            color: displayWeight != null
+                                ? p.warning
+                                : p.textSecondary,
+                            tinted: displayWeight != null,
                             onTap: _saving
                                 ? null
                                 : () => _logWeight(targetDate, index),
@@ -1561,6 +1734,7 @@ class _WorkoutPageState extends State<WorkoutPage>
     required Color color,
     required VoidCallback? onTap,
     required AppPalette p,
+    bool tinted = false,
   }) {
     return Tooltip(
       message: tooltip,
@@ -1574,11 +1748,18 @@ class _WorkoutPageState extends State<WorkoutPage>
             height: 34,
             padding: EdgeInsets.symmetric(horizontal: label == null ? 9 : 11),
             decoration: BoxDecoration(
-              color: p.isDark
-                  ? Colors.white.withValues(alpha: .06)
-                  : Colors.black.withValues(alpha: .04),
+              color: tinted
+                  ? color.withValues(alpha: p.isDark ? .14 : .10)
+                  : (p.isDark
+                      ? Colors.white.withValues(alpha: .06)
+                      : Colors.black.withValues(alpha: .04)),
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: p.borderSubtle, width: 0.8),
+              border: Border.all(
+                color: tinted
+                    ? color.withValues(alpha: p.isDark ? .34 : .26)
+                    : p.borderSubtle,
+                width: 0.8,
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -1591,6 +1772,7 @@ class _WorkoutPageState extends State<WorkoutPage>
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w600,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                       color: color,
                     ),
                   ),
@@ -1682,19 +1864,37 @@ class _PinnedHeroHeaderDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
+    final p = context.palette;
+    final pinned = shrinkOffset > 0.5 || overlapsContent;
     return SizedBox.expand(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
         child: Align(
           alignment: Alignment.center,
-          child: child,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: pinned
+                  ? [
+                      BoxShadow(
+                        color: Colors.black
+                            .withValues(alpha: p.isDark ? .26 : .07),
+                        blurRadius: 18,
+                        offset: const Offset(0, 7),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: child,
+          ),
         ),
       ),
     );
   }
 
   @override
-  bool shouldRebuild(covariant _PinnedHeroHeaderDelegate oldDelegate) => true;
+  bool shouldRebuild(covariant _PinnedHeroHeaderDelegate oldDelegate) =>
+      oldDelegate.extent != extent || oldDelegate.child != child;
 }
 
 class _SliverClipOverlap extends SingleChildRenderObjectWidget {
@@ -1714,12 +1914,12 @@ class _RenderSliverClipOverlap extends RenderProxySliver {
       return;
     }
     final overlap = constraints.overlap;
-    if (overlap <= 0.0) {
+    if (overlap <= 2.0) {
       layer = null;
       context.paintChild(child, offset);
       return;
     }
-    final clipTop = math.max(0.0, overlap - 2.0);
+    final clipTop = overlap - 2.0;
     final clipBottom = math.max(clipTop, constraints.remainingPaintExtent);
     layer = context.pushClipRect(
       needsCompositing,
@@ -1732,13 +1932,22 @@ class _RenderSliverClipOverlap extends RenderProxySliver {
   }
 
   @override
+  Rect? describeApproximatePaintClip(covariant RenderObject child) {
+    final overlap = constraints.overlap;
+    if (overlap <= 2.0) return super.describeApproximatePaintClip(child);
+    final clipTop = overlap - 2.0;
+    final clipBottom = math.max(clipTop, constraints.remainingPaintExtent);
+    return Rect.fromLTRB(0.0, clipTop, constraints.crossAxisExtent, clipBottom);
+  }
+
+  @override
   bool hitTestChildren(
     SliverHitTestResult result, {
     required double mainAxisPosition,
     required double crossAxisPosition,
   }) {
-    if (constraints.overlap > 0.0 &&
-        mainAxisPosition < math.max(0.0, constraints.overlap - 2.0)) {
+    if (constraints.overlap > 2.0 &&
+        mainAxisPosition < constraints.overlap - 2.0) {
       return false;
     }
     return super.hitTestChildren(

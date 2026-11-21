@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import 'ambient_background.dart';
 
 Future<String?> promptText(
   BuildContext context,
@@ -8,7 +9,7 @@ Future<String?> promptText(
   String label = '名称',
   String hint = '',
 }) =>
-    showDialog<String>(
+    showGlassDialogBuilder<String>(
       context: context,
       builder: (_) => _TextPrompt(
         title: title,
@@ -54,20 +55,19 @@ class _TextPromptState extends State<_TextPrompt> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return AlertDialog(
-      title: Text(
-        widget.title,
-        style: TextStyle(
-          fontSize: 17,
-          fontWeight: FontWeight.w800,
-          color: p.textPrimary,
-        ),
-      ),
+    return GlassDialogFrame(
+      title: widget.title,
+      icon: Icons.edit_outlined,
       content: TextField(
         controller: _controller,
         autofocus: true,
         maxLength: 60,
         textInputAction: TextInputAction.done,
+        onChanged: (value) {
+          if (_invalid && value.trim().isNotEmpty) {
+            setState(() => _invalid = false);
+          }
+        },
         onSubmitted: (_) => _submit(),
         decoration: InputDecoration(
           labelText: widget.label,
@@ -78,6 +78,7 @@ class _TextPromptState extends State<_TextPrompt> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(foregroundColor: p.textSecondary),
           child: const Text('取消'),
         ),
         FilledButton(

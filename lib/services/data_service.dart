@@ -6,9 +6,11 @@ import '../models/recomp_models.dart';
 import 'daily_workout_service.dart';
 import 'exercise_library_service.dart';
 import 'nutrition_service.dart';
+import 'rest_timer_service.dart';
+import 'workout_plan_service.dart';
 
 const int currentSchemaVersion = 3;
-const String appDataVersion = '7.1.2';
+const String appDataVersion = '7.1.3';
 const String profileKey = 'recomp_profile_v6';
 const String weightHistoryKey = 'recomp_weight_history_v6';
 const String measurementHistoryKey = 'recomp_measurements_v6';
@@ -32,34 +34,69 @@ class ImportResult {
   });
 }
 
-Future<UserProfile> loadProfile() async {
-  final preferences = await SharedPreferences.getInstance();
-  final raw = preferences.getString(profileKey);
-  if (raw == null) return UserProfile();
-  return UserProfile.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-}
-
-Future<void> saveProfile(UserProfile profile) async {
-  UserProfile.fromJson(profile.toJson());
-  final preferences = await SharedPreferences.getInstance();
-  await writeJson(preferences, profileKey, profile.toJson());
-}
-
 final _bodyWrites = Expando<Future<void>>('body writes');
-Future<T> _serializeBody<T>(Future<T> Function() action) async {
-  final prefs = await SharedPreferences.getInstance();
+Future<T> _serializeBody<T>(
+  Future<T> Function() action, {
+  SharedPreferences? preferences,
+}) async {
+  final prefs = preferences ?? await SharedPreferences.getInstance();
   final next =
       (_bodyWrites[prefs] ?? Future<void>.value()).then((_) => action());
   _bodyWrites[prefs] = next.then<void>((_) {}, onError: (Object _) {});
   return next;
 }
 
+final _exerciseLogWrites = Expando<Future<void>>('exercise log writes');
+Future<T> _serializeExerciseLogs<T>(
+  Future<T> Function() action, {
+  SharedPreferences? preferences,
+}) async {
+  final prefs = preferences ?? await SharedPreferences.getInstance();
+  final next =
+      (_exerciseLogWrites[prefs] ?? Future<void>.value()).then((_) => action());
+  _exerciseLogWrites[prefs] = next.then<void>((_) {}, onError: (Object _) {});
+  return next;
+}
+
+final _importWrites = Expando<Future<void>>('import writes');
+Future<T> _serializeImport<T>(
+  SharedPreferences prefs,
+  Future<T> Function() action,
+) {
+  final next =
+      (_importWrites[prefs] ?? Future<void>.value()).then((_) => action());
+  _importWrites[prefs] = next.then<void>((_) {}, onError: (Object _) {});
+  return next;
+}
+
+Future<UserProfile> loadProfile() async {
+  final preferences = await SharedPreferences.getInstance();
+  final pending = _bodyWrites[preferences];
+  if (pending != null) await pending;
+  final raw = preferences.getString(profileKey);
+  if (raw == null) return UserProfile();
+  final decoded = jsonDecode(raw);
+  if (decoded is! Map) throw const FormatException('个人资料格式无效');
+  return UserProfile.fromJson(Map<String, dynamic>.from(decoded));
+}
+
+Future<void> saveProfile(UserProfile profile) => _serializeBody(() async {
+      UserProfile.fromJson(profile.toJson());
+      final preferences = await SharedPreferences.getInstance();
+      await writeJson(preferences, profileKey, profile.toJson());
+    });
+
+List<WeightEntry> _readWeightHistory(SharedPreferences preferences) =>
+    _decodeStringList<WeightEntry>(
+      preferences.getString(weightHistoryKey),
+      WeightEntry.fromJson,
+    )..sort((a, b) => a.date.compareTo(b.date));
+
 Future<List<WeightEntry>> loadWeightHistory() async {
   final preferences = await SharedPreferences.getInstance();
-  return _decodeStringList<WeightEntry>(
-    preferences.getString(weightHistoryKey),
-    WeightEntry.fromJson,
-  )..sort((a, b) => a.date.compareTo(b.date));
+  final pending = _bodyWrites[preferences];
+  if (pending != null) await pending;
+  return _readWeightHistory(preferences);
 }
 
 Future<void> saveWeightHistory(List<WeightEntry> entries) =>
@@ -81,27 +118,34 @@ Future<void> _writeWeightHistory(List<WeightEntry> entries) async {
 
 Future<List<WeightEntry>> saveWeightEntry(WeightEntry entry) =>
     _serializeBody(() async {
-      final next = upsertWeightEntry(await loadWeightHistory(), entry);
+      final prefs = await SharedPreferences.getInstance();
+      final next = upsertWeightEntry(_readWeightHistory(prefs), entry);
       await _writeWeightHistory(next);
       return next;
     });
 
 Future<List<WeightEntry>> deleteWeightEntry(DateTime date) =>
     _serializeBody(() async {
+      final prefs = await SharedPreferences.getInstance();
       final day = dateOnly(date);
-      final next = (await loadWeightHistory())
+      final next = _readWeightHistory(prefs)
           .where((entry) => dateOnly(entry.date) != day)
           .toList();
       await _writeWeightHistory(next);
       return next;
     });
 
+List<BodyMeasurement> _readMeasurements(SharedPreferences preferences) =>
+    _decodeStringList<BodyMeasurement>(
+      preferences.getString(measurementHistoryKey),
+      BodyMeasurement.fromJson,
+    )..sort((a, b) => a.date.compareTo(b.date));
+
 Future<List<BodyMeasurement>> loadMeasurements() async {
   final preferences = await SharedPreferences.getInstance();
-  return _decodeStringList<BodyMeasurement>(
-    preferences.getString(measurementHistoryKey),
-    BodyMeasurement.fromJson,
-  )..sort((a, b) => a.date.compareTo(b.date));
+  final pending = _bodyWrites[preferences];
+  if (pending != null) await pending;
+  return _readMeasurements(preferences);
 }
 
 Future<void> saveMeasurements(List<BodyMeasurement> entries) =>
@@ -126,7 +170,8 @@ Future<List<BodyMeasurement>> saveMeasurement(
   bool replaceSameDay = false,
 }) =>
     _serializeBody(() async {
-      var current = await loadMeasurements();
+      final prefs = await SharedPreferences.getInstance();
+      var current = _readMeasurements(prefs);
       if (replaceSameDay) {
         final day = dateOnly(entry.date);
         current =
@@ -139,67 +184,87 @@ Future<List<BodyMeasurement>> saveMeasurement(
 
 Future<List<BodyMeasurement>> deleteMeasurement(DateTime date) =>
     _serializeBody(() async {
+      final prefs = await SharedPreferences.getInstance();
       final day = dateOnly(date);
-      final next = (await loadMeasurements())
+      final next = _readMeasurements(prefs)
           .where((entry) => dateOnly(entry.date) != day)
           .toList();
       await _writeMeasurements(next);
       return next;
     });
 
-Future<List<ExerciseLog>> loadExerciseLogs() async {
-  final preferences = await SharedPreferences.getInstance();
+List<ExerciseLog> _readExerciseLogs(SharedPreferences preferences) {
   final logs = _decodeExerciseLogs(preferences.getString(exerciseLogsKey));
   return logs..sort((a, b) => b.date.compareTo(a.date));
 }
 
-Future<void> saveExerciseLogs(List<ExerciseLog> logs) async {
+Future<List<ExerciseLog>> loadExerciseLogs() async {
   final preferences = await SharedPreferences.getInstance();
-  final unique = <String, ExerciseLog>{
-    for (final log in logs) log.identity: log,
-  };
+  final pending = _exerciseLogWrites[preferences];
+  if (pending != null) await pending;
+  return _readExerciseLogs(preferences);
+}
+
+Future<List<ExerciseLog>> _writeExerciseLogs(
+  SharedPreferences preferences,
+  List<ExerciseLog> logs,
+) async {
+  final unique = <String, ExerciseLog>{};
+  for (final log in logs) {
+    _parseExerciseLog(log.toJson());
+    unique[log.identity] = log;
+  }
   final sorted = unique.values.toList()
     ..sort((a, b) => b.date.compareTo(a.date));
-  await preferences.setString(
+  await writeJson(
+    preferences,
     exerciseLogsKey,
-    jsonEncode(sorted.map((log) => log.toJson()).toList()),
+    sorted.map((log) => log.toJson()).toList(),
   );
+  return sorted;
 }
+
+Future<void> saveExerciseLogs(List<ExerciseLog> logs) =>
+    _serializeExerciseLogs(() async {
+      final preferences = await SharedPreferences.getInstance();
+      await _writeExerciseLogs(preferences, logs);
+    });
 
 Future<List<ExerciseLog>> saveExerciseLog(
   String exerciseName,
   ExerciseLog log,
-) async {
-  final logs = await loadExerciseLogs();
-  logs.insert(
-    0,
-    ExerciseLog(
-      exerciseName: exerciseName,
-      date: log.date,
-      weightKg: log.weightKg,
-      sets: log.sets,
-      reps: log.reps,
-      rpe: log.rpe,
-    ),
-  );
-  await saveExerciseLogs(logs);
-  return loadExerciseLogs();
-}
+) =>
+    _serializeExerciseLogs(() async {
+      final preferences = await SharedPreferences.getInstance();
+      final logs = _readExerciseLogs(preferences);
+      final entry = ExerciseLog(
+        exerciseName: exerciseName,
+        date: log.date,
+        weightKg: log.weightKg,
+        sets: log.sets,
+        reps: log.reps,
+        rpe: log.rpe,
+      );
+      _parseExerciseLog(entry.toJson());
+      logs.insert(0, entry);
+      return _writeExerciseLogs(preferences, logs);
+    });
 
-Future<List<ExerciseLog>> deleteExerciseLog(ExerciseLog target) async {
-  final logs = await loadExerciseLogs();
-  var removed = false;
-  final next = <ExerciseLog>[];
-  for (final log in logs) {
-    if (!removed && log.identity == target.identity) {
-      removed = true;
-    } else {
-      next.add(log);
-    }
-  }
-  await saveExerciseLogs(next);
-  return next;
-}
+Future<List<ExerciseLog>> deleteExerciseLog(ExerciseLog target) =>
+    _serializeExerciseLogs(() async {
+      final preferences = await SharedPreferences.getInstance();
+      final logs = _readExerciseLogs(preferences);
+      var removed = false;
+      final next = <ExerciseLog>[];
+      for (final log in logs) {
+        if (!removed && log.identity == target.identity) {
+          removed = true;
+        } else {
+          next.add(log);
+        }
+      }
+      return _writeExerciseLogs(preferences, next);
+    });
 
 List<ExerciseLog> exerciseHistory(
   Iterable<ExerciseLog> logs,
@@ -237,8 +302,7 @@ Map<String, dynamic> _supportedPreferences(SharedPreferences preferences) {
   return values;
 }
 
-Future<String> exportAllData({SharedPreferences? preferences}) async {
-  final prefs = preferences ?? await SharedPreferences.getInstance();
+String _exportPreferencesJson(SharedPreferences prefs) {
   final data = {
     'schemaVersion': currentSchemaVersion,
     'appVersion': appDataVersion,
@@ -246,6 +310,18 @@ Future<String> exportAllData({SharedPreferences? preferences}) async {
     'preferences': _supportedPreferences(prefs),
   };
   return const JsonEncoder.withIndent('  ').convert(data);
+}
+
+Future<String> exportAllData({SharedPreferences? preferences}) async {
+  final prefs = preferences ?? await SharedPreferences.getInstance();
+  final pendingImport = _importWrites[prefs];
+  if (pendingImport != null) await pendingImport;
+  await awaitPendingWorkoutWrites(prefs);
+  final pendingBody = _bodyWrites[prefs];
+  if (pendingBody != null) await pendingBody;
+  final pendingLogs = _exerciseLogWrites[prefs];
+  if (pendingLogs != null) await pendingLogs;
+  return _exportPreferencesJson(prefs);
 }
 
 /// Validates v6.7 backups and migrates the legacy v6.6 object layout in memory.
@@ -336,37 +412,83 @@ Map<String, dynamic> _migrateLegacyBackup(Map<String, dynamic> legacy) {
 
 void _validateKnownPayloads(Map<String, dynamic> preferences) {
   try {
-    decodeDailyWorkouts(preferences[dailyWorkoutsKey] as String?);
-    decodeWorkoutTemplates(preferences[workoutTemplatesKey] as String?);
-    decodeWeeklySchedule(preferences[weeklyScheduleKey] as String?);
-    decodeExerciseLibrary(preferences[exerciseLibraryKey] as String?);
-    decodeMeals(preferences[mealsKey] as String?);
+    String? requireString(String key) {
+      if (!preferences.containsKey(key)) return null;
+      final value = preferences[key];
+      if (value is! String) throw FormatException('$key 必须是字符串');
+      return value;
+    }
+
+    decodeDailyWorkouts(requireString(dailyWorkoutsKey));
+    decodeWorkoutTemplates(requireString(workoutTemplatesKey));
+    decodeWeeklySchedule(requireString(weeklyScheduleKey));
+    decodeExerciseLibrary(requireString(exerciseLibraryKey));
+    decodeMeals(requireString(mealsKey));
+
     final theme = preferences['recomp_theme_v6'];
-    if (theme != null && theme is! int) {
+    if (theme != null && (theme is! int || theme < 0)) {
       throw const FormatException('主题设置格式无效');
     }
-    final profile = preferences[profileKey];
-    if (profile != null) {
-      UserProfile.fromJson(
-        Map<String, dynamic>.from(jsonDecode(profile as String) as Map),
-      );
+
+    final autoRest = preferences[autoRestTimerKey];
+    if (autoRest != null && autoRest is! bool) {
+      throw const FormatException('自动休息计时设置格式无效');
     }
+
+    final doneRaw = requireString('recomp_done_v6');
+    if (doneRaw != null && jsonDecode(doneRaw) is! Map) {
+      throw const FormatException('旧版训练进度格式无效');
+    }
+
+    final doneWeek = preferences['recomp_done_v6_week'];
+    if (doneWeek != null &&
+        (doneWeek is! int || doneWeek < 1 || doneWeek > 53)) {
+      throw const FormatException('旧版训练周数格式无效');
+    }
+
+    final doneYear = preferences['recomp_done_v6_year'];
+    if (doneYear != null &&
+        (doneYear is! int || doneYear < 1970 || doneYear > 9999)) {
+      throw const FormatException('旧版训练年份格式无效');
+    }
+
+    final planRaw = requireString(workoutPlanKey);
+    if (planRaw != null && jsonDecode(planRaw) is! List) {
+      throw const FormatException('旧版训练计划格式无效');
+    }
+
+    final profileRaw = requireString(profileKey);
+    if (profileRaw != null) {
+      final decodedProfile = jsonDecode(profileRaw);
+      if (decodedProfile is! Map) {
+        throw const FormatException('个人资料格式无效');
+      }
+      UserProfile.fromJson(Map<String, dynamic>.from(decodedProfile));
+    }
+
     _decodeStringList<WeightEntry>(
-      preferences[weightHistoryKey] as String?,
+      requireString(weightHistoryKey),
       WeightEntry.fromJson,
     );
     _decodeStringList<BodyMeasurement>(
-      preferences[measurementHistoryKey] as String?,
+      requireString(measurementHistoryKey),
       BodyMeasurement.fromJson,
     );
-    _decodeExerciseLogs(preferences[exerciseLogsKey] as String?);
+    _decodeExerciseLogs(requireString(exerciseLogsKey));
+
     for (final entry in preferences.entries) {
       if (_monthHistoryKey.hasMatch(entry.key)) {
+        if (entry.value is! String) {
+          throw FormatException('${entry.key} 必须是字符串');
+        }
         final history = jsonDecode(entry.value as String);
-        if (history is! Map) throw const FormatException();
+        if (history is! Map) throw const FormatException('月度历史格式无效');
         for (final item in history.entries) {
-          if (int.tryParse(item.key.toString()) == null || item.value is! num) {
-            throw const FormatException();
+          final count = item.value;
+          if (int.tryParse(item.key.toString()) == null ||
+              count is! num ||
+              !count.isFinite) {
+            throw const FormatException('月度历史条目无效');
           }
         }
       }
@@ -380,16 +502,47 @@ Future<ImportResult> importAllData(
   String jsonString, {
   ImportMode mode = ImportMode.merge,
   SharedPreferences? preferences,
+  bool savePreImportBackup = true,
 }) async {
   final prefs = preferences ?? await SharedPreferences.getInstance();
   final data = validateBackup(jsonString);
-  final incoming = Map<String, dynamic>.from(data['preferences'] as Map);
-  final backup = await exportAllData(preferences: prefs);
-  await prefs.setString(lastImportBackupKey, backup);
-  await prefs.setString(
-    lastImportBackupDateKey,
-    DateTime.now().toIso8601String(),
+  return _serializeImport(
+    prefs,
+    () => runSerializedWorkoutWrite(
+      () => _serializeBody(
+        () => _serializeExerciseLogs(
+          () => _applyImport(
+            prefs,
+            data,
+            mode: mode,
+            savePreImportBackup: savePreImportBackup,
+          ),
+          preferences: prefs,
+        ),
+        preferences: prefs,
+      ),
+      preferences: prefs,
+    ),
   );
+}
+
+Future<ImportResult> _applyImport(
+  SharedPreferences prefs,
+  Map<String, dynamic> data, {
+  required ImportMode mode,
+  required bool savePreImportBackup,
+}) async {
+  final incoming = Map<String, dynamic>.from(data['preferences'] as Map);
+  final backup = _exportPreferencesJson(prefs);
+  if (savePreImportBackup) {
+    if (!await prefs.setString(lastImportBackupKey, backup) ||
+        !await prefs.setString(
+          lastImportBackupDateKey,
+          DateTime.now().toIso8601String(),
+        )) {
+      throw StateError('导入前快照保存失败，请重试');
+    }
+  }
 
   if (mode == ImportMode.overwrite) {
     final keysToRemove = prefs
@@ -410,8 +563,10 @@ Future<ImportResult> importAllData(
     final key = entry.key;
     final value = entry.value;
     if (mode == ImportMode.merge && key == dailyWorkoutsKey) {
-      await prefs.setString(
-          key, mergeDailyWorkouts(prefs.getString(key), value as String));
+      final merged = mergeDailyWorkouts(prefs.getString(key), value as String);
+      if (!await prefs.setString(key, merged)) {
+        throw StateError('保存失败，请重试');
+      }
     } else if (mode == ImportMode.merge && key == mealsKey) {
       final meals = {
         ...decodeMeals(prefs.getString(key)),
@@ -427,8 +582,11 @@ Future<ImportResult> importAllData(
       await writeJson(
           prefs, key, templates.values.map((t) => t.toJson()).toList());
     } else if (mode == ImportMode.merge && key == exerciseLibraryKey) {
-      await prefs.setString(
-          key, mergeExerciseLibrary(prefs.getString(key), value as String));
+      final merged =
+          mergeExerciseLibrary(prefs.getString(key), value as String);
+      if (!await prefs.setString(key, merged)) {
+        throw StateError('保存失败，请重试');
+      }
     } else if (mode == ImportMode.merge && key == weightHistoryKey) {
       await _mergeWeightHistory(prefs, value);
     } else if (mode == ImportMode.merge && key == measurementHistoryKey) {
@@ -443,6 +601,38 @@ Future<ImportResult> importAllData(
       await _writeValue(prefs, key, value);
     }
   }
+
+  // When merging a legacy v6.6 backup into an installation that already has
+  // dated daily workouts, fold the legacy week into dailyWorkoutsKey without
+  // overwriting existing sessions.
+  if (mode == ImportMode.merge &&
+      !incoming.containsKey(dailyWorkoutsKey) &&
+      incoming.containsKey('recomp_done_v6') &&
+      prefs.containsKey(dailyWorkoutsKey)) {
+    final legacyYear = (incoming['recomp_done_v6_year'] as int?) ??
+        prefs.getInt('recomp_done_v6_year');
+    final legacyWeek = (incoming['recomp_done_v6_week'] as int?) ??
+        prefs.getInt('recomp_done_v6_week');
+    final migrated = await migrateLegacyDoneToDailyWorkouts(
+      prefs,
+      year: legacyYear,
+      week: legacyWeek,
+      rawDone: incoming['recomp_done_v6'] as String?,
+    );
+    if (migrated.isNotEmpty) {
+      final incomingDailyRaw = jsonEncode({
+        for (final e in migrated.entries) e.key: e.value.toJson(),
+      });
+      final mergedDaily = mergeDailyWorkouts(
+        prefs.getString(dailyWorkoutsKey),
+        incomingDailyRaw,
+      );
+      if (!await prefs.setString(dailyWorkoutsKey, mergedDaily)) {
+        throw StateError('保存失败，请重试');
+      }
+    }
+  }
+
   return ImportResult(
     importedKeys: incoming.length,
     backupJson: backup,
@@ -461,7 +651,12 @@ Future<ImportResult?> restoreLastImportBackup({
   final prefs = preferences ?? await SharedPreferences.getInstance();
   final backup = prefs.getString(lastImportBackupKey);
   if (backup == null) return null;
-  return importAllData(backup, mode: ImportMode.overwrite, preferences: prefs);
+  return importAllData(
+    backup,
+    mode: ImportMode.overwrite,
+    preferences: prefs,
+    savePreImportBackup: false,
+  );
 }
 
 Future<void> _mergeWeightHistory(
@@ -480,9 +675,10 @@ Future<void> _mergeWeightHistory(
   for (final entry in incoming) {
     merged = upsertWeightEntry(merged, entry);
   }
-  await preferences.setString(
+  await writeJson(
+    preferences,
     weightHistoryKey,
-    jsonEncode(merged.map((entry) => entry.toJson()).toList()),
+    merged.map((entry) => entry.toJson()).toList(),
   );
 }
 
@@ -502,9 +698,10 @@ Future<void> _mergeMeasurements(
   for (final entry in incoming) {
     merged = upsertMeasurement(merged, entry);
   }
-  await preferences.setString(
+  await writeJson(
+    preferences,
     measurementHistoryKey,
-    jsonEncode(merged.map((entry) => entry.toJson()).toList()),
+    merged.map((entry) => entry.toJson()).toList(),
   );
 }
 
@@ -514,15 +711,7 @@ Future<void> _mergeExerciseLogs(
 ) async {
   final current = _decodeExerciseLogs(preferences.getString(exerciseLogsKey));
   final incoming = _decodeExerciseLogs(incomingRaw as String?);
-  final unique = <String, ExerciseLog>{
-    for (final log in [...current, ...incoming]) log.identity: log,
-  };
-  final sorted = unique.values.toList()
-    ..sort((a, b) => b.date.compareTo(a.date));
-  await preferences.setString(
-    exerciseLogsKey,
-    jsonEncode(sorted.map((log) => log.toJson()).toList()),
-  );
+  await _writeExerciseLogs(preferences, [...current, ...incoming]);
 }
 
 Future<void> _mergeMonthHistory(
@@ -532,7 +721,7 @@ Future<void> _mergeMonthHistory(
 ) async {
   final current = _decodeJsonMap(preferences.getString(key));
   final incoming = _decodeJsonMap(incomingRaw as String?);
-  await preferences.setString(key, jsonEncode({...current, ...incoming}));
+  await writeJson(preferences, key, {...current, ...incoming});
 }
 
 Future<void> _mergeWorkoutDone(
@@ -541,15 +730,14 @@ Future<void> _mergeWorkoutDone(
 ) async {
   final current = _decodeJsonMap(preferences.getString('recomp_done_v6'));
   final incoming = _decodeJsonMap(incomingRaw as String?);
-  await preferences.setString(
-    'recomp_done_v6',
-    jsonEncode({...current, ...incoming}),
-  );
+  await writeJson(preferences, 'recomp_done_v6', {...current, ...incoming});
 }
 
 Map<String, dynamic> _decodeJsonMap(String? raw) {
   if (raw == null || raw.isEmpty) return {};
-  return Map<String, dynamic>.from(jsonDecode(raw) as Map);
+  final decoded = jsonDecode(raw);
+  if (decoded is! Map) throw const FormatException('数据必须是 JSON 对象');
+  return Map<String, dynamic>.from(decoded);
 }
 
 List<T> _decodeStringList<T>(
@@ -557,33 +745,52 @@ List<T> _decodeStringList<T>(
   T Function(Map<String, dynamic>) fromJson,
 ) {
   if (raw == null || raw.isEmpty) return [];
-  final decoded = jsonDecode(raw) as List<dynamic>;
-  return decoded
-      .map((item) => fromJson(Map<String, dynamic>.from(item as Map)))
-      .toList();
+  final decoded = jsonDecode(raw);
+  if (decoded is! List) throw const FormatException('数据必须是 JSON 数组');
+  return decoded.map((item) {
+    if (item is! Map) throw const FormatException('列表条目必须是 JSON 对象');
+    return fromJson(Map<String, dynamic>.from(item));
+  }).toList();
+}
+
+ExerciseLog _parseExerciseLog(Map<String, dynamic> json) {
+  final name = json['e'];
+  if (name is! String || name.trim().isEmpty) {
+    throw const FormatException('负重记录动作名称无效');
+  }
+  final rawDate = json['d'];
+  if (rawDate != null &&
+      (rawDate is! String || DateTime.tryParse(rawDate) == null)) {
+    throw const FormatException('负重记录日期无效');
+  }
+  for (final key in const ['w', 's', 'r', 'rpe']) {
+    final value = json[key];
+    if (value != null &&
+        (value is! num || !value.toDouble().isFinite || value < 0)) {
+      throw const FormatException('负重记录数值无效');
+    }
+  }
+  return ExerciseLog.fromJson(json);
 }
 
 List<ExerciseLog> _decodeExerciseLogs(String? raw) {
   if (raw == null || raw.isEmpty) return [];
-  try {
-    final decoded = jsonDecode(raw);
-    if (decoded is List) {
-      return decoded
-          .map(
-            (item) =>
-                ExerciseLog.fromJson(Map<String, dynamic>.from(item as Map)),
-          )
-          .toList();
-    }
-    if (decoded is Map) {
-      return decoded.entries.map((entry) {
-        final json = Map<String, dynamic>.from(entry.value as Map);
-        json['e'] ??= entry.key;
-        return ExerciseLog.fromJson(json);
-      }).toList();
-    }
-  } catch (_) {}
-  return [];
+  final decoded = jsonDecode(raw);
+  if (decoded is List) {
+    return decoded.map((item) {
+      if (item is! Map) throw const FormatException('负重记录条目无效');
+      return _parseExerciseLog(Map<String, dynamic>.from(item));
+    }).toList();
+  }
+  if (decoded is Map) {
+    return decoded.entries.map((entry) {
+      if (entry.value is! Map) throw const FormatException('负重记录条目无效');
+      final json = Map<String, dynamic>.from(entry.value as Map);
+      json['e'] ??= entry.key.toString();
+      return _parseExerciseLog(json);
+    }).toList();
+  }
+  throw const FormatException('负重记录格式无效');
 }
 
 Future<void> _writeValue(
@@ -591,17 +798,21 @@ Future<void> _writeValue(
   String key,
   dynamic value,
 ) async {
+  final bool ok;
   if (value is String) {
-    await preferences.setString(key, value);
+    ok = await preferences.setString(key, value);
   } else if (value is bool) {
-    await preferences.setBool(key, value);
+    ok = await preferences.setBool(key, value);
   } else if (value is int) {
-    await preferences.setInt(key, value);
+    ok = await preferences.setInt(key, value);
   } else if (value is double) {
-    await preferences.setDouble(key, value);
+    ok = await preferences.setDouble(key, value);
   } else if (value is List) {
-    await preferences.setStringList(key, value.cast<String>());
+    ok = await preferences.setStringList(key, value.cast<String>());
   } else {
     throw FormatException('字段 $key 类型不受支持');
+  }
+  if (!ok) {
+    throw StateError('保存失败，请重试');
   }
 }

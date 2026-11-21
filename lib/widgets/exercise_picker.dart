@@ -9,6 +9,7 @@ import '../models/recomp_models.dart';
 import '../services/app_signals.dart';
 import '../services/exercise_library_service.dart';
 import '../theme/app_theme.dart';
+import 'ambient_background.dart';
 import 'exercise_editor.dart';
 import 'exercise_mark.dart';
 
@@ -52,6 +53,7 @@ class _ExercisePickerState extends State<_ExercisePicker> {
   late int _source = widget.templates.isEmpty ? 1 : widget.initialSource;
   final _tabs = [0, 0];
   String _query = '';
+  String? _errorMessage;
   final _searchController = TextEditingController();
   final _searchFocus = FocusNode();
   final _searchKey = GlobalKey();
@@ -190,12 +192,11 @@ class _ExercisePickerState extends State<_ExercisePicker> {
             .indexWhere((group) => group.name == created.category);
         if (catIndex >= 0) _tabs[1] = catIndex;
         _selected[_identity(created.exercise)] = created.exercise;
+        _errorMessage = null;
       });
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('新增动作保存失败，请重试')),
-      );
+      setState(() => _errorMessage = '新增动作保存失败，请重试');
     }
   }
 
@@ -213,7 +214,7 @@ class _ExercisePickerState extends State<_ExercisePicker> {
         media.size.height - keyboard - media.padding.top,
       ),
     );
-    final short = height < (compact ? 240 : 340) + (scale - 1) * 60;
+    final short = height < (compact ? 240 : 360) + (scale - 1) * 240;
     final items = _visibleItems();
     final allSelected = items.isNotEmpty &&
         items.every((item) => _selected.containsKey(item.id));
@@ -244,6 +245,8 @@ class _ExercisePickerState extends State<_ExercisePicker> {
                   children: [
                     Text(
                       '添加训练项目',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -252,6 +255,8 @@ class _ExercisePickerState extends State<_ExercisePicker> {
                     ),
                     Text(
                       '${_selected.length} 项已选',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 11.5, color: p.textSecondary),
                     ),
                   ],
@@ -339,10 +344,15 @@ class _ExercisePickerState extends State<_ExercisePicker> {
                       onTap: () => _switchSource(source),
                       borderRadius: BorderRadius.circular(11),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 9),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 9,
+                        ),
                         decoration: BoxDecoration(
                           color: _source == source
-                              ? p.surfaceElevated
+                              ? p.primary.withValues(
+                                  alpha: p.isDark ? .20 : .14,
+                                )
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(11),
                           border: _source == source
@@ -353,6 +363,8 @@ class _ExercisePickerState extends State<_ExercisePicker> {
                           source == 0
                               ? '参考模板 (${widget.templates.length})'
                               : '动作库 · ${_libraryItems.length}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 12,
@@ -393,71 +405,95 @@ class _ExercisePickerState extends State<_ExercisePicker> {
       ],
       Padding(
         padding: const EdgeInsets.fromLTRB(20, 4, 14, 4),
-        child: Row(
+        child: Wrap(
+          spacing: 4,
+          runSpacing: 2,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          alignment: WrapAlignment.spaceBetween,
           children: [
-            Expanded(
-              child: Text(
-                '${items.length} 个动作${_query.isNotEmpty ? ' · 搜索结果' : ''}',
-                style: TextStyle(fontSize: 11.5, color: p.textSecondary),
-              ),
+            Text(
+              '${items.length} 个动作${_query.isNotEmpty ? ' · 搜索结果' : ''}',
+              style: TextStyle(fontSize: 11.5, color: p.textSecondary),
             ),
-            if (!compact && _query.isEmpty && template?.note.isNotEmpty == true)
-              IconButton(
-                tooltip: '查看模板说明',
-                onPressed: () => showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: Text(template!.name),
-                    content: Text(template.note),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('知道了'),
-                      ),
-                    ],
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!compact &&
+                    _query.isEmpty &&
+                    template?.note.isNotEmpty == true)
+                  IconButton(
+                    tooltip: '查看模板说明',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => showGlassConfirm(
+                      context: context,
+                      title: template!.name,
+                      message: template.note,
+                      icon: Icons.info_outline_rounded,
+                      cancelLabel: null,
+                      confirmLabel: '知道了',
+                    ),
+                    icon: Icon(
+                      Icons.info_outline_rounded,
+                      size: 17,
+                      color: p.textSecondary,
+                    ),
+                  ),
+                TextButton(
+                  key: const Key('toggle-visible-selection'),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  onPressed: items.isEmpty
+                      ? null
+                      : () => setState(() {
+                            for (final item in items) {
+                              if (allSelected) {
+                                _selected.remove(item.id);
+                              } else {
+                                _selected[item.id] = item.exercise;
+                              }
+                            }
+                          }),
+                  child: Text(
+                    allSelected ? '取消全选' : '全选',
+                    style: const TextStyle(fontSize: 12),
                   ),
                 ),
-                icon: Icon(
-                  Icons.info_outline_rounded,
-                  size: 17,
-                  color: p.textSecondary,
+                TextButton(
+                  key: const Key('clear-picked-exercises'),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  onPressed: _selected.isEmpty
+                      ? null
+                      : () => setState(_selected.clear),
+                  child: Text(
+                    '清空',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _selected.isEmpty
+                          ? p.textTertiary.withValues(alpha: .4)
+                          : p.textSecondary,
+                    ),
+                  ),
                 ),
-              ),
-            TextButton(
-              key: const Key('toggle-visible-selection'),
-              onPressed: items.isEmpty
-                  ? null
-                  : () => setState(() {
-                        for (final item in items) {
-                          if (allSelected) {
-                            _selected.remove(item.id);
-                          } else {
-                            _selected[item.id] = item.exercise;
-                          }
-                        }
-                      }),
-              child: Text(
-                allSelected ? '取消全选' : '全选',
-                style: const TextStyle(fontSize: 12),
-              ),
-            ),
-            TextButton(
-              key: const Key('clear-picked-exercises'),
-              onPressed:
-                  _selected.isEmpty ? null : () => setState(_selected.clear),
-              child: Text(
-                '清空',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: _selected.isEmpty
-                      ? p.textTertiary.withValues(alpha: .4)
-                      : p.textSecondary,
-                ),
-              ),
+              ],
             ),
           ],
         ),
       ),
+      if (_errorMessage != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+          child: Text(
+            _errorMessage!,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: p.danger,
+            ),
+          ),
+        ),
     ];
 
     final footer = SafeArea(
@@ -506,6 +542,19 @@ class _ExercisePickerState extends State<_ExercisePicker> {
       ),
     );
 
+    final tileTitleH = media.textScaler.scale(13.5) * 1.45 * 2;
+    final tileSubH = media.textScaler.scale(11.5) * 1.45;
+    final gridExtent = math.max(142.0, 90.0 + tileTitleH + tileSubH);
+    final glassTop = p.isDark
+        ? Color.alphaBlend(
+            Colors.white.withValues(alpha: .06),
+            p.surfaceElevated.withValues(alpha: .84),
+          )
+        : Colors.white.withValues(alpha: .86);
+    final glassBottom = p.isDark
+        ? p.canvas.withValues(alpha: .92)
+        : p.surfaceElevated.withValues(alpha: .80);
+
     final results = items.isEmpty
         ? Center(child: empty)
         : compact
@@ -525,7 +574,7 @@ class _ExercisePickerState extends State<_ExercisePicker> {
                   crossAxisCount: 2,
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
-                  mainAxisExtent: math.max(140, 84 + 56 * scale),
+                  mainAxisExtent: gridExtent,
                 ),
                 itemCount: items.length,
                 itemBuilder: (_, index) => _itemTile(items[index]),
@@ -542,48 +591,55 @@ class _ExercisePickerState extends State<_ExercisePicker> {
             borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-              child: Material(
-                color: p.isDark
-                    ? p.surfaceElevated.withValues(alpha: .82)
-                    : Colors.white.withValues(alpha: .84),
-                shape: RoundedRectangleBorder(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [glassTop, glassBottom],
+                  ),
                   borderRadius:
                       const BorderRadius.vertical(top: Radius.circular(28)),
-                  side: BorderSide(
-                      color: p.glassRimBright.withValues(alpha: .52)),
+                  border: Border.all(
+                    color: p.glassRimBright.withValues(alpha: .54),
+                    width: 1.05,
+                  ),
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: SizedBox(
-                  height: height,
-                  child: Column(
-                    children: [
-                      if (!short) ...controls,
-                      Expanded(
-                        child: short
-                            ? CustomScrollView(
-                                key: const ValueKey('picker-compact-scroll'),
-                                controller: _scroll,
-                                slivers: [
-                                  SliverList.list(children: controls),
-                                  if (items.isEmpty)
-                                    SliverToBoxAdapter(child: empty)
-                                  else
-                                    SliverPadding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 20),
-                                      sliver: SliverList.builder(
-                                        itemCount: items.length,
-                                        itemBuilder: (_, index) => _itemTile(
-                                            items[index],
-                                            compact: true),
+                child: Material(
+                  color: Colors.transparent,
+                  clipBehavior: Clip.antiAlias,
+                  child: SizedBox(
+                    height: height,
+                    child: Column(
+                      children: [
+                        if (!short) ...controls,
+                        Expanded(
+                          child: short
+                              ? CustomScrollView(
+                                  key: const ValueKey('picker-compact-scroll'),
+                                  controller: _scroll,
+                                  slivers: [
+                                    SliverList.list(children: controls),
+                                    if (items.isEmpty)
+                                      SliverToBoxAdapter(child: empty)
+                                    else
+                                      SliverPadding(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 20),
+                                        sliver: SliverList.builder(
+                                          itemCount: items.length,
+                                          itemBuilder: (_, index) => _itemTile(
+                                              items[index],
+                                              compact: true),
+                                        ),
                                       ),
-                                    ),
-                                ],
-                              )
-                            : results,
-                      ),
-                      footer,
-                    ],
+                                  ],
+                                )
+                              : results,
+                        ),
+                        footer,
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -615,7 +671,7 @@ class _ExercisePickerState extends State<_ExercisePicker> {
     );
     final subtitle = Text(
       '${exercise.sets} 组 × ${exercise.reps}',
-      maxLines: 2,
+      maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(fontSize: 11.5, color: p.textSecondary),
     );
@@ -626,58 +682,68 @@ class _ExercisePickerState extends State<_ExercisePicker> {
         selected: selected,
         button: true,
         child: Material(
-          color: selected
-              ? p.primary.withValues(alpha: p.isDark ? .12 : .06)
-              : p.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-            side: BorderSide(
-              color: selected ? p.borderHighlight : p.borderSubtle,
-              width: selected ? 1.3 : 1.0,
+          color: Colors.transparent,
+          child: Ink(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: selected
+                    ? [
+                        p.primary.withValues(alpha: p.isDark ? .20 : .14),
+                        p.accent.withValues(alpha: p.isDark ? .08 : .05),
+                      ]
+                    : [p.glassFillTop, p.glassFillBottom],
+              ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: selected ? p.borderHighlight : p.borderSubtle,
+                width: selected ? 1.3 : 1.0,
+              ),
             ),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            key: ValueKey(item.widgetKey),
-            onTap: () => _toggle(item),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: compact
-                  ? Row(
-                      children: [
-                        ExerciseMark(exercise.name, size: 38),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
+            child: InkWell(
+              key: ValueKey(item.widgetKey),
+              borderRadius: BorderRadius.circular(18),
+              onTap: () => _toggle(item),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: compact
+                    ? Row(
+                        children: [
+                          ExerciseMark(exercise.name, size: 38),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                title,
+                                const SizedBox(height: 3),
+                                subtitle,
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          check,
+                        ],
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              title,
-                              const SizedBox(height: 3),
-                              subtitle,
+                              ExerciseMark(exercise.name, size: 46),
+                              const Spacer(),
+                              check,
                             ],
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        check,
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            ExerciseMark(exercise.name, size: 46),
-                            const Spacer(),
-                            check,
-                          ],
-                        ),
-                        const Spacer(),
-                        title,
-                        const SizedBox(height: 4),
-                        subtitle,
-                      ],
-                    ),
+                          const Spacer(),
+                          title,
+                          const SizedBox(height: 4),
+                          subtitle,
+                        ],
+                      ),
+              ),
             ),
           ),
         ),

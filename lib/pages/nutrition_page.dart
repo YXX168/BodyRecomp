@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import '../models/daily_workout.dart';
 import '../services/app_signals.dart';
 import '../services/nutrition_service.dart';
@@ -28,18 +31,40 @@ class _NutritionPageState extends State<NutritionPage>
   String? _error;
   bool _busy = false;
   int _generation = 0;
+  bool _loadScheduled = false;
+  bool _ignoringSignals = false;
 
   @override
   void initState() {
     super.initState();
-    workoutDataRevision.addListener(_load);
+    nutritionRevision.addListener(_onRevisionChanged);
+    workoutDataRevision.addListener(_onRevisionChanged);
     _load();
   }
 
   @override
   void dispose() {
-    workoutDataRevision.removeListener(_load);
+    nutritionRevision.removeListener(_onRevisionChanged);
+    workoutDataRevision.removeListener(_onRevisionChanged);
     super.dispose();
+  }
+
+  void _onRevisionChanged() {
+    if (_ignoringSignals || _loadScheduled) return;
+    _loadScheduled = true;
+    scheduleMicrotask(() {
+      _loadScheduled = false;
+      if (mounted) _load();
+    });
+  }
+
+  void _emitSilent(VoidCallback notify) {
+    _ignoringSignals = true;
+    try {
+      notify();
+    } finally {
+      _ignoringSignals = false;
+    }
   }
 
   Future<void> _load() async {
@@ -89,6 +114,7 @@ class _NutritionPageState extends State<NutritionPage>
           _meals![id] = result.entry!;
         }
       });
+      _emitSilent(() => nutritionRevision.value++);
       if (result.entry == null && before != null) {
         showUndoNotice(context, '已清除此餐记录', onUndo: () async {
           // An old undo must never replace a later record of this meal.
@@ -96,12 +122,11 @@ class _NutritionPageState extends State<NutritionPage>
           setState(() => _busy = true);
           try {
             await saveMealEntry(id, before);
+            _emitSilent(() => nutritionRevision.value++);
             await _load();
           } catch (_) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('恢复失败，请重试')),
-              );
+              showGlassNotice(context, '恢复失败，请重试', isError: true);
             }
           } finally {
             if (mounted) setState(() => _busy = false);
@@ -110,9 +135,7 @@ class _NutritionPageState extends State<NutritionPage>
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('保存失败，请重试')),
-        );
+        showGlassNotice(context, '保存失败，请重试', isError: true);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -130,6 +153,7 @@ class _NutritionPageState extends State<NutritionPage>
 
     setState(() => _busy = true);
     _generation++;
+    var copiedCount = 0;
     try {
       for (final meal in prevMeals) {
         final copied = MealEntry(
@@ -141,17 +165,33 @@ class _NutritionPageState extends State<NutritionPage>
         );
         await saveMealEntry(copied.id, copied);
         _meals![copied.id] = copied;
+        copiedCount++;
       }
+      _emitSilent(() => nutritionRevision.value++);
       if (mounted) {
         setState(() {});
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('已沿用前一天 ${prevMeals.length} 餐记录')),
-        );
+        showGlassNotice(context, '已沿用前一天 ${prevMeals.length} 餐记录');
       }
     } catch (_) {
+      if (copiedCount > 0) {
+        _emitSilent(() => nutritionRevision.value++);
+      }
+      try {
+        final fresh = await loadMeals();
+        if (mounted) {
+          setState(() {
+            _meals = fresh;
+            _error = null;
+          });
+        }
+      } catch (_) {
+        if (mounted) setState(() {});
+      }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('复制失败，请重试')),
+        showGlassNotice(
+          context,
+          copiedCount > 0 ? '部分餐次复制失败，已同步写入 $copiedCount 餐' : '复制失败，请重试',
+          isError: true,
         );
       }
     } finally {
@@ -226,16 +266,20 @@ class _NutritionPageState extends State<NutritionPage>
         ),
         Expanded(
           child: HorizontalDaySwipe(
-            onPrevious: () {
-              final prev = DateTime(
-                  recordDate.year, recordDate.month, recordDate.day - 1);
-              if (!prev.isBefore(DateTime(2000))) selectRecordDate(prev);
-            },
-            onNext: () {
-              final next = DateTime(
-                  recordDate.year, recordDate.month, recordDate.day + 1);
-              if (!next.isAfter(today)) selectRecordDate(next);
-            },
+            onPrevious: _busy
+                ? null
+                : () {
+                    final prev = DateTime(
+                        recordDate.year, recordDate.month, recordDate.day - 1);
+                    if (!prev.isBefore(DateTime(2000))) selectRecordDate(prev);
+                  },
+            onNext: _busy
+                ? null
+                : () {
+                    final next = DateTime(
+                        recordDate.year, recordDate.month, recordDate.day + 1);
+                    if (!next.isAfter(today)) selectRecordDate(next);
+                  },
             child: ListView(
               key: PageStorageKey('nutrition-scroll-$currentDateKey'),
               padding: const EdgeInsets.fromLTRB(18, 4, 18, 110),
@@ -265,14 +309,14 @@ class _NutritionPageState extends State<NutritionPage>
                                     IconButton(
                                       tooltip: '营养汇总说明',
                                       visualDensity: VisualDensity.compact,
-                                      onPressed: () => showDialog(
+                                      onPressed: () => showGlassConfirm(
                                         context: context,
-                                        builder: (context) => const AlertDialog(
-                                          title: Text('营养汇总'),
-                                          content: Text(
+                                        title: '营养汇总',
+                                        message:
                                             '仅汇总手动填写的热量和蛋白质。未填写的餐次不参与计算，也不等于零摄入。',
-                                          ),
-                                        ),
+                                        icon: Icons.info_outline_rounded,
+                                        cancelLabel: null,
+                                        confirmLabel: '知道了',
                                       ),
                                       icon: Icon(
                                         Icons.info_outline_rounded,
@@ -297,7 +341,7 @@ class _NutritionPageState extends State<NutritionPage>
                                                 .toStringAsFixed(0),
                                         label: '已填热量',
                                         unit: 'kcal',
-                                        color: const Color(0xFFFBBF24),
+                                        color: p.warning,
                                         p: p,
                                       ),
                                     ),
@@ -472,7 +516,7 @@ class _NutritionPageState extends State<NutritionPage>
                                             StatusPill(
                                               label:
                                                   '${meal.calories!.toStringAsFixed(0)} kcal',
-                                              color: const Color(0xFFFBBF24),
+                                              color: p.warning,
                                             ),
                                           if (meal.protein != null)
                                             StatusPill(
@@ -657,22 +701,13 @@ class _MealEditorState extends State<_MealEditor> {
                   TextButton(
                     onPressed: () async {
                       if (_actual.text.trim().isNotEmpty) {
-                        final replace = await showDialog<bool>(
+                        final replace = await showGlassConfirm(
                           context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('替换已填写的饮食？'),
-                            content: const Text('填入参考后，还可以按实际情况修改。'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx, false),
-                                child: const Text('保留原内容'),
-                              ),
-                              FilledButton(
-                                onPressed: () => Navigator.pop(ctx, true),
-                                child: const Text('填入参考'),
-                              ),
-                            ],
-                          ),
+                          title: '替换已填写的饮食？',
+                          message: '填入参考后，还可以按实际情况修改。',
+                          icon: Icons.restaurant_rounded,
+                          cancelLabel: '保留原内容',
+                          confirmLabel: '填入参考',
                         );
                         if (replace != true || !mounted) return;
                       }

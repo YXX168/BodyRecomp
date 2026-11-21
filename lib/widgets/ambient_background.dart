@@ -212,7 +212,7 @@ class SurfaceCard extends StatelessWidget {
         : (!p.isDark
             ? [
                 BoxShadow(
-                  color: const Color(0xFF0F293A).withValues(alpha: .04),
+                  color: p.textPrimary.withValues(alpha: .045),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -428,46 +428,6 @@ class StatusPill extends StatelessWidget {
   }
 }
 
-class PressScale extends StatefulWidget {
-  final Widget child;
-  final VoidCallback? onTap;
-  final double scale;
-
-  const PressScale({
-    super.key,
-    required this.child,
-    this.onTap,
-    this.scale = 0.975,
-  });
-
-  @override
-  State<PressScale> createState() => _PressScaleState();
-}
-
-class _PressScaleState extends State<PressScale> {
-  bool _down = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = widget.onTap != null;
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: enabled ? (_) => setState(() => _down = true) : null,
-      onTapUp: enabled ? (_) => setState(() => _down = false) : null,
-      onTapCancel: enabled ? () => setState(() => _down = false) : null,
-      onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _down && !reduceMotion ? widget.scale : 1.0,
-        duration:
-            reduceMotion ? Duration.zero : const Duration(milliseconds: 110),
-        curve: Curves.easeOutCubic,
-        child: widget.child,
-      ),
-    );
-  }
-}
-
 class GlassMenuItem<T> {
   final T value;
   final String label;
@@ -494,13 +454,23 @@ Future<T?> showGlassMenu<T>({
   required List<GlassMenuItem<T>> items,
 }) {
   final navigator = Navigator.of(context);
+  final overlayRo = navigator.overlay?.context.findRenderObject();
   final overlayBox =
-      navigator.overlay?.context.findRenderObject() as RenderBox?;
+      overlayRo is RenderBox && overlayRo.attached && overlayRo.hasSize
+          ? overlayRo
+          : null;
   final overlaySize = overlayBox?.size ?? MediaQuery.sizeOf(context);
 
+  RenderBox? anchorBox;
+  if (anchorContext != null && anchorContext.mounted) {
+    final ro = anchorContext.findRenderObject();
+    if (ro is RenderBox && ro.attached && ro.hasSize) {
+      anchorBox = ro;
+    }
+  }
+
   Rect anchorRect;
-  final anchorBox = anchorContext?.findRenderObject() as RenderBox?;
-  if (anchorBox != null && anchorBox.hasSize && overlayBox != null) {
+  if (anchorBox != null && overlayBox != null) {
     anchorRect = Rect.fromPoints(
       anchorBox.localToGlobal(Offset.zero, ancestor: overlayBox),
       anchorBox.localToGlobal(
@@ -523,6 +493,7 @@ Future<T?> showGlassMenu<T>({
     from: context,
     to: navigator.context,
   );
+  final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
   return navigator.push<T>(
     _GlassMenuRoute<T>(
@@ -530,6 +501,7 @@ Future<T?> showGlassMenu<T>({
       title: title,
       items: items,
       themes: themes,
+      reduceMotion: reduceMotion,
       barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
     ),
   );
@@ -540,12 +512,14 @@ class _GlassMenuRoute<T> extends PopupRoute<T> {
   final String? title;
   final List<GlassMenuItem<T>> items;
   final CapturedThemes themes;
+  final bool reduceMotion;
 
   _GlassMenuRoute({
     required this.anchorRect,
     required this.title,
     required this.items,
     required this.themes,
+    required this.reduceMotion,
     required String barrierLabel,
   }) : _barrierLabel = barrierLabel;
 
@@ -561,7 +535,8 @@ class _GlassMenuRoute<T> extends PopupRoute<T> {
   Color get barrierColor => Colors.black.withValues(alpha: 0.08);
 
   @override
-  Duration get transitionDuration => const Duration(milliseconds: 160);
+  Duration get transitionDuration =>
+      reduceMotion ? Duration.zero : const Duration(milliseconds: 160);
 
   @override
   Widget buildPage(
@@ -570,12 +545,25 @@ class _GlassMenuRoute<T> extends PopupRoute<T> {
     Animation<double> secondaryAnimation,
   ) {
     final safePadding = MediaQuery.paddingOf(context);
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final screenSize = MediaQuery.sizeOf(context);
     final textDirection = Directionality.of(context);
-    final curved = CurvedAnimation(
-      parent: animation,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
+    final disableMotion =
+        reduceMotion || MediaQuery.disableAnimationsOf(context);
+
+    final alignLeft = anchorRect.center.dx < screenSize.width * 0.35;
+    final usableTop = safePadding.top + 12.0;
+    final usableBottom =
+        screenSize.height - safePadding.bottom - bottomInset - 12.0;
+    final spaceBelow = usableBottom - (anchorRect.bottom + 6.0);
+    final spaceAbove = (anchorRect.top - 6.0) - usableTop;
+    final openAbove = spaceBelow < 180.0 && spaceAbove > spaceBelow;
+    final scaleAlignment = Alignment(
+      alignLeft ? -1.0 : 1.0,
+      openAbove ? 1.0 : -1.0,
     );
+
+    final menuCard = _GlassMenuCard<T>(title: title, items: items);
 
     return themes.wrap(
       SafeArea(
@@ -585,19 +573,29 @@ class _GlassMenuRoute<T> extends PopupRoute<T> {
           delegate: _GlassMenuLayoutDelegate(
             anchorRect: anchorRect,
             safePadding: safePadding,
+            bottomInset: bottomInset,
             textDirection: textDirection,
           ),
-          child: FadeTransition(
-            opacity: curved,
-            child: ScaleTransition(
-              scale: Tween<double>(begin: 0.92, end: 1.0).animate(curved),
-              alignment: anchorRect.center.dy >
-                      MediaQuery.sizeOf(context).height * 0.62
-                  ? Alignment.bottomRight
-                  : Alignment.topRight,
-              child: _GlassMenuCard<T>(title: title, items: items),
-            ),
-          ),
+          child: disableMotion
+              ? menuCard
+              : AnimatedBuilder(
+                  animation: animation,
+                  child: menuCard,
+                  builder: (context, child) {
+                    final raw = animation.value.clamp(0.0, 1.0);
+                    final t = animation.status == AnimationStatus.reverse
+                        ? Curves.easeInCubic.transform(raw)
+                        : Curves.easeOutCubic.transform(raw);
+                    return Opacity(
+                      opacity: t,
+                      child: Transform.scale(
+                        scale: 0.92 + 0.08 * t,
+                        alignment: scaleAlignment,
+                        child: child,
+                      ),
+                    );
+                  },
+                ),
         ),
       ),
     );
@@ -607,21 +605,25 @@ class _GlassMenuRoute<T> extends PopupRoute<T> {
 class _GlassMenuLayoutDelegate extends SingleChildLayoutDelegate {
   final Rect anchorRect;
   final EdgeInsets safePadding;
+  final double bottomInset;
   final TextDirection textDirection;
 
   const _GlassMenuLayoutDelegate({
     required this.anchorRect,
     required this.safePadding,
+    required this.bottomInset,
     required this.textDirection,
   });
 
   @override
   BoxConstraints getConstraintsForChild(BoxConstraints constraints) {
     final maxW = math.max(160.0, math.min(256.0, constraints.maxWidth - 24.0));
-    final maxH = math.max(
-      140.0,
-      constraints.maxHeight - safePadding.top - safePadding.bottom - 24.0,
-    );
+    final availableH = constraints.maxHeight -
+        safePadding.top -
+        safePadding.bottom -
+        bottomInset -
+        24.0;
+    final maxH = math.max(96.0, availableH);
     return BoxConstraints(maxWidth: maxW, maxHeight: maxH);
   }
 
@@ -640,7 +642,7 @@ class _GlassMenuLayoutDelegate extends SingleChildLayoutDelegate {
     final minY = safePadding.top + 12.0;
     final maxY = math.max(
       minY,
-      size.height - safePadding.bottom - 12.0 - childSize.height,
+      size.height - safePadding.bottom - bottomInset - 12.0 - childSize.height,
     );
     final belowY = anchorRect.bottom + 6.0;
     final aboveY = anchorRect.top - 6.0 - childSize.height;
@@ -656,6 +658,7 @@ class _GlassMenuLayoutDelegate extends SingleChildLayoutDelegate {
   bool shouldRelayout(covariant _GlassMenuLayoutDelegate oldDelegate) =>
       anchorRect != oldDelegate.anchorRect ||
       safePadding != oldDelegate.safePadding ||
+      bottomInset != oldDelegate.bottomInset ||
       textDirection != oldDelegate.textDirection;
 }
 
@@ -676,6 +679,21 @@ class _GlassMenuCard<T> extends StatelessWidget {
       textScale > 1.3 ? 256.0 : 224.0,
       math.max(180.0, MediaQuery.sizeOf(context).width - 24.0),
     );
+    final glassTop = p.isDark
+        ? Color.alphaBlend(
+            p.primary.withValues(alpha: 0.12),
+            p.surfaceElevated.withValues(alpha: 0.88),
+          )
+        : Color.alphaBlend(
+            p.primary.withValues(alpha: 0.06),
+            Colors.white.withValues(alpha: 0.92),
+          );
+    final glassBottom = p.isDark
+        ? Color.alphaBlend(
+            p.glassFillBottom,
+            p.canvas.withValues(alpha: 0.92),
+          )
+        : p.surfaceElevated.withValues(alpha: 0.88);
 
     return Material(
       type: MaterialType.transparency,
@@ -701,101 +719,95 @@ class _GlassMenuCard<T> extends StatelessWidget {
             borderRadius: BorderRadius.circular(22),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color.alphaBlend(
-                        p.primary.withValues(alpha: p.isDark ? 0.14 : 0.08),
-                        p.isDark
-                            ? const Color(0xD8172538)
-                            : const Color(0xEEFFFFFF),
-                      ),
-                      p.isDark
-                          ? const Color(0xE2101A28)
-                          : const Color(0xE0F2FAF7),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: p.glassRimBright
-                        .withValues(alpha: p.isDark ? 0.38 : 0.85),
-                    width: 1.0,
-                  ),
+              child: CustomPaint(
+                foregroundPainter: _LiquidRimPainter(
+                  radius: 22,
+                  brightRim: p.glassRimBright
+                      .withValues(alpha: p.isDark ? 0.44 : 0.88),
+                  accentRim: p.glassRimAccent,
+                  strokeWidth: 1.0,
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (title != null && title!.isNotEmpty) ...[
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 11, 14, 8),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: p.primary,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: p.primary.withValues(alpha: 0.45),
-                                    blurRadius: 6,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 7),
-                            Expanded(
-                              child: Text(
-                                title!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: p.textSecondary,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [glassTop, glassBottom],
+                    ),
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (title != null && title!.isNotEmpty) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 11, 14, 8),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: p.primary,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: p.primary.withValues(alpha: 0.45),
+                                      blurRadius: 6,
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 7),
+                              Expanded(
+                                child: Text(
+                                  title!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: p.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      Divider(
-                        height: 1,
-                        thickness: 0.8,
-                        color: p.borderSubtle,
+                        Divider(
+                          height: 1,
+                          thickness: 0.8,
+                          color: p.borderSubtle,
+                        ),
+                      ],
+                      Flexible(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(6),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (final item in items) ...[
+                                if (item.hasTopDivider)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 4,
+                                    ),
+                                    child: Divider(
+                                      height: 1,
+                                      thickness: 0.8,
+                                      color: p.borderSubtle,
+                                    ),
+                                  ),
+                                _GlassMenuRow<T>(item: item),
+                              ],
+                            ],
+                          ),
+                        ),
                       ),
                     ],
-                    Flexible(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(6),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            for (final item in items) ...[
-                              if (item.hasTopDivider)
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 4,
-                                  ),
-                                  child: Divider(
-                                    height: 1,
-                                    thickness: 0.8,
-                                    color: p.borderSubtle,
-                                  ),
-                                ),
-                              _GlassMenuRow<T>(item: item),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -865,3 +877,313 @@ class _GlassMenuRow<T> extends StatelessWidget {
     );
   }
 }
+
+/// Frosted Liquid Glass modal dialog frame, keyboard-aware and safe at 2.0x textScale.
+class GlassDialogFrame extends StatelessWidget {
+  final String title;
+  final String? message;
+  final Widget? content;
+  final IconData? icon;
+  final Color? accentColor;
+  final List<Widget>? actions;
+
+  const GlassDialogFrame({
+    super.key,
+    required this.title,
+    this.message,
+    this.content,
+    this.icon,
+    this.accentColor,
+    this.actions,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final media = MediaQuery.of(context);
+    final tint = accentColor ?? p.primary;
+    final availableHeight = media.size.height -
+        media.viewInsets.bottom -
+        media.padding.top -
+        media.padding.bottom -
+        40.0;
+    final glassTop = p.isDark
+        ? Color.alphaBlend(
+            tint.withValues(alpha: 0.11),
+            p.surfaceElevated.withValues(alpha: 0.88),
+          )
+        : Color.alphaBlend(
+            tint.withValues(alpha: 0.05),
+            Colors.white.withValues(alpha: 0.92),
+          );
+    final glassBottom = p.isDark
+        ? Color.alphaBlend(
+            p.glassFillBottom,
+            p.canvas.withValues(alpha: 0.93),
+          )
+        : p.surfaceElevated.withValues(alpha: 0.90);
+
+    return AnimatedPadding(
+      padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 140),
+      curve: Curves.easeOutCubic,
+      child: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: 400,
+                maxHeight: math.max(160.0, availableHeight),
+              ),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(26),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black
+                          .withValues(alpha: p.isDark ? 0.48 : 0.16),
+                      blurRadius: 32,
+                      offset: const Offset(0, 14),
+                    ),
+                    BoxShadow(
+                      color: tint.withValues(alpha: p.isDark ? 0.12 : 0.08),
+                      blurRadius: 18,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(26),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                    child: CustomPaint(
+                      foregroundPainter: _LiquidRimPainter(
+                        radius: 26,
+                        brightRim: p.glassRimBright
+                            .withValues(alpha: p.isDark ? 0.46 : 0.90),
+                        accentRim:
+                            tint.withValues(alpha: p.isDark ? 0.34 : 0.24),
+                        strokeWidth: 1.05,
+                      ),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [glassTop, glassBottom],
+                          ),
+                          borderRadius: BorderRadius.circular(26),
+                        ),
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    if (icon != null) ...[
+                                      Container(
+                                        width: 36,
+                                        height: 36,
+                                        decoration: BoxDecoration(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          color: tint.withValues(
+                                            alpha: p.isDark ? 0.18 : 0.12,
+                                          ),
+                                          border: Border.all(
+                                            color: tint.withValues(
+                                              alpha: p.isDark ? 0.32 : 0.24,
+                                            ),
+                                            width: 0.9,
+                                          ),
+                                        ),
+                                        child:
+                                            Icon(icon, size: 19, color: tint),
+                                      ),
+                                      const SizedBox(width: 11),
+                                    ],
+                                    Expanded(
+                                      child: Text(
+                                        title,
+                                        style: TextStyle(
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.w800,
+                                          height: 1.25,
+                                          letterSpacing: -0.2,
+                                          color: p.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if ((message != null && message!.isNotEmpty) ||
+                                    content != null) ...[
+                                  const SizedBox(height: 12),
+                                  Flexible(
+                                    child: SingleChildScrollView(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          if (message != null &&
+                                              message!.isNotEmpty)
+                                            Text(
+                                              message!,
+                                              style: TextStyle(
+                                                fontSize: 13.5,
+                                                height: 1.5,
+                                                color: p.textSecondary,
+                                              ),
+                                            ),
+                                          if (message != null &&
+                                              message!.isNotEmpty &&
+                                              content != null)
+                                            const SizedBox(height: 12),
+                                          if (content != null) content!,
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                if (actions != null && actions!.isNotEmpty) ...[
+                                  const SizedBox(height: 18),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      alignment: WrapAlignment.end,
+                                      crossAxisAlignment:
+                                          WrapCrossAlignment.center,
+                                      children: actions!,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Shows a custom modal widget (typically [GlassDialogFrame]) with zero-bounce Liquid Glass transition.
+Future<T?> showGlassDialogBuilder<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  bool barrierDismissible = true,
+}) {
+  final p = context.palette;
+  final reduceMotion = MediaQuery.disableAnimationsOf(context);
+  return showGeneralDialog<T>(
+    context: context,
+    barrierDismissible: barrierDismissible,
+    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+    barrierColor: Colors.black.withValues(alpha: p.isDark ? 0.54 : 0.26),
+    transitionDuration:
+        reduceMotion ? Duration.zero : const Duration(milliseconds: 190),
+    pageBuilder: (ctx, animation, secondaryAnimation) => builder(ctx),
+    transitionBuilder: (ctx, animation, secondaryAnimation, child) {
+      if (reduceMotion || MediaQuery.disableAnimationsOf(ctx)) return child;
+      final raw = animation.value.clamp(0.0, 1.0);
+      final t = animation.status == AnimationStatus.reverse
+          ? Curves.easeInCubic.transform(raw)
+          : Curves.easeOutCubic.transform(raw);
+      return Opacity(
+        opacity: t,
+        child: Transform.scale(
+          scale: 0.94 + 0.06 * t,
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+/// Shows a frosted Liquid Glass dialog safe at 320x568 @ 2.0x textScale.
+Future<T?> showGlassDialog<T>({
+  required BuildContext context,
+  required String title,
+  String? message,
+  Widget? content,
+  IconData? icon,
+  Color? accentColor,
+  List<Widget>? actions,
+  List<Widget> Function(BuildContext dialogContext)? actionsBuilder,
+  bool barrierDismissible = true,
+}) =>
+    showGlassDialogBuilder<T>(
+      context: context,
+      barrierDismissible: barrierDismissible,
+      builder: (ctx) => GlassDialogFrame(
+        title: title,
+        message: message,
+        content: content,
+        icon: icon,
+        accentColor: accentColor,
+        actions: actionsBuilder != null ? actionsBuilder(ctx) : actions,
+      ),
+    );
+
+/// Shows a frosted Liquid Glass confirmation / info dialog.
+/// Pass `cancelLabel: null` for single-action informational notices.
+Future<bool?> showGlassConfirm({
+  required BuildContext context,
+  required String title,
+  String? message,
+  Widget? content,
+  IconData? icon,
+  Color? accentColor,
+  String? cancelLabel = '取消',
+  String confirmLabel = '确定',
+  bool isDanger = false,
+  bool barrierDismissible = true,
+}) =>
+    showGlassDialog<bool>(
+      context: context,
+      title: title,
+      message: message,
+      content: content,
+      icon: icon ?? (isDanger ? Icons.warning_amber_rounded : null),
+      accentColor: accentColor ?? (isDanger ? context.palette.danger : null),
+      barrierDismissible: barrierDismissible,
+      actionsBuilder: (ctx) {
+        final p = ctx.palette;
+        return [
+          if (cancelLabel != null)
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              style: TextButton.styleFrom(foregroundColor: p.textSecondary),
+              child: Text(cancelLabel),
+            ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: isDanger
+                ? FilledButton.styleFrom(
+                    backgroundColor: p.danger,
+                    foregroundColor: Colors.white,
+                  )
+                : null,
+            child: Text(confirmLabel),
+          ),
+        ];
+      },
+    );

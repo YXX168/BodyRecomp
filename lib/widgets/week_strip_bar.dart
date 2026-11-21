@@ -34,7 +34,11 @@ class WeekStripBar extends StatelessWidget {
     final p = context.palette;
     final selected = dateOnly(date);
     final todayDay = dateOnly(today);
-    final monday = selected.subtract(Duration(days: selected.weekday - 1));
+    final monday = DateTime(
+      selected.year,
+      selected.month,
+      selected.day - (selected.weekday - 1),
+    );
     const labels = ['一', '二', '三', '四', '五', '六', '日'];
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
@@ -45,6 +49,7 @@ class WeekStripBar extends StatelessWidget {
           date: date,
           today: today,
           enabled: enabled,
+          allowFutureNext: allowFutureSelection,
           onChanged: onChanged,
         ),
         const SizedBox(height: 4),
@@ -65,7 +70,8 @@ class WeekStripBar extends StatelessWidget {
                 Expanded(
                   child: Builder(
                     builder: (context) {
-                      final day = monday.add(Duration(days: i));
+                      final day =
+                          DateTime(monday.year, monday.month, monday.day + i);
                       final isSelected = day == selected;
                       final isToday = day == todayDay;
                       final isFuture = day.isAfter(todayDay);

@@ -147,4 +147,90 @@ void main() {
         (await loadDailyWorkouts())['2026-11-12']!.blocks.single.exercise.name,
         '平板卧推');
   });
+
+  test('corrupt legacy recomp_done_v6 never bricks loadDailyWorkouts',
+      () async {
+    SharedPreferences.setMockInitialValues({
+      'recomp_done_v6_year': 'not-an-int',
+      'recomp_done_v6_week': 46,
+      'recomp_done_v6': '{corrupt-legacy-json',
+    });
+    final records = await loadDailyWorkouts();
+    expect(records, isEmpty);
+  });
+
+  test('instantiateTemplateBlocks preview mode yields deterministic IDs', () {
+    final tpl = defaultTemplates.first;
+    final first = instantiateTemplateBlocks(tpl, '2026-11-12', preview: true);
+    final second = instantiateTemplateBlocks(tpl, '2026-11-12', preview: true);
+    expect(
+      first.map((b) => b.id).toList(),
+      second.map((b) => b.id).toList(),
+    );
+    expect(first.first.id, 'preview_2026-11-12_${tpl.id}_0');
+
+    final materialized = instantiateTemplateBlocks(tpl, '2026-11-12');
+    expect(materialized.first.id, startsWith('tpl_2026-11-12_'));
+  });
+
+  test('DailyWorkout persists template metadata and deduplicates merged slots',
+      () {
+    final withTemplate = DailyWorkout(
+      date: '2026-11-12',
+      templateId: 'push',
+      templateName: '推 · 胸肩三头',
+      blocks: [
+        WorkoutBlock(
+            id: 'tpl_2026-11-12_100_0_0', exercise: bench, completedSets: 1)
+      ],
+    );
+    final decoded = DailyWorkout.fromJson(withTemplate.toJson());
+    expect(decoded.templateId, 'push');
+    expect(decoded.templateName, '推 · 胸肩三头');
+    expect(decoded.copyWith(clearTemplate: true).templateId, isNull);
+
+    final incoming = DailyWorkout(
+      date: '2026-11-12',
+      blocks: [
+        WorkoutBlock(
+          id: 'tpl_2026-11-12_999_0_0',
+          exercise: bench,
+          completedSets: 3,
+        ),
+      ],
+    );
+    final mergedRaw = mergeDailyWorkouts(
+      jsonEncode({withTemplate.date: withTemplate.toJson()}),
+      jsonEncode({incoming.date: incoming.toJson()}),
+    );
+    final merged = decodeDailyWorkouts(mergedRaw)['2026-11-12']!;
+    expect(merged.blocks, hasLength(1));
+    expect(merged.blocks.single.completedSets, 3);
+    expect(merged.templateId, 'push');
+  });
+
+  test('analytics streak stays exact across DST transition boundaries', () {
+    // Covers US spring-forward (2026-03-08) and fall-back (2026-11-01) dates.
+    final springSessions = {
+      '2026-03-07': session('2026-03-07', done: 2),
+      '2026-03-08': session('2026-03-08', done: 3),
+      '2026-03-09': session('2026-03-09', done: 4),
+    };
+    final springStats =
+        computeWorkoutAnalytics(springSessions, DateTime(2026, 3, 9));
+    expect(springStats.currentStreak, 3);
+    expect(springStats.longestStreak, 3);
+    expect(springStats.last7Days.last.completedSets, 4);
+
+    final fallSessions = {
+      '2026-10-31': session('2026-10-31', done: 2),
+      '2026-11-01': session('2026-11-01', done: 3),
+      '2026-11-02': session('2026-11-02', done: 4),
+    };
+    final fallStats =
+        computeWorkoutAnalytics(fallSessions, DateTime(2026, 11, 2));
+    expect(fallStats.currentStreak, 3);
+    expect(fallStats.longestStreak, 3);
+    expect(fallStats.monthCompletedSets, 7);
+  });
 }

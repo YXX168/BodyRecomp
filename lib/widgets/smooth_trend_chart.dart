@@ -318,7 +318,10 @@ class _SmoothTrendPainter extends CustomPainter {
       };
       tp.paint(
         canvas,
-        Offset(dx.clamp(0, size.width - tp.width), topPad + chartH + 6),
+        Offset(
+          dx.clamp(0.0, math.max(0.0, size.width - tp.width)).toDouble(),
+          topPad + chartH + 6,
+        ),
       );
     }
 
@@ -336,5 +339,8 @@ class _SmoothTrendPainter extends CustomPainter {
       old.selectedIndex != selectedIndex ||
       old.lineColor != lineColor ||
       old.brightColor != brightColor ||
+      old.gridColor != gridColor ||
+      old.labelColor != labelColor ||
+      old.surfaceColor != surfaceColor ||
       old.isDark != isDark;
 }

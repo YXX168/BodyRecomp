@@ -7,6 +7,7 @@ import '../widgets/ambient_background.dart';
 import '../widgets/app_navigation_bar.dart';
 import '../widgets/rest_timer_pill.dart';
 import '../widgets/sheet_frame.dart';
+import '../widgets/undo_notice.dart';
 import 'exercise_library_view.dart';
 import 'profile_page.dart';
 import 'template_manager_page.dart';
@@ -14,7 +15,7 @@ import 'workout_page.dart';
 
 class MainShell extends StatefulWidget {
   final String appVersion;
-  const MainShell({super.key, this.appVersion = '7.1.2'});
+  const MainShell({super.key, this.appVersion = '7.1.3'});
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -37,6 +38,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    final state = WidgetsBinding.instance.lifecycleState;
+    _rest.setActive(state == null || state == AppLifecycleState.resumed);
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -110,7 +113,13 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       ),
     );
     if (mode != null && mounted) {
-      await controller.setTheme(mode);
+      try {
+        await controller.setTheme(mode);
+      } catch (_) {
+        if (mounted) {
+          showGlassNotice(context, '主题保存失败，请重试', isError: true);
+        }
+      }
     }
   }
 

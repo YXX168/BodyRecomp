@@ -13,6 +13,7 @@ mixin DailyRecordDate<T extends StatefulWidget>
   bool _followToday = true;
   bool _pageVisible = true;
   bool _foreground = true;
+  bool get allowFutureRecordDate => false;
   bool get pageActive => _pageVisible && _foreground;
   Timer? _midnight;
 
@@ -49,8 +50,10 @@ mixin DailyRecordDate<T extends StatefulWidget>
   void _updateToday() {
     final selected = recordDate;
     today = dateOnly(now);
-    if (_followToday || selected.isAfter(today)) {
+    if (_followToday || (!allowFutureRecordDate && selected.isAfter(today))) {
       recordDate = today;
+      _followToday = true;
+    } else if (allowFutureRecordDate && recordDate == today) {
       _followToday = true;
     }
   }

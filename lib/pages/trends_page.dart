@@ -1,12 +1,16 @@
+import 'dart:async';
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/daily_workout.dart';
+import '../models/library_exercise.dart';
 import '../models/recomp_models.dart';
 import '../services/app_signals.dart';
 import '../services/daily_workout_service.dart';
 import '../services/data_service.dart';
+import '../services/exercise_library_service.dart';
 import '../services/record_summary_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ambient_background.dart';
@@ -16,24 +20,36 @@ import '../widgets/loading_view.dart';
 import '../widgets/sheet_frame.dart';
 import '../widgets/smooth_trend_chart.dart';
 import '../widgets/text_prompt.dart';
+import '../widgets/undo_notice.dart';
 import '../widgets/weight_log_sheet.dart';
 
 class TrendsPage extends StatefulWidget {
-  const TrendsPage({super.key});
+  final int initialSegment;
+  final int initialBodyTab;
+
+  const TrendsPage({
+    super.key,
+    this.initialSegment = 0,
+    this.initialBodyTab = 0,
+  });
 
   @override
   State<TrendsPage> createState() => _TrendsPageState();
 }
 
 class _TrendsPageState extends State<TrendsPage> {
-  int _segment = 0; // 0: 训练热力, 1: 力量 PR, 2: 身体曲线
-  String _bodyTab = 'weight';
+  static const _customExerciseSentinel = '__custom_strength_exercise__';
+
+  late int _segment; // 0: 训练热力, 1: 力量 PR, 2: 身体数据
+  late String _bodyTab;
   int _viewYear = DateTime.now().year;
   int _viewMonth = DateTime.now().month;
 
   bool _loading = true;
   String? _loadError;
   int _loadGeneration = 0;
+  bool _loadScheduled = false;
+  bool _ignoringSignals = false;
 
   Map<int, int> _monthData = {};
   int _yearTotal = 0;
@@ -55,18 +71,40 @@ class _TrendsPageState extends State<TrendsPage> {
   @override
   void initState() {
     super.initState();
-    workoutDataRevision.addListener(_loadData);
-    workoutHistoryRevision.addListener(_loadData);
-    exerciseLogsRevision.addListener(_loadData);
+    _segment = widget.initialSegment.clamp(0, 2);
+    _bodyTab = widget.initialBodyTab == 1 ? 'measurements' : 'weight';
+    bodyMetricsRevision.addListener(_onRevisionChanged);
+    workoutDataRevision.addListener(_onRevisionChanged);
+    workoutHistoryRevision.addListener(_onRevisionChanged);
+    exerciseLogsRevision.addListener(_onRevisionChanged);
     _loadData();
   }
 
   @override
   void dispose() {
-    workoutDataRevision.removeListener(_loadData);
-    workoutHistoryRevision.removeListener(_loadData);
-    exerciseLogsRevision.removeListener(_loadData);
+    bodyMetricsRevision.removeListener(_onRevisionChanged);
+    workoutDataRevision.removeListener(_onRevisionChanged);
+    workoutHistoryRevision.removeListener(_onRevisionChanged);
+    exerciseLogsRevision.removeListener(_onRevisionChanged);
     super.dispose();
+  }
+
+  void _onRevisionChanged() {
+    if (_ignoringSignals || _loadScheduled) return;
+    _loadScheduled = true;
+    scheduleMicrotask(() {
+      _loadScheduled = false;
+      if (mounted) _loadData();
+    });
+  }
+
+  void _emitSilent(VoidCallback notify) {
+    _ignoringSignals = true;
+    try {
+      notify();
+    } finally {
+      _ignoringSignals = false;
+    }
   }
 
   Future<void> _loadData() async {
@@ -259,22 +297,31 @@ class _TrendsPageState extends State<TrendsPage> {
       final entries = await saveWeightEntry(
         WeightEntry(date: date, weightKg: result),
       );
-      if (dateOnly(date) == dateOnly(DateTime.now())) {
-        await saveProfile(
-          UserProfile(
-            birthday: _profile.birthday,
-            heightCm: _profile.heightCm,
-            weightKg: result,
-            gender: _profile.gender,
-          ),
+      var updatedProfile = _profile;
+      final isNewest =
+          entries.isNotEmpty && dateOnly(date) == dateOnly(entries.last.date);
+      if (dateOnly(date) == dateOnly(DateTime.now()) || isNewest) {
+        updatedProfile = UserProfile(
+          birthday: _profile.birthday,
+          heightCm: _profile.heightCm,
+          weightKg: entries.isNotEmpty ? entries.last.weightKg : result,
+          gender: _profile.gender,
         );
+        await saveProfile(updatedProfile);
       }
-      workoutDataRevision.value++;
-      if (mounted) setState(() => _weightHistory = entries);
+      if (mounted) {
+        setState(() {
+          _weightHistory = entries;
+          _profile = updatedProfile;
+        });
+      }
+      _emitSilent(() {
+        bodyMetricsRevision.value++;
+        workoutDataRevision.value++;
+      });
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('体重记录保存失败，请重试')));
+        showGlassNotice(context, '体重记录保存失败，请重试', isError: true);
       }
     }
   }
@@ -286,8 +333,31 @@ class _TrendsPageState extends State<TrendsPage> {
     if (!confirmed || !mounted) return;
     try {
       final entries = await deleteWeightEntry(entry.date);
-      if (mounted) setState(() => _weightHistory = entries);
-    } catch (_) {}
+      var updatedProfile = _profile;
+      if (entries.isNotEmpty && entries.last.weightKg != _profile.weightKg) {
+        updatedProfile = UserProfile(
+          birthday: _profile.birthday,
+          heightCm: _profile.heightCm,
+          weightKg: entries.last.weightKg,
+          gender: _profile.gender,
+        );
+        await saveProfile(updatedProfile);
+      }
+      if (mounted) {
+        setState(() {
+          _weightHistory = entries;
+          _profile = updatedProfile;
+        });
+      }
+      _emitSilent(() {
+        bodyMetricsRevision.value++;
+        workoutDataRevision.value++;
+      });
+    } catch (_) {
+      if (mounted) {
+        showGlassNotice(context, '体重记录删除失败，请重试', isError: true);
+      }
+    }
   }
 
   Future<void> _addMeasurement({BodyMeasurement? existing}) async {
@@ -312,10 +382,13 @@ class _TrendsPageState extends State<TrendsPage> {
         replaceSameDay: existing != null,
       );
       if (mounted) setState(() => _measurements = entries);
+      _emitSilent(() {
+        bodyMetricsRevision.value++;
+        workoutDataRevision.value++;
+      });
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('围度保存失败，请重试')));
+        showGlassNotice(context, '围度保存失败，请重试', isError: true);
       }
     }
   }
@@ -328,44 +401,127 @@ class _TrendsPageState extends State<TrendsPage> {
     try {
       final entries = await deleteMeasurement(entry.date);
       if (mounted) setState(() => _measurements = entries);
-    } catch (_) {}
+      _emitSilent(() {
+        bodyMetricsRevision.value++;
+        workoutDataRevision.value++;
+      });
+    } catch (_) {
+      if (mounted) {
+        showGlassNotice(context, '围度记录删除失败，请重试', isError: true);
+      }
+    }
   }
 
   Future<bool> _confirmDelete(String message) async {
-    return await showDialog<bool>(
+    return await showGlassConfirm(
           context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('确认删除'),
-            content: Text(message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('删除'),
-              ),
-            ],
-          ),
+          title: '确认删除',
+          message: message,
+          cancelLabel: '取消',
+          confirmLabel: '删除',
+          isDanger: true,
         ) ??
         false;
   }
 
   Future<void> _logNewStrengthExercise() async {
-    final name = await promptText(
-      context,
-      '记录动作负重',
-      label: '动作名称',
-      hint: '例如：平板卧推',
+    List<LibraryExercise> library = const [];
+    try {
+      library = await loadExerciseLibrary();
+    } catch (_) {
+      library = const [];
+    }
+    if (!mounted) return;
+
+    final loggedNames = <String>[];
+    final prByName = <String, ExerciseLog>{};
+    for (final log in _exerciseLogs) {
+      if (!prByName.containsKey(log.exerciseName)) {
+        loggedNames.add(log.exerciseName);
+        prByName[log.exerciseName] = log;
+      } else if (log.estimated1RM > prByName[log.exerciseName]!.estimated1RM) {
+        prByName[log.exerciseName] = log;
+      }
+    }
+
+    var picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _StrengthExercisePickerSheet(
+        loggedNames: loggedNames,
+        prByName: prByName,
+        library: library,
+        customSentinel: _customExerciseSentinel,
+      ),
     );
-    if (name == null || !mounted) return;
-    await showWeightLogSheet(
+    if (picked == null || !mounted) return;
+
+    if (picked == _customExerciseSentinel) {
+      picked = await promptText(
+        context,
+        '记录动作负重',
+        label: '动作名称',
+        hint: '例如：平板卧推',
+      );
+    }
+    if (picked == null || picked.trim().isEmpty || !mounted) return;
+    final name = picked.trim();
+
+    final saved = await showWeightLogSheet(
       context,
       exerciseName: name,
       latestLog: exerciseHistory(_exerciseLogs, name).firstOrNull,
       personalRecord: exercisePersonalRecord(_exerciseLogs, name),
     );
+    if (saved != null && mounted) {
+      setState(() => _selectedStrengthExercise = name);
+    }
+  }
+
+  Future<void> _showRawBackupDialog() async {
+    try {
+      final raw = await exportAllData();
+      if (!mounted) return;
+      await showGlassDialog<void>(
+        context: context,
+        title: '原数据备份 (JSON)',
+        icon: Icons.data_object_rounded,
+        content: Builder(
+          builder: (ctx) {
+            final p = ctx.palette;
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: p.surfaceMuted,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: p.borderSubtle),
+              ),
+              child: SelectableText(
+                raw,
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.45,
+                  fontFamily: 'monospace',
+                  color: p.textPrimary,
+                ),
+              ),
+            );
+          },
+        ),
+        actionsBuilder: (ctx) => [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('关闭'),
+          ),
+        ],
+      );
+    } catch (e) {
+      if (mounted) {
+        showGlassNotice(context, '导出原数据失败: $e', isError: true);
+      }
+    }
   }
 
   @override
@@ -374,55 +530,43 @@ class _TrendsPageState extends State<TrendsPage> {
     if (_loading) return const LoadingView();
     if (_loadError != null) {
       return Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_loadError!, style: TextStyle(color: p.textPrimary)),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextButton(onPressed: _loadData, child: const Text('重试')),
-                  const SizedBox(width: 8),
-                  OutlinedButton(
-                    onPressed: () async {
-                      final raw = await exportAllData();
-                      if (!context.mounted) return;
-                      showDialog<void>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('原数据备份 (JSON)'),
-                          content: SizedBox(
-                            width: double.maxFinite,
-                            child: SingleChildScrollView(
-                              child: SelectableText(
-                                raw,
-                                style: const TextStyle(fontSize: 11),
-                              ),
-                            ),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: const Text('关闭'),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                    child: const Text('查看原数据'),
-                  ),
-                ],
-              ),
-            ],
+          child: SurfaceCard(
+            radius: 24,
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.error_outline_rounded, size: 30, color: p.danger),
+                const SizedBox(height: 10),
+                Text(
+                  _loadError!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: p.textPrimary),
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    TextButton(onPressed: _loadData, child: const Text('重试')),
+                    OutlinedButton(
+                      onPressed: _showRawBackupDialog,
+                      child: const Text('查看原数据'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       );
     }
 
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final activeSegColor = p.primary.withValues(alpha: p.isDark ? .20 : .14);
     return Column(
       children: [
         Padding(
@@ -453,11 +597,12 @@ class _TrendsPageState extends State<TrendsPage> {
                         padding: const EdgeInsets.symmetric(vertical: 9),
                         decoration: BoxDecoration(
                           color: _segment == item.$1
-                              ? p.surfaceElevated
+                              ? activeSegColor
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(12),
                           border: _segment == item.$1
-                              ? Border.all(color: p.borderHighlight, width: 0.9)
+                              ? Border.all(
+                                  color: p.borderHighlight, width: 0.95)
                               : null,
                         ),
                         child: Text(
@@ -499,6 +644,8 @@ class _TrendsPageState extends State<TrendsPage> {
     final isCurrentMonth = _viewYear == now.year && _viewMonth == now.month;
     final daysInMonth = DateTime(_viewYear, _viewMonth + 1, 0).day;
     final firstWeekday = DateTime(_viewYear, _viewMonth, 1).weekday - 1;
+    final textScale =
+        MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 2.2);
     const monthNames = [
       '1月',
       '2月',
@@ -534,6 +681,8 @@ class _TrendsPageState extends State<TrendsPage> {
                     children: [
                       Text(
                         '$_viewYear年 ${monthNames[_viewMonth - 1]}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
@@ -542,6 +691,8 @@ class _TrendsPageState extends State<TrendsPage> {
                       ),
                       Text(
                         isCurrentMonth ? '当前月份' : '点击回到本月',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -673,6 +824,10 @@ class _TrendsPageState extends State<TrendsPage> {
                   if (idx < firstWeekday) return const SizedBox.shrink();
                   final day = idx - firstWeekday + 1;
                   final count = _monthData[day] ?? 0;
+                  final session = _sessions[dayKey(
+                    DateTime(_viewYear, _viewMonth, day),
+                  )];
+                  final isRested = count == 0 && (session?.rested ?? false);
                   final isToday = isCurrentMonth && day == now.day;
                   final intensity =
                       count == 0 ? 0.0 : (count / 5).clamp(0.28, 1.0);
@@ -683,57 +838,91 @@ class _TrendsPageState extends State<TrendsPage> {
                         color: count > 0
                             ? p.primary
                                 .withValues(alpha: 0.16 + intensity * 0.72)
-                            : p.surfaceMuted,
+                            : isRested
+                                ? p.accent
+                                    .withValues(alpha: p.isDark ? .18 : .13)
+                                : p.surfaceMuted,
                         borderRadius: BorderRadius.circular(10),
                         border: isToday
                             ? Border.all(color: p.primaryBright, width: 1.6)
-                            : Border.all(color: p.borderSubtle, width: 0.6),
+                            : isRested
+                                ? Border.all(
+                                    color: p.accent.withValues(
+                                        alpha: p.isDark ? .34 : .26),
+                                    width: 0.9,
+                                  )
+                                : Border.all(color: p.borderSubtle, width: 0.6),
                       ),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Text(
-                            '$day',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: isToday || count > 0
-                                  ? FontWeight.w800
-                                  : FontWeight.w500,
-                              color: count > 0 && intensity > 0.55
-                                  ? p.onPrimary
-                                  : isToday
-                                      ? p.primary
-                                      : p.textPrimary,
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(2),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '$day',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: isToday || count > 0 || isRested
+                                    ? FontWeight.w800
+                                    : FontWeight.w500,
+                                color: count > 0 && intensity > 0.55
+                                    ? p.onPrimary
+                                    : isToday
+                                        ? p.primary
+                                        : isRested
+                                            ? p.accent
+                                            : p.textPrimary,
+                              ),
                             ),
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   );
                 },
               ),
               const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text('少',
-                      style: TextStyle(fontSize: 11, color: p.textTertiary)),
-                  const SizedBox(width: 6),
-                  for (final level in const [0.0, 0.3, 0.65, 1.0])
+              Align(
+                alignment: Alignment.centerRight,
+                child: Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
                     Container(
                       width: 13,
                       height: 13,
-                      margin: const EdgeInsets.only(right: 4),
                       decoration: BoxDecoration(
-                        color: level == 0
-                            ? p.surfaceMuted
-                            : p.primary.withValues(alpha: 0.16 + level * 0.72),
+                        color: p.accent.withValues(alpha: p.isDark ? .18 : .13),
                         borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color:
+                              p.accent.withValues(alpha: p.isDark ? .34 : .26),
+                          width: 0.7,
+                        ),
                       ),
                     ),
-                  Text('多',
-                      style: TextStyle(fontSize: 11, color: p.textTertiary)),
-                ],
+                    Text('休',
+                        style: TextStyle(fontSize: 11, color: p.textTertiary)),
+                    const SizedBox(width: 4),
+                    Text('少',
+                        style: TextStyle(fontSize: 11, color: p.textTertiary)),
+                    for (final level in const [0.0, 0.3, 0.65, 1.0])
+                      Container(
+                        width: 13,
+                        height: 13,
+                        decoration: BoxDecoration(
+                          color: level == 0
+                              ? p.surfaceMuted
+                              : p.primary
+                                  .withValues(alpha: 0.16 + level * 0.72),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    Text('多',
+                        style: TextStyle(fontSize: 11, color: p.textTertiary)),
+                  ],
+                ),
               ),
             ],
           ),
@@ -750,14 +939,14 @@ class _TrendsPageState extends State<TrendsPage> {
           child: GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 4,
               mainAxisSpacing: 12,
               crossAxisSpacing: 10,
-              childAspectRatio: 0.92,
+              childAspectRatio: textScale > 1.35 ? 0.80 : 0.92,
             ),
             itemCount: 12,
-            itemBuilder: (context, idx) => _buildMiniMonth(idx + 1, p),
+            itemBuilder: (context, idx) => _buildMiniMonth(idx + 1, p, now),
           ),
         ),
       ],
@@ -792,13 +981,17 @@ class _TrendsPageState extends State<TrendsPage> {
               ],
             ),
             const SizedBox(height: 8),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
-                fontFeatures: const [FontFeature.tabularFigures()],
-                color: p.textPrimary,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  color: p.textPrimary,
+                ),
               ),
             ),
             const SizedBox(height: 2),
@@ -812,61 +1005,67 @@ class _TrendsPageState extends State<TrendsPage> {
         ),
       );
 
-  Widget _buildMiniMonth(int month, AppPalette p) {
-    final data = _yearMonths[month] ?? {};
+  Widget _buildMiniMonth(int month, AppPalette p, DateTime now) {
+    final data = _yearMonths[month] ?? const <int, int>{};
     final daysInMonth = DateTime(_viewYear, month + 1, 0).day;
     final firstWd = DateTime(_viewYear, month, 1).weekday - 1;
     final isSelected = month == _viewMonth;
+    final isFuture =
+        _viewYear > now.year || (_viewYear == now.year && month > now.month);
 
     return GestureDetector(
-      onTap: () {
-        setState(() => _viewMonth = month);
-        _loadData();
-      },
+      key: ValueKey('mini-month-$month'),
+      behavior: HitTestBehavior.opaque,
+      onTap: isFuture
+          ? null
+          : () {
+              if (_viewMonth == month) return;
+              setState(() => _viewMonth = month);
+              _loadData();
+            },
       child: Container(
         padding: const EdgeInsets.all(5),
         decoration: BoxDecoration(
           color: isSelected
-              ? p.primary.withValues(alpha: p.isDark ? .12 : .07)
+              ? p.primary.withValues(alpha: p.isDark ? .14 : .09)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           border: isSelected ? Border.all(color: p.borderHighlight) : null,
         ),
         child: Column(
           children: [
-            Text(
-              '$month月',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                color: isSelected ? p.primary : p.textSecondary,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                '$month月',
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  color: isFuture
+                      ? p.textTertiary.withValues(alpha: .42)
+                      : isSelected
+                          ? p.primary
+                          : p.textSecondary,
+                ),
               ),
             ),
             const SizedBox(height: 4),
             Expanded(
-              child: GridView.builder(
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 7,
-                  mainAxisSpacing: 1.5,
-                  crossAxisSpacing: 1.5,
-                ),
-                itemCount: firstWd + daysInMonth,
-                itemBuilder: (context, idx) {
-                  if (idx < firstWd) return const SizedBox.shrink();
-                  final day = idx - firstWd + 1;
-                  final count = data[day] ?? 0;
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: count > 0
-                          ? p.primary.withValues(
-                              alpha: (0.28 + count * 0.14).clamp(0.28, 0.95),
-                            )
+              child: SizedBox.expand(
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: _MiniMonthPainter(
+                      daysInMonth: daysInMonth,
+                      firstWeekday: firstWd,
+                      data: data,
+                      primaryColor: p.primary,
+                      emptyColor: isFuture
+                          ? p.surfaceMuted.withValues(alpha: .45)
                           : p.surfaceMuted,
-                      borderRadius: BorderRadius.circular(2),
                     ),
-                  );
-                },
+                  ),
+                ),
               ),
             ),
           ],
@@ -922,10 +1121,9 @@ class _TrendsPageState extends State<TrendsPage> {
             ),
           )
         else ...[
-          SizedBox(
-            height: 38,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
               children: [
                 for (final name in names)
                   Padding(
@@ -962,8 +1160,10 @@ class _TrendsPageState extends State<TrendsPage> {
                 final name = _selectedStrengthExercise!;
                 final history = exerciseHistory(_exerciseLogs, name);
                 final pr = exercisePersonalRecord(_exerciseLogs, name);
-                final chartPoints = history.reversed
+                final chartPoints = history
                     .take(24)
+                    .toList()
+                    .reversed
                     .map(
                       (log) => TrendPoint(
                         '${log.date.month}/${log.date.day}',
@@ -1064,8 +1264,18 @@ class _TrendsPageState extends State<TrendsPage> {
                                 visualDensity: VisualDensity.compact,
                                 onPressed: () async {
                                   if (await _confirmDelete('删除这条负重记录？')) {
-                                    await deleteExerciseLog(log);
-                                    exerciseLogsRevision.value++;
+                                    try {
+                                      await deleteExerciseLog(log);
+                                      exerciseLogsRevision.value++;
+                                    } catch (_) {
+                                      if (context.mounted) {
+                                        showGlassNotice(
+                                          context,
+                                          '删除负重记录失败，请重试',
+                                          isError: true,
+                                        );
+                                      }
+                                    }
                                   }
                                 },
                                 icon: Icon(
@@ -1090,6 +1300,13 @@ class _TrendsPageState extends State<TrendsPage> {
   Widget _buildBodyMetricsView(BuildContext context) {
     final p = context.palette;
     final isWeight = _bodyTab == 'weight';
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final activeSegColor = p.primary.withValues(alpha: p.isDark ? .20 : .14);
+    final waistEntries =
+        _measurements.where((m) => m.values.containsKey('waist')).toList();
+    final recentWaistEntries = waistEntries.length <= 30
+        ? waistEntries
+        : waistEntries.sublist(waistEntries.length - 30);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 4, 18, 110),
@@ -1112,17 +1329,29 @@ class _TrendsPageState extends State<TrendsPage> {
                     ])
                       Expanded(
                         child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
                           onTap: () => setState(() => _bodyTab = tab.$1),
-                          child: Container(
+                          child: AnimatedContainer(
+                            duration: reduceMotion
+                                ? Duration.zero
+                                : const Duration(milliseconds: 160),
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             decoration: BoxDecoration(
                               color: _bodyTab == tab.$1
-                                  ? p.surfaceElevated
+                                  ? activeSegColor
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(9),
+                              border: _bodyTab == tab.$1
+                                  ? Border.all(
+                                      color: p.borderHighlight,
+                                      width: 0.9,
+                                    )
+                                  : null,
                             ),
                             child: Text(
                               tab.$2,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 12.5,
@@ -1238,7 +1467,7 @@ class _TrendsPageState extends State<TrendsPage> {
               ),
             )
           else ...[
-            if (_measurements.any((m) => m.values.containsKey('waist'))) ...[
+            if (recentWaistEntries.isNotEmpty) ...[
               SurfaceCard(
                 elevated: true,
                 padding: const EdgeInsets.all(16),
@@ -1255,8 +1484,7 @@ class _TrendsPageState extends State<TrendsPage> {
                     ),
                     const SizedBox(height: 10),
                     SmoothTrendChart(
-                      points: _measurements
-                          .where((m) => m.values.containsKey('waist'))
+                      points: recentWaistEntries
                           .map(
                             (m) => TrendPoint(
                               '${m.date.month}/${m.date.day}',
@@ -1338,6 +1566,272 @@ class _TrendsPageState extends State<TrendsPage> {
       };
 }
 
+class _StrengthExercisePickerSheet extends StatefulWidget {
+  final List<String> loggedNames;
+  final Map<String, ExerciseLog> prByName;
+  final List<LibraryExercise> library;
+  final String customSentinel;
+
+  const _StrengthExercisePickerSheet({
+    required this.loggedNames,
+    required this.prByName,
+    required this.library,
+    required this.customSentinel,
+  });
+
+  @override
+  State<_StrengthExercisePickerSheet> createState() =>
+      _StrengthExercisePickerSheetState();
+}
+
+class _StrengthExercisePickerSheetState
+    extends State<_StrengthExercisePickerSheet> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final q = _query.trim().toLowerCase();
+    final loggedSet = widget.loggedNames.toSet();
+
+    final filteredLogged = widget.loggedNames
+        .where((name) => q.isEmpty || name.toLowerCase().contains(q))
+        .toList();
+
+    final seenLibraryNames = <String>{...loggedSet};
+    final filteredLibrary = <LibraryExercise>[];
+    for (final item in widget.library) {
+      final name = item.exercise.name;
+      if (!seenLibraryNames.add(name)) continue;
+      if (q.isNotEmpty &&
+          !name.toLowerCase().contains(q) &&
+          !item.category.toLowerCase().contains(q) &&
+          !item.exercise.muscles.any((m) => m.toLowerCase().contains(q))) {
+        continue;
+      }
+      filteredLibrary.add(item);
+    }
+
+    return SheetFrame(
+      title: '选择动作记负重',
+      subtitle: '从已记录或动作库选择，避免动作名重复分散',
+      icon: Icons.fitness_center_rounded,
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _searchCtrl,
+            onChanged: (v) => setState(() => _query = v),
+            decoration: InputDecoration(
+              hintText: '搜索动作名称或部位…',
+              prefixIcon:
+                  Icon(Icons.search_rounded, size: 19, color: p.primary),
+              suffixIcon: _query.isNotEmpty
+                  ? IconButton(
+                      tooltip: '清空',
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        setState(() => _query = '');
+                      },
+                      icon: const Icon(Icons.close_rounded, size: 17),
+                    )
+                  : null,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (filteredLogged.isNotEmpty) ...[
+            _sectionLabel('已记录动作', p),
+            const SizedBox(height: 6),
+            for (final name in filteredLogged)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 7),
+                child: _exerciseRow(
+                  name: name,
+                  subtitle: _formatPr(widget.prByName[name]),
+                  accent: p.warning,
+                  p: p,
+                  onTap: () => Navigator.pop(context, name),
+                ),
+              ),
+            const SizedBox(height: 8),
+          ],
+          if (filteredLibrary.isNotEmpty) ...[
+            _sectionLabel('动作库动作', p),
+            const SizedBox(height: 6),
+            for (final item in filteredLibrary)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 7),
+                child: _exerciseRow(
+                  name: item.exercise.name,
+                  subtitle: item.exercise.muscles.isNotEmpty
+                      ? '${item.category} · ${item.exercise.muscles.join(' / ')}'
+                      : item.category,
+                  accent: p.textSecondary,
+                  p: p,
+                  onTap: () => Navigator.pop(context, item.exercise.name),
+                ),
+              ),
+          ],
+          if (filteredLogged.isEmpty && filteredLibrary.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              child: Text(
+                '没有匹配的动作，可点击下方「自定义动作名称」手动输入。',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12.5, color: p.textSecondary),
+              ),
+            ),
+        ],
+      ),
+      footer: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+          onPressed: () => Navigator.pop(context, widget.customSentinel),
+          icon: const Icon(Icons.edit_outlined, size: 17),
+          label: const Text('自定义动作名称'),
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionLabel(String text, AppPalette p) => Text(
+        text,
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w700,
+          color: p.textSecondary,
+        ),
+      );
+
+  String _formatPr(ExerciseLog? pr) {
+    if (pr == null) return '已有负重记录';
+    return 'PR ${pr.weightKg.toStringAsFixed(1)}kg × ${pr.reps} · 1RM ${pr.estimated1RM.toStringAsFixed(1)}kg';
+  }
+
+  Widget _exerciseRow({
+    required String name,
+    required String subtitle,
+    required Color accent,
+    required AppPalette p,
+    required VoidCallback onTap,
+  }) =>
+      SurfaceCard(
+        radius: 16,
+        onTap: onTap,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            ExerciseMark(name, size: 36),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: p.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11.5, color: accent),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(Icons.chevron_right_rounded, size: 18, color: p.textTertiary),
+          ],
+        ),
+      );
+}
+
+class _MiniMonthPainter extends CustomPainter {
+  final int daysInMonth;
+  final int firstWeekday;
+  final Map<int, int> data;
+  final Color primaryColor;
+  final Color emptyColor;
+
+  const _MiniMonthPainter({
+    required this.daysInMonth,
+    required this.firstWeekday,
+    required this.data,
+    required this.primaryColor,
+    required this.emptyColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+    const cols = 7;
+    final rows = math.max(5, (firstWeekday + daysInMonth + cols - 1) ~/ cols);
+    const gap = 1.5;
+    final cellW = (size.width - gap * (cols - 1)) / cols;
+    final cellH = (size.height - gap * (rows - 1)) / rows;
+    final cell = math.min(cellW, cellH);
+    if (cell <= 0.5) return;
+
+    final gridW = cell * cols + gap * (cols - 1);
+    final offsetX = (size.width - gridW) / 2;
+    final radius = Radius.circular(math.min(2.0, cell * 0.35));
+    final paint = Paint()..style = PaintingStyle.fill;
+
+    for (var day = 1; day <= daysInMonth; day++) {
+      final idx = firstWeekday + day - 1;
+      final row = idx ~/ cols;
+      final col = idx % cols;
+      final count = data[day] ?? 0;
+      paint.color = count > 0
+          ? primaryColor.withValues(
+              alpha: (0.28 + count * 0.14).clamp(0.28, 0.95),
+            )
+          : emptyColor;
+      final rect = Rect.fromLTWH(
+        offsetX + col * (cell + gap),
+        row * (cell + gap),
+        cell,
+        cell,
+      );
+      canvas.drawRRect(RRect.fromRectAndRadius(rect, radius), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_MiniMonthPainter oldDelegate) =>
+      oldDelegate.daysInMonth != daysInMonth ||
+      oldDelegate.firstWeekday != firstWeekday ||
+      oldDelegate.primaryColor != primaryColor ||
+      oldDelegate.emptyColor != emptyColor ||
+      !_mapEquals(oldDelegate.data, data);
+
+  static bool _mapEquals(Map<int, int> a, Map<int, int> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      if (b[entry.key] != entry.value) return false;
+    }
+    return true;
+  }
+}
+
 class _WeeklyVolumeBars extends StatelessWidget {
   final List<DayVolumePoint> points;
   const _WeeklyVolumeBars({required this.points});
@@ -1348,29 +1842,35 @@ class _WeeklyVolumeBars extends StatelessWidget {
     if (points.isEmpty) return const SizedBox(height: 90);
     final maxSets =
         points.fold<int>(1, (best, pt) => math.max(best, pt.completedSets));
+    final textScale =
+        MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 2.2);
     const weekdays = ['一', '二', '三', '四', '五', '六', '日'];
 
     return SizedBox(
-      height: 118,
+      height: 70 + 48 * textScale,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           for (var i = 0; i < points.length; i++)
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 3),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    Text(
-                      points[i].completedSets > 0
-                          ? '${points[i].completedSets}'
-                          : '',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                        color: p.primary,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        points[i].completedSets > 0
+                            ? '${points[i].completedSets}'
+                            : ' ',
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                          color: p.primary,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -1380,9 +1880,12 @@ class _WeeklyVolumeBars extends StatelessWidget {
                           final maxH = math.max(12.0, c.maxHeight);
                           final barH = points[i].completedSets == 0
                               ? 6.0
-                              : math.max(
-                                  14.0,
-                                  maxH * (points[i].completedSets / maxSets),
+                              : math.min(
+                                  maxH,
+                                  math.max(
+                                    14.0,
+                                    maxH * (points[i].completedSets / maxSets),
+                                  ),
                                 );
                           return Align(
                             alignment: Alignment.bottomCenter,
@@ -1408,16 +1911,20 @@ class _WeeklyVolumeBars extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      '周${weekdays[points[i].date.weekday - 1]}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: i == points.length - 1
-                            ? FontWeight.w800
-                            : FontWeight.w500,
-                        color: i == points.length - 1
-                            ? p.primary
-                            : p.textSecondary,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '周${weekdays[points[i].date.weekday - 1]}',
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: i == points.length - 1
+                              ? FontWeight.w800
+                              : FontWeight.w500,
+                          color: i == points.length - 1
+                              ? p.primary
+                              : p.textSecondary,
+                        ),
                       ),
                     ),
                   ],

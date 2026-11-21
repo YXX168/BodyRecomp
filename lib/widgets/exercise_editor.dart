@@ -4,6 +4,7 @@ import '../models/library_exercise.dart';
 import '../models/recomp_models.dart';
 import '../services/rest_timer_service.dart';
 import '../theme/app_theme.dart';
+import 'muscle_body_graphic.dart';
 import 'sheet_frame.dart';
 
 class ExerciseEditResult {
@@ -112,17 +113,51 @@ class _ExerciseEditorState extends State<_ExerciseEditor> {
   late bool _saveToLibrary = widget.offerSaveToLibrary;
   late bool _isFavorite = widget.initialFavorite;
 
+  static String? _mapTagToCategory(String raw) {
+    final t = raw.trim().toLowerCase();
+    if (t.isEmpty) return null;
+    for (final cat in exerciseCategories) {
+      if (t == cat.toLowerCase()) return cat;
+    }
+    if (RegExp(r'胸|chest|pec').hasMatch(t)) return '胸部';
+    if (RegExp(r'背|背阔|斜方|菱形|back|lat').hasMatch(t)) return '背部';
+    if (RegExp(r'肩|三角肌|shoulder|delt').hasMatch(t)) return '肩部';
+    if (RegExp(r'腿|臀|股四|腘绳|小腿|leg|glute|quad|hamstring|calf').hasMatch(t)) {
+      return '腿臀';
+    }
+    if (RegExp(r'臂|二头|三头|肱|腕|arm|bicep|tricep').hasMatch(t)) return '手臂';
+    if (RegExp(r'腹|核心|core|abs').hasMatch(t)) return '核心';
+    if (RegExp(r'有氧|心肺|恢复|拉伸|放松|cardio|hiit|recovery|stretch').hasMatch(t)) {
+      return '有氧恢复';
+    }
+    if (t == '其他' || t == 'other') return '其他';
+    return null;
+  }
+
   String _resolveInitialCategory() {
     if (widget.initialCategory != null &&
         widget.initialCategory!.trim().isNotEmpty) {
-      return widget.initialCategory!;
+      return _mapTagToCategory(widget.initialCategory!) ??
+          widget.initialCategory!;
     }
     final muscles = widget.initial?.muscles ?? const [];
     for (final m in muscles) {
-      for (final cat in exerciseCategories) {
-        if (cat.contains(m) || m.contains(cat.replaceAll('部', ''))) {
-          return cat;
-        }
+      final mapped = _mapTagToCategory(m);
+      if (mapped != null) return mapped;
+    }
+    if (widget.initial != null) {
+      final inferred = inferMuscleGroups([widget.initial!]);
+      const order = [
+        ('chest', '胸部'),
+        ('back', '背部'),
+        ('shoulders', '肩部'),
+        ('legs', '腿臀'),
+        ('arms', '手臂'),
+        ('core', '核心'),
+        ('cardio', '有氧恢复'),
+      ];
+      for (final (key, cat) in order) {
+        if (inferred.contains(key)) return cat;
       }
     }
     return exerciseCategories.first;

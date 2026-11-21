@@ -237,4 +237,116 @@ void main() {
       expect(prefs.containsKey(lastImportBackupKey), isFalse);
     }
   });
+
+  test('strict payload validation rejects wrong-typed keys and corrupt logs',
+      () async {
+    final invalidCases = <Map<String, dynamic>>[
+      {'recomp_auto_rest_timer_v2': 'yes'},
+      {
+        'recomp_schedule_v1': jsonEncode([1, 2, 3, 4, 5, 6, 7])
+      },
+      {'recomp_theme_v6': -1},
+      {'recomp_theme_v6': 'blue'},
+      {'recomp_done_v6_week': 54},
+      {'recomp_done_v6_year': 1900},
+      {'recomp_done_v6': '[]'},
+      {exerciseLogsKey: '[corrupt json'},
+      {
+        exerciseLogsKey: jsonEncode([
+          {'e': '卧推', 'd': 'bad-date', 'w': -10, 's': 3, 'r': 5},
+        ]),
+      },
+    ];
+
+    for (final prefsMap in invalidCases) {
+      final backup = jsonEncode({
+        'schemaVersion': currentSchemaVersion,
+        'preferences': prefsMap,
+      });
+      expect(
+        () => validateBackup(backup),
+        throwsFormatException,
+        reason: 'expected FormatException for $prefsMap',
+      );
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(exerciseLogsKey, '{broken-logs');
+    await expectLater(loadExerciseLogs(), throwsFormatException);
+  });
+
+  test('restoreLastImportBackup restores prior snapshot and keeps backup key',
+      () async {
+    await saveProfile(UserProfile(weightKg: 71.5));
+    await saveWeightEntry(
+      WeightEntry(date: DateTime(2026, 11, 10), weightKg: 71.5),
+    );
+    final prefs = await SharedPreferences.getInstance();
+
+    final incoming = jsonEncode({
+      'schemaVersion': currentSchemaVersion,
+      'preferences': {
+        profileKey: jsonEncode({'weightKg': 88.0}),
+      },
+    });
+    await importAllData(
+      incoming,
+      mode: ImportMode.overwrite,
+      preferences: prefs,
+    );
+    final savedBackup = prefs.getString(lastImportBackupKey);
+    expect(savedBackup, isNotNull);
+    expect((await loadProfile()).weightKg, 88.0);
+    expect(await loadWeightHistory(), isEmpty);
+
+    final restored = await restoreLastImportBackup(preferences: prefs);
+    expect(restored, isNotNull);
+    expect((await loadProfile()).weightKg, 71.5);
+    expect((await loadWeightHistory()).single.weightKg, 71.5);
+    // Restoring does not overwrite the saved pre-import snapshot.
+    expect(prefs.getString(lastImportBackupKey), savedBackup);
+  });
+
+  test('legacy merge folds recomp_done_v6 into existing daily workouts',
+      () async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'recomp_daily_workouts_v1',
+      jsonEncode({
+        '2026-11-15': {
+          'date': '2026-11-15',
+          'blocks': [
+            {
+              'id': 'keep',
+              'exercise': {
+                'name': '平板卧推',
+                'muscles': ['胸'],
+                'muscleTarget': '胸',
+                'sets': 4,
+                'reps': '8-10',
+                'rest': '90s',
+              },
+              'completedSets': 2,
+            }
+          ],
+          'rested': false,
+        }
+      }),
+    );
+
+    final legacyBackup = jsonEncode({
+      'version': '6.6.1',
+      'workoutDone': {'1_0': true},
+      'settings': {'week': 46, 'year': 2026},
+    });
+    await importAllData(
+      legacyBackup,
+      mode: ImportMode.merge,
+      preferences: prefs,
+    );
+
+    final decoded =
+        jsonDecode(prefs.getString('recomp_daily_workouts_v1')!) as Map;
+    expect(decoded.keys, containsAll(['2026-11-15', '2026-11-10']));
+  });
 }

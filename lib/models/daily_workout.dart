@@ -45,8 +45,15 @@ class DailyWorkout {
   final String date;
   final List<WorkoutBlock> blocks;
   final bool rested;
-  const DailyWorkout(
-      {required this.date, this.blocks = const [], this.rested = false});
+  final String? templateId;
+  final String? templateName;
+  const DailyWorkout({
+    required this.date,
+    this.blocks = const [],
+    this.rested = false,
+    this.templateId,
+    this.templateName,
+  });
 
   // A partial workout is still a real training day.
   int get trainedProjects =>
@@ -56,16 +63,29 @@ class DailyWorkout {
   int get plannedSets =>
       blocks.fold(0, (sum, block) => sum + block.exercise.sets);
 
-  DailyWorkout copyWith({List<WorkoutBlock>? blocks, bool? rested}) =>
+  DailyWorkout copyWith({
+    List<WorkoutBlock>? blocks,
+    bool? rested,
+    String? templateId,
+    String? templateName,
+    bool clearTemplate = false,
+  }) =>
       DailyWorkout(
         date: date,
         blocks: blocks ?? this.blocks,
         rested: rested ?? this.rested,
+        templateId: clearTemplate ? null : (templateId ?? this.templateId),
+        templateName:
+            clearTemplate ? null : (templateName ?? this.templateName),
       );
   Map<String, dynamic> toJson() => {
         'date': date,
         'blocks': blocks.map((block) => block.toJson()).toList(),
         'rested': rested,
+        if (templateId != null && templateId!.trim().isNotEmpty)
+          'templateId': templateId!.trim(),
+        if (templateName != null && templateName!.trim().isNotEmpty)
+          'templateName': templateName!.trim(),
       };
   factory DailyWorkout.fromJson(Map<String, dynamic> json) {
     final date = json['date'] as String;
@@ -83,7 +103,27 @@ class DailyWorkout {
     if (rested && blocks.isNotEmpty) {
       throw const FormatException('休息日不能同时包含训练项目');
     }
-    return DailyWorkout(date: date, blocks: blocks, rested: rested);
+    final rawTemplateId = json['templateId'];
+    final rawTemplateName = json['templateName'];
+    if (rawTemplateId != null && rawTemplateId is! String) {
+      throw const FormatException('训练模板标识无效');
+    }
+    if (rawTemplateName != null && rawTemplateName is! String) {
+      throw const FormatException('训练模板名称无效');
+    }
+    final parsedTemplateId = (rawTemplateId as String?)?.trim();
+    final parsedTemplateName = (rawTemplateName as String?)?.trim();
+    return DailyWorkout(
+      date: date,
+      blocks: blocks,
+      rested: rested,
+      templateId: parsedTemplateId == null || parsedTemplateId.isEmpty
+          ? null
+          : parsedTemplateId,
+      templateName: parsedTemplateName == null || parsedTemplateName.isEmpty
+          ? null
+          : parsedTemplateName,
+    );
   }
 }
 

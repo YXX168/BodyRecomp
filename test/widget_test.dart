@@ -203,7 +203,7 @@ void main() {
     await saveAutoRestTimer(true);
     await pump(tester, WorkoutPage(now: () => today));
     await tapVisible(tester, find.byKey(const Key('previous-date')));
-    expect(find.text('休息 / 恢复'), findsOneWidget);
+    expect(find.text('自由训练'), findsOneWidget);
     await tapVisible(tester, find.byKey(const ValueKey('complete-set-0')));
     expect(find.byKey(const Key('rest-timer-panel')), findsNothing);
     expect((await loadDailyWorkouts())[dayKey(yesterday)]!.completedSets, 1);

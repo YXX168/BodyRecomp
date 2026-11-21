@@ -103,11 +103,6 @@ class _BodyEditorState extends State<_BodyEditor> {
                   decoration: InputDecoration(
                     labelText: field.value,
                     hintText: widget.fields.length > 1 ? '选填' : '请输入数值',
-                    filled: true,
-                    fillColor: p.surfaceMuted,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
                   ),
                   validator: (text) {
                     final raw = text?.trim() ?? '';

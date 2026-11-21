@@ -75,10 +75,10 @@ WorkoutAnalytics computeWorkoutAnalytics(
   var currentStreak = 0;
   var cursor = trainedDays.contains(todayOnly)
       ? todayOnly
-      : todayOnly.subtract(const Duration(days: 1));
+      : DateTime(todayOnly.year, todayOnly.month, todayOnly.day - 1);
   while (trainedDays.contains(cursor)) {
     currentStreak++;
-    cursor = cursor.subtract(const Duration(days: 1));
+    cursor = DateTime(cursor.year, cursor.month, cursor.day - 1);
   }
 
   // Longest streak across all dated workouts.
@@ -88,7 +88,12 @@ WorkoutAnalytics computeWorkoutAnalytics(
     var run = 1;
     longestStreak = 1;
     for (var i = 1; i < sorted.length; i++) {
-      if (sorted[i].difference(sorted[i - 1]).inDays == 1) {
+      final curr = sorted[i];
+      final prev = sorted[i - 1];
+      final diffDays = DateTime.utc(curr.year, curr.month, curr.day)
+          .difference(DateTime.utc(prev.year, prev.month, prev.day))
+          .inDays;
+      if (diffDays == 1) {
         run++;
         longestStreak = math.max(longestStreak, run);
       } else {
@@ -100,7 +105,11 @@ WorkoutAnalytics computeWorkoutAnalytics(
   final last7Days = <DayVolumePoint>[
     for (var offset = 6; offset >= 0; offset--)
       () {
-        final d = todayOnly.subtract(Duration(days: offset));
+        final d = DateTime(
+          todayOnly.year,
+          todayOnly.month,
+          todayOnly.day - offset,
+        );
         final session = sessions[dayKey(d)];
         return DayVolumePoint(
           date: d,
@@ -130,13 +139,13 @@ Future<RecordSummary> loadRecordSummary(
   }
 
   final current = now ?? DateTime.now();
-  final rawDone = preferences.getString('recomp_done_v6');
-  final storedWeek =
-      preferences.getInt('recomp_done_v6_week') ?? isoWeekNumber(current);
-  final storedYear =
-      preferences.getInt('recomp_done_v6_year') ?? isoWeekYear(current);
-  if (rawDone != null) {
-    try {
+  try {
+    final rawDone = preferences.getString('recomp_done_v6');
+    if (rawDone != null) {
+      final storedWeek =
+          preferences.getInt('recomp_done_v6_week') ?? isoWeekNumber(current);
+      final storedYear =
+          preferences.getInt('recomp_done_v6_year') ?? isoWeekYear(current);
       final done = jsonDecode(rawDone) as Map<String, dynamic>;
       final currentCounts = countByActualDate(done, storedYear, storedWeek);
       for (final entry in currentCounts.entries) {
@@ -144,12 +153,13 @@ Future<RecordSummary> loadRecordSummary(
           months[entry.key.month]![entry.key.day] = entry.value;
         }
       }
-    } catch (_) {
-      // Malformed current-week data should not hide valid archived history.
     }
+  } catch (_) {
+    // Malformed current-week data should not hide valid archived history.
   }
 
   // Dated actual records take precedence over legacy positional progress.
+  await awaitPendingWorkoutWrites(preferences);
   final sessions = decodeDailyWorkouts(preferences.getString(dailyWorkoutsKey));
   for (final session in sessions.values) {
     final date = DateTime.parse(session.date);

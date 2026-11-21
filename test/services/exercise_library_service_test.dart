@@ -115,6 +115,24 @@ void main() {
     );
     expect(
         (await loadExerciseLibrary()).any((e) => e.id == 'custom_b'), isTrue);
+
+    // Overwrite import replaces local custom library items cleanly.
+    await importAllData(backupA, mode: ImportMode.overwrite);
+    final overwritten = await loadExerciseLibrary();
+    expect(overwritten.any((e) => e.id == 'custom_a'), isTrue);
+    expect(overwritten.any((e) => e.id == 'custom_b'), isFalse);
+
+    // Duplicate IDs inside library backup are rejected.
+    final dupBackup = jsonEncode({
+      'schemaVersion': 3,
+      'preferences': {
+        exerciseLibraryKey: jsonEncode([customA.toJson(), customA.toJson()]),
+      },
+    });
+    await expectLater(
+      importAllData(dupBackup, mode: ImportMode.merge),
+      throwsFormatException,
+    );
   });
 
   test('deleteWorkoutTemplate removes template and clears dangling schedule',
