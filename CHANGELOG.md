@@ -1,5 +1,13 @@
 # 青燃 更新记录
 
+## 7.1.5 · 原生 1:1 跟手切日翻页、零闪跳周历联动与总览卡同滑隐藏（2026-11-21，build 96）
+
+- **原生 1:1 跟手切日翻页（`DayPageView`）**：以独立每日视口的原生 `PageView.builder` 配合临界阻尼弹簧物理（`mass: 1.0, stiffness: 145.0, damping: 24.4`，零过冲、120Hz 原生跟手）重构左右滑动切换日期，消除旧版单页替换时的位置回弹与透明度闪跳，舒缓时长告别急促感；饮食页同步接入 `DayPageView`。
+- **周历胶囊与翻页进度 1:1 实时联动**：`WeekStripBar` 胶囊位移与 7 天文字点亮度实时追踪页面滑动比例（`pageProgress`），跨周滑过周日/周一时胶囊从边缘平滑流转并无卡顿，点击或 `<`/`>` 切换亦走 340–528ms 柔和缓动。
+- **总览卡片与日期条共同顺滑收起**：取消原先吸顶裁剪的割裂过渡，改为零重构 `Stack` + 顶部安全裁切，让训练总览卡随日期条 1:1 同滑隐藏，跨日左右滑动时日期条随目标天滚动深度连续滑入显隐。
+
+[7.1.5 发布说明](docs/releases/v7.1.5.md) · [7.1.4](docs/releases/v7.1.4.md) · [7.1.3](docs/releases/v7.1.3.md) · [7.1.2](docs/releases/v7.1.2.md) · [7.1.1](docs/releases/v7.1.1.md)
+
 ## 7.1.4 · 120Hz 高刷优化、跟手切换与定制 4 练课表（2026-11-21，build 95）
 
 - **120Hz 原生高刷与弹窗转场性能跃升**：Android 端 `MainActivity` 自动解锁高刷新率显示模式；路由切用硬件加速 `CupertinoPageTransitionsBuilder`；缓存 `LiquidBackdrop` 极光球纹理并以硬件 `FadeTransition`/`ScaleTransition` 搭配轻量化 `sigma=12` 磨砂高斯模糊重构弹窗及菜单过渡，显著减少切页与弹窗掉帧。

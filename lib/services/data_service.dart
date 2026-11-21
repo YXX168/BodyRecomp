@@ -10,7 +10,7 @@ import 'rest_timer_service.dart';
 import 'workout_plan_service.dart';
 
 const int currentSchemaVersion = 3;
-const String appDataVersion = '7.1.4';
+const String appDataVersion = '7.1.5';
 const String profileKey = 'recomp_profile_v6';
 const String weightHistoryKey = 'recomp_weight_history_v6';
 const String measurementHistoryKey = 'recomp_measurements_v6';

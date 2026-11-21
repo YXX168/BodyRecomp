@@ -39,7 +39,11 @@ void main() {
 
   Future<void> tapVisible(WidgetTester tester, Finder finder) async {
     if (finder.evaluate().isEmpty) {
-      await tester.scrollUntilVisible(finder, 180);
+      await tester.scrollUntilVisible(
+        finder,
+        180,
+        scrollable: find.byType(Scrollable).last,
+      );
     }
     await tester.ensureVisible(finder);
     await tester.pumpAndSettle();
@@ -275,7 +279,11 @@ void main() {
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     expect((await loadMeals()).values.single.actual, '2 个鸡蛋 + 牛奶');
-    await tester.scrollUntilVisible(find.text('已记录 1/5 餐'), -180);
+    await tester.scrollUntilVisible(
+      find.text('已记录 1/5 餐'),
+      -180,
+      scrollable: find.byType(Scrollable).last,
+    );
     expect(find.text('已记录 1/5 餐'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

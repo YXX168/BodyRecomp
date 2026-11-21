@@ -1,7 +1,7 @@
 name: body_recomp
 description: 本地优先的流光液态玻璃健身记录：每日固定训练模板、可增删个人动作库、力量 PR、饮食与体重追踪。
 publish_to: 'none'
-version: 7.1.4+95
+version: 7.1.5+96
 
 environment:
   sdk: '>=3.2.0 <4.0.0'

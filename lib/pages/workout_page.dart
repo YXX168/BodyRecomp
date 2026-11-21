@@ -1,5 +1,7 @@
 import 'dart:math' as math;
+import 'dart:ui' show lerpDouble;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -17,10 +19,10 @@ import '../services/rest_timer_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ambient_background.dart';
 import '../widgets/daily_record_date.dart';
+import '../widgets/day_page_view.dart';
 import '../widgets/exercise_editor.dart';
 import '../widgets/exercise_mark.dart';
 import '../widgets/exercise_picker.dart';
-import '../widgets/horizontal_day_swipe.dart';
 import '../widgets/loading_view.dart';
 import '../widgets/muscle_body_graphic.dart';
 import '../widgets/rest_timer_pill.dart';
@@ -48,9 +50,8 @@ class WorkoutPage extends StatefulWidget {
 }
 
 class _WorkoutPageState extends State<WorkoutPage>
-    with WidgetsBindingObserver, DailyRecordDate, TickerProviderStateMixin {
+    with WidgetsBindingObserver, DailyRecordDate {
   static final DateTime _minDate = DateTime(2000);
-  static const Curve _dayCurve = Cubic(0.22, 1.0, 0.36, 1.0);
 
   @override
   DateTime get now => (widget.now ?? DateTime.now)();
@@ -61,12 +62,19 @@ class _WorkoutPageState extends State<WorkoutPage>
   RestCountdown? _ownedRest;
   RestCountdown get _rest => widget.restController ?? _ownedRest!;
 
-  final ScrollController _scrollController = ScrollController();
   final Map<String, double> _scrollOffsets = {};
-  String? _activeScrollDateKey;
-  bool _restoringScroll = false;
   final Map<String, String> _selectedTemplateByDate = {};
   final Set<String> _expandedNotes = {};
+
+  late final ValueNotifier<double> _pageProgressNotifier =
+      ValueNotifier<double>(DayPageView.dateToPageIndex(recordDate).toDouble());
+  final ValueNotifier<double> _weekStripHeightNotifier =
+      ValueNotifier<double>(96.0);
+  final ValueNotifier<double> _headerCollapseNotifier =
+      ValueNotifier<double>(0.0);
+  late final Listenable _headerSyncListenable =
+      Listenable.merge([_headerCollapseNotifier, _weekStripHeightNotifier]);
+  double? _measuredWeekStripHeight;
 
   bool _loading = true;
   bool _saving = false;
@@ -86,51 +94,43 @@ class _WorkoutPageState extends State<WorkoutPage>
   Map<String, ExerciseLog> _prByExercise = {};
   bool _autoRest = false;
 
-  late final AnimationController _dayAnim = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 190),
-    value: 1.0,
-  );
-  int _dayTransitionDir = 0;
-  bool _skipNextDayAnim = false;
-
-  @override
-  void selectRecordDate(DateTime date) {
-    final prev = dateOnly(recordDate);
-    final next = dateOnly(date);
-    super.selectRecordDate(next);
-    if (next == prev) return;
-    if (_skipNextDayAnim || MediaQuery.disableAnimationsOf(context)) {
-      _skipNextDayAnim = false;
-      _dayTransitionDir = 0;
-      _dayAnim.value = 1.0;
-      return;
-    }
-    _dayTransitionDir = next.isAfter(prev) ? 1 : -1;
-    _dayAnim.forward(from: 0.0).whenComplete(() {
-      if (mounted) _dayTransitionDir = 0;
-    });
+  double _collapseForPageIndex(int pageIndex) {
+    final maxCollapse = _weekStripHeightNotifier.value;
+    if (maxCollapse <= 0) return 0.0;
+    final key = dayKey(DayPageView.pageIndexToDate(pageIndex));
+    return (_scrollOffsets[key] ?? 0.0).clamp(0.0, maxCollapse).toDouble();
   }
 
-  Widget _dayTransitionWrap(Widget child) {
-    if (_dayTransitionDir == 0 && !_dayAnim.isAnimating) return child;
-    return AnimatedBuilder(
-      animation: _dayAnim,
-      child: child,
-      builder: (context, inner) {
-        final raw = _dayAnim.value.clamp(0.0, 1.0);
-        if (raw >= 0.999) return inner!;
-        final t = _dayCurve.transform(raw);
-        final dx = _dayTransitionDir * 16.0 * (1.0 - t);
-        return Transform.translate(
-          offset: Offset(dx, 0),
-          child: Opacity(
-            opacity: (0.72 + 0.28 * t).clamp(0.0, 1.0),
-            child: inner,
-          ),
-        );
-      },
-    );
+  void _recomputeHeaderCollapse() {
+    final page = _pageProgressNotifier.value;
+    final low = page.floor();
+    final high = page.ceil();
+    final frac = (page - low).clamp(0.0, 1.0);
+    final next = lerpDouble(
+          _collapseForPageIndex(low),
+          _collapseForPageIndex(high),
+          frac,
+        ) ??
+        0.0;
+    if ((next - _headerCollapseNotifier.value).abs() > 0.01) {
+      _headerCollapseNotifier.value = next;
+    }
+  }
+
+  void _onDayScrollChanged(String dateKey, double offset) {
+    _scrollOffsets[dateKey] = offset;
+    _recomputeHeaderCollapse();
+  }
+
+  void _onWeekStripHeightChanged(double height) {
+    if (!mounted || height <= 0) return;
+    if (_measuredWeekStripHeight != null &&
+        (_measuredWeekStripHeight! - height).abs() < 0.5) {
+      return;
+    }
+    _measuredWeekStripHeight = height;
+    _weekStripHeightNotifier.value = height;
+    _recomputeHeaderCollapse();
   }
 
   @override
@@ -142,12 +142,12 @@ class _WorkoutPageState extends State<WorkoutPage>
         onFinished: () => HapticFeedback.heavyImpact(),
       );
     }
+    _pageProgressNotifier.addListener(_recomputeHeaderCollapse);
     workoutDataRevision.addListener(_loadAll);
     workoutHistoryRevision.addListener(_onHistoryRevision);
     workoutPlanRevision.addListener(_onPlanRevision);
     exerciseLogsRevision.addListener(_loadLogsOnly);
     restTimerPreferenceRevision.addListener(_loadAutoRestOnly);
-    _scrollController.addListener(_onScrollChanged);
     _loadAll();
   }
 
@@ -194,15 +194,6 @@ class _WorkoutPageState extends State<WorkoutPage>
   void _onPlanRevision() {
     if (_suppressOwnPlanReload > 0) return;
     _loadPlanOnly();
-  }
-
-  void _onScrollChanged() {
-    if (_restoringScroll ||
-        _activeScrollDateKey == null ||
-        !_scrollController.hasClients) {
-      return;
-    }
-    _scrollOffsets[_activeScrollDateKey!] = _scrollController.offset;
   }
 
   Future<void> _showHeroMenu(
@@ -287,6 +278,14 @@ class _WorkoutPageState extends State<WorkoutPage>
     if (_ownedRest != null) {
       _ownedRest!.setActive(pageActive);
     }
+    if (_measuredWeekStripHeight == null) {
+      final ts = MediaQuery.textScalerOf(context);
+      final dateBarH = math.max(30.0, ts.scale(13.5) * 1.35 + 8.0);
+      final stripH =
+          16.0 + ts.scale(10.0) * 1.15 + 1.5 + ts.scale(13.0) * 1.15 + 5.5;
+      _weekStripHeightNotifier.value =
+          (dateBarH + 4.0 + stripH + 8.0).ceilToDouble();
+    }
   }
 
   @override
@@ -304,10 +303,11 @@ class _WorkoutPageState extends State<WorkoutPage>
     workoutPlanRevision.removeListener(_onPlanRevision);
     exerciseLogsRevision.removeListener(_loadLogsOnly);
     restTimerPreferenceRevision.removeListener(_loadAutoRestOnly);
-    _scrollController
-      ..removeListener(_onScrollChanged)
+    _pageProgressNotifier
+      ..removeListener(_recomputeHeaderCollapse)
       ..dispose();
-    _dayAnim.dispose();
+    _weekStripHeightNotifier.dispose();
+    _headerCollapseNotifier.dispose();
     _ownedRest?.dispose();
     super.dispose();
   }
@@ -974,37 +974,123 @@ class _WorkoutPageState extends State<WorkoutPage>
     }
 
     final currentDate = recordDate;
-    final currentKey = dayKey(currentDate);
-    if (_activeScrollDateKey != currentKey) {
-      _activeScrollDateKey = currentKey;
-      _restoringScroll = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        try {
-          if (!mounted ||
-              _activeScrollDateKey != currentKey ||
-              !_scrollController.hasClients) {
-            return;
-          }
-          final target = _scrollOffsets[currentKey] ?? 0.0;
-          final max = _scrollController.position.maxScrollExtent;
-          _scrollController.jumpTo(target.clamp(0.0, max));
-        } finally {
-          if (_activeScrollDateKey == currentKey) {
-            _restoringScroll = false;
-          }
-        }
-      });
-    }
+    final maxDate = DateTime(today.year + 1, today.month, today.day);
+
+    return Column(
+      children: [
+        if (widget.showRestTimer)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 2),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [RestTimerPill(controller: _rest)],
+            ),
+          ),
+        Expanded(
+          child: ClipRect(
+            child: Stack(
+              children: [
+                AnimatedBuilder(
+                  animation: _headerSyncListenable,
+                  child: DayPageView(
+                    date: currentDate,
+                    minDate: _minDate,
+                    maxDate: maxDate,
+                    enabled: !_saving,
+                    pageProgressNotifier: _pageProgressNotifier,
+                    onDateChanged: selectRecordDate,
+                    pageBuilder: (context, pageDate) {
+                      final keyStr = dayKey(pageDate);
+                      return _WorkoutDayList(
+                        key: ValueKey('workout-day-$keyStr'),
+                        dateKey: keyStr,
+                        initialScrollOffset: _scrollOffsets[keyStr] ?? 0.0,
+                        topInsetListenable: _weekStripHeightNotifier,
+                        onScrollOffsetChanged: _onDayScrollChanged,
+                        childBuilder: (context, controller, topInset) =>
+                            _buildDayScrollView(
+                          context: context,
+                          pageDate: pageDate,
+                          controller: controller,
+                          topInset: topInset,
+                        ),
+                      );
+                    },
+                  ),
+                  builder: (context, child) {
+                    final collapse = _headerCollapseNotifier.value;
+                    final maxCollapse = _weekStripHeightNotifier.value;
+                    final visibleTop =
+                        (maxCollapse - collapse).clamp(0.0, maxCollapse);
+                    return ClipRect(
+                      clipper: _TopInsetClipper(visibleTop),
+                      child: child,
+                    );
+                  },
+                ),
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: AnimatedBuilder(
+                    animation: _headerSyncListenable,
+                    child: RepaintBoundary(
+                      child: _MeasureHeight(
+                        onHeightChanged: _onWeekStripHeightChanged,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+                          child: WeekStripBar(
+                            date: currentDate,
+                            today: today,
+                            enabled: !_saving,
+                            allowFutureSelection: true,
+                            pageProgress: _pageProgressNotifier,
+                            statusForDay: _statusForDay,
+                            onChanged: selectRecordDate,
+                          ),
+                        ),
+                      ),
+                    ),
+                    builder: (context, child) {
+                      final collapse = _headerCollapseNotifier.value;
+                      final maxCollapse = _weekStripHeightNotifier.value;
+                      final hidden =
+                          maxCollapse > 0 && collapse >= maxCollapse - 1.0;
+                      return IgnorePointer(
+                        ignoring: hidden,
+                        child: Transform.translate(
+                          offset: Offset(0, -collapse),
+                          child: child,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDayScrollView({
+    required BuildContext context,
+    required DateTime pageDate,
+    required ScrollController controller,
+    required double topInset,
+  }) {
+    final currentKey = dayKey(pageDate);
     final existingSession = _sessions[currentKey];
-    final session = _effectiveSession(currentDate);
-    final scheduledTpl = _scheduledTemplate(currentDate);
+    final session = _effectiveSession(pageDate);
+    final scheduledTpl = _scheduledTemplate(pageDate);
     final persistedTpl = _templateById(session.templateId);
     final selectedTpl = _templateById(_selectedTemplateByDate[currentKey]);
     final activeTpl = persistedTpl ??
         (session.templateName != null ? null : (selectedTpl ?? scheduledTpl));
     final resolvedTplName =
         persistedTpl?.name ?? session.templateName ?? activeTpl?.name;
-    final isFuture = !_isDateEditable(currentDate);
+    final isFuture = !_isDateEditable(pageDate);
     final blocks = session.blocks;
     final planned = session.plannedSets;
     final completed = session.completedSets;
@@ -1022,145 +1108,55 @@ class _WorkoutPageState extends State<WorkoutPage>
         ? '今日休整'
         : (resolvedTplName ?? (blocks.isNotEmpty ? '自由训练' : '未排计划'));
 
-    void stepDate(int delta) {
-      if (_saving) return;
-      final d = dateOnly(currentDate);
-      final target = DateTime(d.year, d.month, d.day + delta);
-      if (target.isBefore(_minDate)) return;
-      selectRecordDate(target);
-    }
-
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    final textScaler = MediaQuery.textScalerOf(context);
-    final hasProgress = !session.rested && planned > 0;
-    final futurePillHeight =
-        isFuture ? textScaler.scale(11.0) * 1.45 + 10.0 : 0.0;
-    final row1Height = math.max(
-      28.0,
-      math.max(textScaler.scale(17.5) * 1.32, futurePillHeight) + 2.0,
-    );
-    final row2Height = textScaler.scale(hasProgress ? 15.0 : 12.0) * 1.38 + 2.0;
-    final progressHeight = hasProgress ? 12.0 : 0.0;
-    final heroContentHeight =
-        math.max(60.0, row1Height + 6.0 + row2Height + progressHeight);
-    final heroHeaderExtent = (heroContentHeight + 44.0).ceilToDouble();
-
-    return Column(
-      children: [
-        if (widget.showRestTimer)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 2),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [RestTimerPill(controller: _rest)],
-            ),
-          ),
-        Expanded(
-          child: HorizontalDaySwipe(
-            onPrevious: () {
-              _skipNextDayAnim = true;
-              stepDate(-1);
-            },
-            onNext: () {
-              _skipNextDayAnim = true;
-              stepDate(1);
-            },
-            child: CustomScrollView(
-              controller: _scrollController,
-              slivers: [
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
-                    child: WeekStripBar(
-                      date: currentDate,
-                      today: today,
-                      enabled: !_saving,
-                      allowFutureSelection: true,
-                      statusForDay: _statusForDay,
-                      onChanged: selectRecordDate,
+    return CustomScrollView(
+      controller: controller,
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(16, topInset + 4, 16, 112),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              _buildHeroCard(
+                context: context,
+                targetDate: pageDate,
+                heroTitle: heroTitle,
+                completed: completed,
+                planned: planned,
+                progress: progress,
+                muscles: muscles,
+                session: session,
+                existingSession: existingSession,
+                scheduledTpl: scheduledTpl,
+                isFuture: isFuture,
+              ),
+              const SizedBox(height: 12),
+              if (blocks.isEmpty)
+                _buildEmptyOrRestCard(
+                  context: context,
+                  targetDate: pageDate,
+                  rested: session.rested,
+                  hasScheduled: scheduledTpl != null,
+                  isFuture: isFuture,
+                )
+              else ...[
+                for (var i = 0; i < blocks.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _buildBlockCard(
+                      context: context,
+                      targetDate: pageDate,
+                      dateKeyStr: currentKey,
+                      index: i,
+                      block: blocks[i],
+                      totalBlocks: blocks.length,
+                      isFuture: isFuture,
                     ),
                   ),
-                ),
-                SliverPersistentHeader(
-                  pinned: true,
-                  delegate: _PinnedHeroHeaderDelegate(
-                    extent: heroHeaderExtent,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onTap: () {
-                        if (_scrollController.hasClients &&
-                            _scrollController.offset > 12) {
-                          _scrollController.animateTo(
-                            0,
-                            duration: reduceMotion
-                                ? Duration.zero
-                                : const Duration(milliseconds: 260),
-                            curve: Curves.easeOutCubic,
-                          );
-                        }
-                      },
-                      child: _dayTransitionWrap(
-                        _buildHeroCard(
-                          context: context,
-                          targetDate: currentDate,
-                          heroTitle: heroTitle,
-                          completed: completed,
-                          planned: planned,
-                          progress: progress,
-                          muscles: muscles,
-                          session: session,
-                          existingSession: existingSession,
-                          scheduledTpl: scheduledTpl,
-                          isFuture: isFuture,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                _SliverClipOverlap(
-                  child: SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 2, 16, 112),
-                    sliver: blocks.isEmpty
-                        ? SliverToBoxAdapter(
-                            child: _dayTransitionWrap(
-                              _buildEmptyOrRestCard(
-                                context: context,
-                                targetDate: currentDate,
-                                rested: session.rested,
-                                hasScheduled: scheduledTpl != null,
-                                isFuture: isFuture,
-                              ),
-                            ),
-                          )
-                        : SliverList(
-                            delegate: SliverChildListDelegate([
-                              for (var i = 0; i < blocks.length; i++)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: _dayTransitionWrap(
-                                    _buildBlockCard(
-                                      context: context,
-                                      targetDate: currentDate,
-                                      dateKeyStr: currentKey,
-                                      index: i,
-                                      block: blocks[i],
-                                      totalBlocks: blocks.length,
-                                      isFuture: isFuture,
-                                    ),
-                                  ),
-                                ),
-                              if (!isFuture) ...[
-                                const SizedBox(height: 2),
-                                _dayTransitionWrap(
-                                  _buildBottomAddBar(context, currentDate),
-                                ),
-                              ],
-                            ]),
-                          ),
-                  ),
-                ),
+                if (!isFuture) ...[
+                  const SizedBox(height: 2),
+                  _buildBottomAddBar(context, pageDate),
+                ],
               ],
-            ),
+            ]),
           ),
         ),
       ],
@@ -1919,117 +1915,112 @@ class _WorkoutPageState extends State<WorkoutPage>
   }
 }
 
-class _PinnedHeroHeaderDelegate extends SliverPersistentHeaderDelegate {
-  final double extent;
-  final Widget child;
+class _WorkoutDayList extends StatefulWidget {
+  final String dateKey;
+  final double initialScrollOffset;
+  final ValueListenable<double> topInsetListenable;
+  final void Function(String dateKey, double offset) onScrollOffsetChanged;
+  final Widget Function(
+    BuildContext context,
+    ScrollController controller,
+    double topInset,
+  ) childBuilder;
 
-  const _PinnedHeroHeaderDelegate({
-    required this.extent,
-    required this.child,
+  const _WorkoutDayList({
+    super.key,
+    required this.dateKey,
+    required this.initialScrollOffset,
+    required this.topInsetListenable,
+    required this.onScrollOffsetChanged,
+    required this.childBuilder,
   });
 
   @override
-  double get minExtent => extent;
+  State<_WorkoutDayList> createState() => _WorkoutDayListState();
+}
 
-  @override
-  double get maxExtent => extent;
+class _WorkoutDayListState extends State<_WorkoutDayList> {
+  late final ScrollController _controller =
+      ScrollController(initialScrollOffset: widget.initialScrollOffset);
 
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    final p = context.palette;
-    final pinned = shrinkOffset > 0.5 || overlapsContent;
-    return SizedBox.expand(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-        child: Align(
-          alignment: Alignment.center,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
-              boxShadow: pinned
-                  ? [
-                      BoxShadow(
-                        color: Colors.black
-                            .withValues(alpha: p.isDark ? .26 : .07),
-                        blurRadius: 18,
-                        offset: const Offset(0, 7),
-                      ),
-                    ]
-                  : null,
-            ),
-            child: child,
-          ),
-        ),
-      ),
-    );
+  void _onScroll() {
+    if (!_controller.hasClients) return;
+    widget.onScrollOffsetChanged(widget.dateKey, _controller.offset);
   }
 
   @override
-  bool shouldRebuild(covariant _PinnedHeroHeaderDelegate oldDelegate) =>
-      oldDelegate.extent != extent || oldDelegate.child != child;
+  void initState() {
+    super.initState();
+    _controller.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _controller
+      ..removeListener(_onScroll)
+      ..dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<double>(
+      valueListenable: widget.topInsetListenable,
+      builder: (context, topInset, _) =>
+          widget.childBuilder(context, _controller, topInset),
+    );
+  }
 }
 
-class _SliverClipOverlap extends SingleChildRenderObjectWidget {
-  const _SliverClipOverlap({super.child});
+class _TopInsetClipper extends CustomClipper<Rect> {
+  final double topInset;
+
+  const _TopInsetClipper(this.topInset);
+
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTRB(0.0, topInset, size.width, size.height);
+
+  @override
+  bool shouldReclip(covariant _TopInsetClipper oldClipper) =>
+      (oldClipper.topInset - topInset).abs() > 0.2;
+}
+
+class _MeasureHeight extends SingleChildRenderObjectWidget {
+  final ValueChanged<double> onHeightChanged;
+
+  const _MeasureHeight({
+    required this.onHeightChanged,
+    required super.child,
+  });
 
   @override
   RenderObject createRenderObject(BuildContext context) =>
-      _RenderSliverClipOverlap();
+      _RenderMeasureHeight(onHeightChanged);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    covariant _RenderMeasureHeight renderObject,
+  ) {
+    renderObject.onHeightChanged = onHeightChanged;
+  }
 }
 
-class _RenderSliverClipOverlap extends RenderProxySliver {
-  @override
-  void paint(PaintingContext context, Offset offset) {
-    final child = this.child;
-    if (child == null || !(child.geometry?.visible ?? false)) {
-      layer = null;
-      return;
-    }
-    final overlap = constraints.overlap;
-    if (overlap <= 2.0) {
-      layer = null;
-      context.paintChild(child, offset);
-      return;
-    }
-    final clipTop = overlap - 2.0;
-    final clipBottom = math.max(clipTop, constraints.remainingPaintExtent);
-    layer = context.pushClipRect(
-      needsCompositing,
-      offset,
-      Rect.fromLTRB(0.0, clipTop, constraints.crossAxisExtent, clipBottom),
-      super.paint,
-      clipBehavior: Clip.hardEdge,
-      oldLayer: layer as ClipRectLayer?,
-    );
-  }
+class _RenderMeasureHeight extends RenderProxyBox {
+  ValueChanged<double> onHeightChanged;
+  double? _lastHeight;
+
+  _RenderMeasureHeight(this.onHeightChanged);
 
   @override
-  Rect? describeApproximatePaintClip(covariant RenderObject child) {
-    final overlap = constraints.overlap;
-    if (overlap <= 2.0) return super.describeApproximatePaintClip(child);
-    final clipTop = overlap - 2.0;
-    final clipBottom = math.max(clipTop, constraints.remainingPaintExtent);
-    return Rect.fromLTRB(0.0, clipTop, constraints.crossAxisExtent, clipBottom);
-  }
-
-  @override
-  bool hitTestChildren(
-    SliverHitTestResult result, {
-    required double mainAxisPosition,
-    required double crossAxisPosition,
-  }) {
-    if (constraints.overlap > 2.0 &&
-        mainAxisPosition < constraints.overlap - 2.0) {
-      return false;
+  void performLayout() {
+    super.performLayout();
+    final height = size.height;
+    if (_lastHeight == null || (_lastHeight! - height).abs() > 0.25) {
+      _lastHeight = height;
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => onHeightChanged(height));
     }
-    return super.hitTestChildren(
-      result,
-      mainAxisPosition: mainAxisPosition,
-      crossAxisPosition: crossAxisPosition,
-    );
   }
 }

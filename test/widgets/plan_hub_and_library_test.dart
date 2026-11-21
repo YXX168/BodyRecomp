@@ -10,7 +10,6 @@ import 'package:body_recomp/widgets/app_navigation_bar.dart';
 import 'package:body_recomp/widgets/muscle_body_graphic.dart';
 import 'package:body_recomp/widgets/week_strip_bar.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -220,7 +219,7 @@ void main() {
   });
 
   testWidgets(
-      'workout date bar hides on downward scroll while overview card stays pinned',
+      'workout date bar and overview card scroll and hide smoothly together',
       (tester) async {
     tester.view.physicalSize = const Size(390, 640);
     tester.view.devicePixelRatio = 1;
@@ -241,55 +240,71 @@ void main() {
     final heroFinder = find.byKey(const Key('daily-suggestion'));
     final block0Finder = find.byKey(const ValueKey('workout-block-0'));
 
+    final viewportTop = tester.getRect(scrollFinder).top;
+    final weekBefore = tester.getRect(weekFinder);
     final heroBefore = tester.getRect(heroFinder);
     final blockBefore = tester.getRect(block0Finder);
 
     // Small downward drag moves WeekStripBar, HeroCard and blocks 1:1 together
-    // (~30px after 18px touch slop) with zero abrupt height-collapse jump.
+    // with zero pinned detach or jump.
     await tester.drag(scrollFinder, const Offset(0, -48));
     await tester.pumpAndSettle();
 
+    final weekMid = tester.getRect(weekFinder);
     final heroMid = tester.getRect(heroFinder);
     final blockMid = tester.getRect(block0Finder);
+    final weekDelta = weekBefore.top - weekMid.top;
     final heroDelta = heroBefore.top - heroMid.top;
     final blockDelta = blockBefore.top - blockMid.top;
     expect(heroDelta, inInclusiveRange(18.0, 42.0));
+    expect((heroDelta - weekDelta).abs(), lessThan(2.0));
     expect((heroDelta - blockDelta).abs(), lessThan(2.0));
-    expect(weekFinder, findsOneWidget);
 
-    // Larger downward drag scrolls WeekStripBar out while HeroCard pins cleanly.
-    await tester.drag(scrollFinder, const Offset(0, -240));
+    // Larger downward drag smoothly hides BOTH WeekStripBar and HeroCard together.
+    await tester.drag(scrollFinder, const Offset(0, -280));
     await tester.pumpAndSettle();
 
-    final scrollTop = tester.getRect(scrollFinder).top;
-    final heroDocked = tester.getRect(heroFinder);
-    expect(heroDocked.top - scrollTop, inInclusiveRange(0.0, 12.0));
-    if (weekFinder.evaluate().isNotEmpty) {
-      expect(tester.getRect(weekFinder).bottom,
-          lessThanOrEqualTo(scrollTop + 4.0));
-    }
+    expect(
+        tester.getRect(weekFinder).bottom, lessThanOrEqualTo(viewportTop + 4));
     expect(
       tester
-          .firstRenderObject<RenderSliver>(find.byType(SliverPadding))
-          .constraints
-          .overlap,
-      greaterThan(0.0),
+          .widget<IgnorePointer>(
+            find
+                .ancestor(of: weekFinder, matching: find.byType(IgnorePointer))
+                .first,
+          )
+          .ignoring,
+      isTrue,
     );
-
-    // Small upward drag mid-list keeps HeroCard calmly pinned at the top.
-    await tester.drag(scrollFinder, const Offset(0, 60));
-    await tester.pumpAndSettle();
     expect(
-      tester.getRect(heroFinder).top - scrollTop,
-      inInclusiveRange(0.0, 12.0),
+      heroFinder.evaluate().isEmpty ||
+          tester.getRect(heroFinder).bottom <= viewportTop + 4.0,
+      isTrue,
     );
 
-    // Tapping the pinned HeroCard smoothly scrolls back to reveal WeekStripBar.
-    await tester.tap(heroFinder);
+    // Scrolling back up restores both HeroCard and WeekStripBar cleanly.
+    await tester.drag(scrollFinder, const Offset(0, 320));
     await tester.pumpAndSettle();
-    expect(tester.getRect(weekFinder).top, greaterThanOrEqualTo(scrollTop));
 
-    // Tapping block-menu opens the new frosted glass submenu card.
+    expect(
+        tester.getRect(weekFinder).top, greaterThanOrEqualTo(viewportTop - 1));
+    expect(
+      tester
+          .widget<IgnorePointer>(
+            find
+                .ancestor(of: weekFinder, matching: find.byType(IgnorePointer))
+                .first,
+          )
+          .ignoring,
+      isFalse,
+    );
+    expect(heroFinder, findsOneWidget);
+    expect(
+      tester.getRect(heroFinder).top,
+      greaterThanOrEqualTo(tester.getRect(weekFinder).bottom - 1),
+    );
+
+    // Tapping block-menu opens the frosted glass submenu card.
     await tester.tap(find.byKey(const ValueKey('block-menu-0')));
     await tester.pumpAndSettle();
     expect(find.text('第 1 项 · 动作操作'), findsOneWidget);

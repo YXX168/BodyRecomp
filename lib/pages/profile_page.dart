@@ -26,7 +26,7 @@ typedef ProfileHubPage = ProfilePage;
 
 class ProfilePage extends StatefulWidget {
   final String appVersion;
-  const ProfilePage({super.key, this.appVersion = '7.1.4'});
+  const ProfilePage({super.key, this.appVersion = '7.1.5'});
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();

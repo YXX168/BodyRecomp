@@ -542,8 +542,8 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView>
                   AnimatedPositioned(
                     duration: reduceMotion
                         ? Duration.zero
-                        : const Duration(milliseconds: 250),
-                    curve: const Cubic(0.22, 1.0, 0.36, 1.0),
+                        : const Duration(milliseconds: 340),
+                    curve: const Cubic(0.32, 0.72, 0.0, 1.0),
                     left: _selectedDay * slotWidth,
                     top: 0,
                     bottom: 0,

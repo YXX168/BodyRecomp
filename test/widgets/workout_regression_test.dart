@@ -1,12 +1,15 @@
 import 'package:body_recomp/data/workout_templates.dart';
 import 'package:body_recomp/main.dart';
 import 'package:body_recomp/models/daily_workout.dart';
+import 'package:body_recomp/pages/nutrition_page.dart';
 import 'package:body_recomp/pages/template_manager_page.dart';
 import 'package:body_recomp/pages/workout_page.dart';
 import 'package:body_recomp/services/daily_workout_service.dart';
 import 'package:body_recomp/services/data_service.dart';
+import 'package:body_recomp/services/nutrition_service.dart';
 import 'package:body_recomp/services/rest_countdown.dart';
 import 'package:body_recomp/widgets/ambient_background.dart';
+import 'package:body_recomp/widgets/day_page_view.dart';
 import 'package:body_recomp/widgets/horizontal_day_swipe.dart';
 import 'package:body_recomp/widgets/rest_timer_pill.dart';
 import 'package:body_recomp/widgets/week_strip_bar.dart';
@@ -101,53 +104,132 @@ void main() {
   });
 
   testWidgets(
-      '_SliverClipOverlap blocks bleed-through taps on scrolled-under controls',
+      'WorkoutPage horizontal DayPageView swipes 1:1 with stationary WeekStripBar and cross-week sync',
       (tester) async {
-    final today = DateTime(2026, 11, 12, 12);
-    await saveDailyWorkout(
-      DailyWorkout(
-        date: dayKey(today),
-        blocks: [
-          for (var i = 0; i < 6; i++)
-            WorkoutBlock(
-              id: 'b-$i',
-              exercise: defaultTemplates.first.exercises.first
-                  .copyWith(name: '动作 $i'),
-            ),
-        ],
-      ),
+    final sunday = DateTime(2026, 11, 22, 12);
+    await pumpWorkout(tester, WorkoutPage(now: () => sunday));
+
+    final weekFinder = find.byType(WeekStripBar);
+    final weekBefore = tester.getRect(weekFinder);
+    expect(find.text('准备开练'), findsOneWidget);
+
+    // Mid-drag left toward Monday: adjacent day pages render 1:1 side-by-side
+    // while WeekStripBar stays horizontally anchored.
+    final gesture = await tester.startGesture(const Offset(340, 350));
+    await gesture.moveBy(const Offset(-25, 0));
+    await tester.pump();
+    await gesture.moveBy(const Offset(-140, 0));
+    await tester.pump();
+
+    expect(
+      tester.getRect(weekFinder).center.dx,
+      closeTo(weekBefore.center.dx, 0.1),
     );
+    expect(find.text('准备开练'), findsOneWidget);
+    expect(find.text('推 · 胸肩三头'), findsOneWidget);
+
+    await gesture.moveBy(const Offset(-90, 0));
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('11月23日 周一'), findsOneWidget);
+    expect(find.text('推 · 胸肩三头'), findsOneWidget);
+    expect(find.text('准备开练'), findsNothing);
+
+    // Tapping Thursday on WeekStripBar smoothly animates to Thursday's page.
+    await tester.tap(find.byKey(const ValueKey('week-strip-day-3')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('11月26日 周四'), findsOneWidget);
+    expect(find.text('上肢 · 轮廓与代谢'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'WorkoutPage scroll hides WeekStripBar + HeroCard and cross-swipe reveals WeekStripBar cleanly',
+      (tester) async {
+    final thursday = DateTime(2026, 11, 19, 12);
     await pumpWorkout(
       tester,
-      WorkoutPage(now: () => today),
+      WorkoutPage(now: () => thursday),
       size: const Size(390, 620),
     );
 
-    // Scroll so block-0's complete-set-0 moves directly behind the pinned
-    // HeroCard while still mounted in the sliver list.
     final scrollFinder = find.byType(CustomScrollView);
+    final weekFinder = find.byType(WeekStripBar);
     final heroFinder = find.byKey(const Key('daily-suggestion'));
-    final block0SetFinder = find.byKey(const ValueKey('complete-set-0'));
-    final scrollTop = tester.getRect(scrollFinder).top;
-    final heroHeight = tester.getRect(heroFinder).height;
-    final setCenterBefore = tester.getCenter(block0SetFinder).dy;
-    final targetY = scrollTop + heroHeight * 0.55;
-    final dragDelta = setCenterBefore - targetY + 18.0; // +18 touch slop
+    final viewportTop = tester.getRect(scrollFinder).top;
 
-    await tester.drag(scrollFinder, Offset(0, -dragDelta));
+    await tester.drag(scrollFinder, const Offset(0, -280));
     await tester.pumpAndSettle();
 
-    final heroRect = tester.getRect(heroFinder);
-    expect(block0SetFinder.evaluate(), isNotEmpty);
-    final clippedSetCenter = tester.getCenter(block0SetFinder);
-    expect(heroRect.contains(clippedSetCenter), isTrue);
+    expect(
+      tester
+          .widget<IgnorePointer>(
+            find
+                .ancestor(of: weekFinder, matching: find.byType(IgnorePointer))
+                .first,
+          )
+          .ignoring,
+      isTrue,
+    );
+    expect(
+      heroFinder.evaluate().isEmpty ||
+          tester.getRect(heroFinder).bottom <= viewportTop + 4.0,
+      isTrue,
+    );
 
-    // Tapping right over the scrolled-under complete-set button must NOT log a set.
-    await tester.tapAt(clippedSetCenter);
+    // Swiping right to unscrolled Wednesday smoothly reveals WeekStripBar.
+    await tester.drag(find.byType(DayPageView), const Offset(280, 0));
     await tester.pumpAndSettle();
 
-    final session = (await loadDailyWorkouts())[dayKey(today)]!;
-    expect(session.completedSets, 0);
+    expect(
+      tester
+          .widget<IgnorePointer>(
+            find
+                .ancestor(of: weekFinder, matching: find.byType(IgnorePointer))
+                .first,
+          )
+          .ignoring,
+      isFalse,
+    );
+    expect(
+        tester.getRect(weekFinder).top, greaterThanOrEqualTo(viewportTop - 1));
+    expect(find.text('腿臀 · 核心塑形'), findsOneWidget);
+    expect(
+      tester.getRect(heroFinder).top,
+      greaterThanOrEqualTo(tester.getRect(weekFinder).bottom - 1),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'NutritionPage horizontal DayPageView switches to yesterday and blocks future swipe',
+      (tester) async {
+    final thursday = DateTime(2026, 11, 19, 12);
+    final yesterday = DateTime(2026, 11, 18, 12);
+    await saveMealEntry(
+      '${dayKey(yesterday)}|breakfast',
+      MealEntry(
+        date: dayKey(yesterday),
+        meal: 'breakfast',
+        actual: '燕麦鸡蛋',
+      ),
+    );
+
+    await pumpWorkout(tester, NutritionPage(now: () => thursday));
+    expect(find.textContaining('今天 · 11月19日 周四'), findsOneWidget);
+
+    // Swiping left cannot navigate into future beyond today.
+    await tester.drag(find.byType(DayPageView), const Offset(-260, 0));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('今天 · 11月19日 周四'), findsOneWidget);
+    expect(find.text('燕麦鸡蛋'), findsNothing);
+
+    // Swiping right smoothly moves to yesterday and shows its meal.
+    await tester.drag(find.byType(DayPageView), const Offset(260, 0));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('11月18日 周三'), findsOneWidget);
+    expect(find.text('燕麦鸡蛋'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

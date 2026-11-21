@@ -24,17 +24,16 @@ class HorizontalDaySwipe extends StatefulWidget {
 
 class _HorizontalDaySwipeState extends State<HorizontalDaySwipe>
     with SingleTickerProviderStateMixin {
-  static const Curve _glideCurve = Cubic(0.22, 1.0, 0.36, 1.0);
+  static const Curve _glideCurve = Cubic(0.32, 0.72, 0.0, 1.0);
 
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 220),
+    duration: const Duration(milliseconds: 320),
   );
 
   double _rawDrag = 0.0;
   double _dragOffset = 0.0;
   double _animFromOffset = 0.0;
-  double _animFromOpacity = 1.0;
   bool _animating = false;
 
   @override
@@ -43,13 +42,12 @@ class _HorizontalDaySwipeState extends State<HorizontalDaySwipe>
     super.dispose();
   }
 
-  void _startGlide({required double fromOffset, required double fromOpacity}) {
+  void _startGlide({required double fromOffset}) {
     if (MediaQuery.disableAnimationsOf(context)) {
       _controller.value = 1.0;
       setState(() {
         _dragOffset = 0.0;
         _animFromOffset = 0.0;
-        _animFromOpacity = 1.0;
         _animating = false;
       });
       return;
@@ -57,14 +55,12 @@ class _HorizontalDaySwipeState extends State<HorizontalDaySwipe>
     setState(() {
       _dragOffset = 0.0;
       _animFromOffset = fromOffset;
-      _animFromOpacity = fromOpacity;
       _animating = true;
     });
     _controller.forward(from: 0.0).whenComplete(() {
       if (!mounted) return;
       setState(() {
         _animFromOffset = 0.0;
-        _animFromOpacity = 1.0;
         _animating = false;
       });
     });
@@ -77,7 +73,6 @@ class _HorizontalDaySwipeState extends State<HorizontalDaySwipe>
       setState(() {
         _dragOffset = 0.0;
         _animFromOffset = 0.0;
-        _animFromOpacity = 1.0;
         _animating = false;
       });
     }
@@ -108,20 +103,18 @@ class _HorizontalDaySwipeState extends State<HorizontalDaySwipe>
     if (triggerNext) {
       HapticFeedback.selectionClick();
       widget.onNext!.call();
-      _startGlide(fromOffset: 36.0, fromOpacity: 0.55);
+      _startGlide(fromOffset: 36.0);
       return;
     }
     if (triggerPrev) {
       HapticFeedback.selectionClick();
       widget.onPrevious!.call();
-      _startGlide(fromOffset: -36.0, fromOpacity: 0.55);
+      _startGlide(fromOffset: -36.0);
       return;
     }
 
     if (_dragOffset.abs() > 0.5) {
-      final currentOpacity =
-          (1.0 - (_dragOffset.abs() / 80.0) * 0.12).clamp(0.88, 1.0);
-      _startGlide(fromOffset: _dragOffset, fromOpacity: currentOpacity);
+      _startGlide(fromOffset: _dragOffset);
     } else if (_dragOffset != 0.0) {
       setState(() => _dragOffset = 0.0);
     }
@@ -130,9 +123,7 @@ class _HorizontalDaySwipeState extends State<HorizontalDaySwipe>
   void _handleDragCancel() {
     _rawDrag = 0.0;
     if (_dragOffset.abs() > 0.5) {
-      final currentOpacity =
-          (1.0 - (_dragOffset.abs() / 80.0) * 0.12).clamp(0.88, 1.0);
-      _startGlide(fromOffset: _dragOffset, fromOpacity: currentOpacity);
+      _startGlide(fromOffset: _dragOffset);
     } else if (_dragOffset != 0.0) {
       setState(() => _dragOffset = 0.0);
     }
@@ -159,34 +150,17 @@ class _HorizontalDaySwipeState extends State<HorizontalDaySwipe>
         child: widget.child,
         builder: (context, child) {
           final double currentX;
-          final double currentOpacity;
           if (_animating) {
             final t = _glideCurve.transform(_controller.value.clamp(0.0, 1.0));
             currentX = _animFromOffset * (1.0 - t);
-            currentOpacity = (_animFromOpacity + (1.0 - _animFromOpacity) * t)
-                .clamp(0.0, 1.0);
           } else {
             currentX = _dragOffset;
-            currentOpacity = currentX == 0.0
-                ? 1.0
-                : (1.0 - (currentX.abs() / 80.0) * 0.12).clamp(0.88, 1.0);
           }
 
-          if (currentX == 0.0 && currentOpacity >= 0.999) {
-            return child!;
-          }
-
-          Widget transformed = Transform.translate(
+          return Transform.translate(
             offset: Offset(currentX, 0),
             child: child,
           );
-          if (currentOpacity < 0.999) {
-            transformed = Opacity(
-              opacity: currentOpacity,
-              child: transformed,
-            );
-          }
-          return transformed;
         },
       ),
     );
