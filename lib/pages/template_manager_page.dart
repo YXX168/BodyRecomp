@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../data/workout_templates.dart';
 import '../models/daily_workout.dart';
 import '../models/library_exercise.dart';
 import '../models/recomp_models.dart';
@@ -152,6 +153,39 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView>
   WorkoutTemplate? _templateForDay(int day) {
     if (_templates == null || day < 0 || day >= _schedule.length) return null;
     return _templateById(_schedule[day]);
+  }
+
+  Future<void> _resetToDefaultPlan() async {
+    if (_busy) return;
+    final ok = await showGlassConfirm(
+      context: context,
+      title: '恢复默认 4 练课表？',
+      message: '将重置预制模板并设为周一周二周三周四训练、周五六日休息的增肌减脂方案，已记录的每日历史训练不会被修改。',
+      icon: Icons.restart_alt_rounded,
+      confirmLabel: '恢复默认',
+    );
+    if (ok != true || !mounted || _busy) return;
+    setState(() => _busy = true);
+    try {
+      final freshTemplates = List<WorkoutTemplate>.from(defaultTemplates);
+      final freshSchedule = List<String>.from(defaultSchedule);
+      await saveWorkoutTemplates(freshTemplates);
+      await saveWeeklySchedule(freshSchedule);
+      workoutPlanRevision.value++;
+      if (!mounted) return;
+      setState(() {
+        _templates = freshTemplates;
+        _schedule = freshSchedule;
+        _error = null;
+      });
+      showGlassNotice(context, '已恢复默认 4 练增肌减脂课表');
+    } catch (_) {
+      if (mounted) {
+        showGlassNotice(context, '恢复默认课表失败，请重试', isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<bool> _saveTemplateUpdate(WorkoutTemplate updated) async {
@@ -487,7 +521,7 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView>
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 112),
       children: [
-        // Unified Calm 7-Day Glass Pill Rail
+        // Unified Calm 7-Day Glass Pill Rail with smooth sliding indicator
         Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
@@ -499,91 +533,129 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView>
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: p.borderSubtle, width: 0.9),
           ),
-          child: Row(
-            children: [
-              for (var d = 0; d < 7; d++)
-                Expanded(
-                  child: Builder(
-                    builder: (context) {
-                      final isSelected = d == _selectedDay;
-                      final isToday = d == todayWeekday;
-                      final hasTpl = _templateForDay(d) != null;
-                      return Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          key: ValueKey('schedule-day-$d'),
-                          borderRadius: BorderRadius.circular(14),
-                          onTap: _busy
-                              ? null
-                              : () {
-                                  if (_selectedDay == d) {
-                                    _chooseDay(d);
-                                  } else {
-                                    setState(() => _selectedDay = d);
-                                  }
-                                },
-                          child: AnimatedContainer(
-                            duration: MediaQuery.disableAnimationsOf(context)
-                                ? Duration.zero
-                                : const Duration(milliseconds: 170),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(
-                              gradient: isSelected ? p.primaryGradient : null,
-                              color: isSelected
-                                  ? null
-                                  : isToday
-                                      ? p.primary.withValues(
-                                          alpha: p.isDark ? .12 : .08,
-                                        )
-                                      : Colors.transparent,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: !isSelected && isToday
-                                    ? p.primary.withValues(alpha: .40)
-                                    : Colors.transparent,
-                                width: 0.9,
-                              ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final slotWidth = constraints.maxWidth / 7;
+              final reduceMotion = MediaQuery.disableAnimationsOf(context);
+              return Stack(
+                children: [
+                  AnimatedPositioned(
+                    duration: reduceMotion
+                        ? Duration.zero
+                        : const Duration(milliseconds: 250),
+                    curve: const Cubic(0.22, 1.0, 0.36, 1.0),
+                    left: _selectedDay * slotWidth,
+                    top: 0,
+                    bottom: 0,
+                    width: slotWidth,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: p.primaryGradient,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: Colors.white.withValues(
+                            alpha: p.isDark ? 0.22 : 0.34,
+                          ),
+                          width: 0.8,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: p.primary.withValues(
+                              alpha: p.isDark ? 0.28 : 0.20,
                             ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  shortWeekdays[d],
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: isSelected || isToday
-                                        ? FontWeight.w800
-                                        : FontWeight.w600,
-                                    color: isSelected
-                                        ? p.onPrimary
-                                        : isToday
-                                            ? p.primary
-                                            : p.textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Container(
-                                  width: hasTpl ? 6 : 4,
-                                  height: 4,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(99),
-                                    color: isSelected
-                                        ? p.onPrimary.withValues(
-                                            alpha: hasTpl ? .92 : .35)
-                                        : hasTpl
-                                            ? p.primary.withValues(alpha: .85)
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      for (var d = 0; d < 7; d++)
+                        Expanded(
+                          child: Builder(
+                            builder: (context) {
+                              final isSelected = d == _selectedDay;
+                              final isToday = d == todayWeekday;
+                              final hasTpl = _templateForDay(d) != null;
+                              return Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  key: ValueKey('schedule-day-$d'),
+                                  borderRadius: BorderRadius.circular(14),
+                                  onTap: _busy
+                                      ? null
+                                      : () {
+                                          if (_selectedDay == d) {
+                                            _chooseDay(d);
+                                          } else {
+                                            setState(() => _selectedDay = d);
+                                          }
+                                        },
+                                  child: Container(
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: !isSelected && isToday
+                                          ? p.primary.withValues(
+                                              alpha: p.isDark ? .12 : .08,
+                                            )
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: !isSelected && isToday
+                                            ? p.primary.withValues(alpha: .40)
                                             : Colors.transparent,
+                                        width: 0.9,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          shortWeekdays[d],
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: isSelected || isToday
+                                                ? FontWeight.w800
+                                                : FontWeight.w600,
+                                            color: isSelected
+                                                ? p.onPrimary
+                                                : isToday
+                                                    ? p.primary
+                                                    : p.textPrimary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Container(
+                                          width: hasTpl ? 6 : 4,
+                                          height: 4,
+                                          decoration: BoxDecoration(
+                                            borderRadius:
+                                                BorderRadius.circular(99),
+                                            color: isSelected
+                                                ? p.onPrimary.withValues(
+                                                    alpha: hasTpl ? .92 : .35)
+                                                : hasTpl
+                                                    ? p.primary
+                                                        .withValues(alpha: .85)
+                                                    : Colors.transparent,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ],
-                            ),
+                              );
+                            },
                           ),
                         ),
-                      );
-                    },
+                    ],
                   ),
-                ),
-            ],
+                ],
+              );
+            },
           ),
         ),
         const SizedBox(height: 12),
@@ -1065,6 +1137,19 @@ class _WeeklyTemplatesViewState extends State<WeeklyTemplatesView>
                   ),
                 ),
             ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Center(
+          child: TextButton.icon(
+            key: const Key('reset-default-templates'),
+            onPressed: _busy ? null : _resetToDefaultPlan,
+            style: TextButton.styleFrom(
+              foregroundColor: p.textSecondary,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            ),
+            icon: const Icon(Icons.restart_alt_rounded, size: 17),
+            label: const Text('恢复默认 4 练增肌减脂课表'),
           ),
         ),
       ],

@@ -53,15 +53,15 @@ void main() {
       (tester) async {
     await pump(tester, WorkoutPage(now: () => today));
     // Thursday fixed template auto-loads without manual picking
-    expect(find.text('腿 · 核心与肩补强'), findsOneWidget);
+    expect(find.text('上肢 · 轮廓与代谢'), findsOneWidget);
     expect(find.byKey(const ValueKey('workout-block-0')), findsOneWidget);
-    expect(find.text('倒蹬机'), findsOneWidget);
+    expect(find.text('上斜器械推胸'), findsOneWidget);
     // Still unmaterialized until user logs or edits
     expect((await loadDailyWorkouts())[dayKey(today)], isNull);
 
     await tapVisible(tester, find.byKey(const ValueKey('complete-set-0')));
     final session = (await loadDailyWorkouts())[dayKey(today)]!;
-    expect(session.blocks.first.exercise.name, '倒蹬机');
+    expect(session.blocks.first.exercise.name, '上斜器械推胸');
     expect(session.blocks.first.completedSets, 1);
     expect(find.byKey(const Key('rest-timer-panel')), findsNothing);
   });

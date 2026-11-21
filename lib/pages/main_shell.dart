@@ -15,7 +15,7 @@ import 'workout_page.dart';
 
 class MainShell extends StatefulWidget {
   final String appVersion;
-  const MainShell({super.key, this.appVersion = '7.1.3'});
+  const MainShell({super.key, this.appVersion = '7.1.4'});
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -147,20 +147,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Container(
-                                width: 25,
-                                height: 25,
-                                decoration: BoxDecoration(
-                                  gradient: p.primaryGradient,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  Icons.bolt_rounded,
-                                  size: 16,
-                                  color: p.onPrimary,
-                                ),
-                              ),
-                              const SizedBox(width: 7),
+                              const QingranBrandMark(size: 30),
+                              const SizedBox(width: 8),
                               ShaderMask(
                                 shaderCallback: (bounds) =>
                                     p.primaryGradient.createShader(bounds),

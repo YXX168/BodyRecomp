@@ -587,58 +587,66 @@ class _ExercisePickerState extends State<_ExercisePicker> {
         heightFactor: 1,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 620),
-          child: ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [glassTop, glassBottom],
-                  ),
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(28)),
-                  border: Border.all(
-                    color: p.glassRimBright.withValues(alpha: .54),
-                    width: 1.05,
-                  ),
+          child: RepaintBoundary(
+            child: ClipRRect(
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(
+                  sigmaX: 12,
+                  sigmaY: 12,
+                  tileMode: TileMode.clamp,
                 ),
-                child: Material(
-                  color: Colors.transparent,
-                  clipBehavior: Clip.antiAlias,
-                  child: SizedBox(
-                    height: height,
-                    child: Column(
-                      children: [
-                        if (!short) ...controls,
-                        Expanded(
-                          child: short
-                              ? CustomScrollView(
-                                  key: const ValueKey('picker-compact-scroll'),
-                                  controller: _scroll,
-                                  slivers: [
-                                    SliverList.list(children: controls),
-                                    if (items.isEmpty)
-                                      SliverToBoxAdapter(child: empty)
-                                    else
-                                      SliverPadding(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 20),
-                                        sliver: SliverList.builder(
-                                          itemCount: items.length,
-                                          itemBuilder: (_, index) => _itemTile(
-                                              items[index],
-                                              compact: true),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [glassTop, glassBottom],
+                    ),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(28)),
+                    border: Border.all(
+                      color: p.glassRimBright.withValues(alpha: .54),
+                      width: 1.05,
+                    ),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    clipBehavior: Clip.antiAlias,
+                    child: SizedBox(
+                      height: height,
+                      child: Column(
+                        children: [
+                          if (!short) ...controls,
+                          Expanded(
+                            child: short
+                                ? CustomScrollView(
+                                    key:
+                                        const ValueKey('picker-compact-scroll'),
+                                    controller: _scroll,
+                                    slivers: [
+                                      SliverList.list(children: controls),
+                                      if (items.isEmpty)
+                                        SliverToBoxAdapter(child: empty)
+                                      else
+                                        SliverPadding(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 20),
+                                          sliver: SliverList.builder(
+                                            itemCount: items.length,
+                                            itemBuilder: (_, index) =>
+                                                _itemTile(items[index],
+                                                    compact: true),
+                                          ),
                                         ),
-                                      ),
-                                  ],
-                                )
-                              : results,
-                        ),
-                        footer,
-                      ],
+                                    ],
+                                  )
+                                : results,
+                          ),
+                          footer,
+                        ],
+                      ),
                     ),
                   ),
                 ),

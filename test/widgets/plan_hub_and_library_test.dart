@@ -1,3 +1,4 @@
+import 'package:body_recomp/data/workout_templates.dart';
 import 'package:body_recomp/main.dart';
 import 'package:body_recomp/models/daily_workout.dart';
 import 'package:body_recomp/pages/template_manager_page.dart';
@@ -33,22 +34,22 @@ void main() {
 
   testWidgets('future weekday preview is read-only and blocks打卡',
       (tester) async {
-    // 2026-11-19 is Thursday; Friday 2026-11-20 is future in same week
-    final thursday = DateTime(2026, 11, 19, 12);
+    // 2026-11-18 is Wednesday; Thursday 2026-11-19 is future in same week
+    final wednesday = DateTime(2026, 11, 18, 12);
     await tester.pumpWidget(
       MaterialApp(
         theme: RecompApp.themeFor(AppTheme.blue),
-        home: Scaffold(body: WorkoutPage(now: () => thursday)),
+        home: Scaffold(body: WorkoutPage(now: () => wednesday)),
       ),
     );
     await tester.pumpAndSettle();
 
-    // Tap Friday (index 4) on WeekStripBar
-    await tester.tap(find.byKey(const ValueKey('week-strip-day-4')));
+    // Tap Thursday (index 3) on WeekStripBar
+    await tester.tap(find.byKey(const ValueKey('week-strip-day-3')));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('未来日期预览'), findsOneWidget);
-    expect(find.text('上肢 · 泵感与手臂'), findsOneWidget);
+    expect(find.text('上肢 · 轮廓与代谢'), findsOneWidget);
     expect(find.byKey(const ValueKey('complete-set-0')), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -144,6 +145,17 @@ void main() {
   testWidgets(
       'logging exercise weight updates workout badge and Trends PR view',
       (tester) async {
+    await saveDailyWorkout(
+      DailyWorkout(
+        date: dayKey(DateTime.now()),
+        blocks: [
+          WorkoutBlock(
+            id: 'bench-0',
+            exercise: defaultTemplates.first.exercises.first,
+          ),
+        ],
+      ),
+    );
     await tester.pumpWidget(const ThemeState(child: RecompApp()));
     await tester.pumpAndSettle();
 
@@ -170,11 +182,12 @@ void main() {
   testWidgets(
       'muscle body graphic renders inferred active groups on workout and templates',
       (tester) async {
-    final thursday = DateTime(2026, 11, 19, 12);
+    // 2026-11-18 is Wednesday -> 'legs' (腿臀 · 核心塑形)
+    final wednesday = DateTime(2026, 11, 18, 12);
     await tester.pumpWidget(
       MaterialApp(
         theme: RecompApp.themeFor(AppTheme.blue),
-        home: Scaffold(body: WorkoutPage(now: () => thursday)),
+        home: Scaffold(body: WorkoutPage(now: () => wednesday)),
       ),
     );
     await tester.pumpAndSettle();

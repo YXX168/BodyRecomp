@@ -56,152 +56,159 @@ class _SheetFrameState extends State<SheetFrame> {
               maxHeight:
                   math.max(0, math.min(media.size.height * .9, available)),
             ),
-            child: ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(30)),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [glassTop, glassBottom],
-                    ),
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(30)),
-                    border: Border.all(
-                      color: p.glassRimBright.withValues(alpha: .56),
-                      width: 1.1,
-                    ),
+            child: RepaintBoundary(
+              child: ClipRRect(
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(30)),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(
+                    sigmaX: 12,
+                    sigmaY: 12,
+                    tileMode: TileMode.clamp,
                   ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final scrollAll = constraints.maxHeight <
-                            200 * media.textScaler.scale(1).clamp(1.0, 2.0);
-                        final children = <Widget>[
-                          Container(
-                            width: 36,
-                            height: 4,
-                            margin: const EdgeInsets.only(top: 10, bottom: 14),
-                            decoration: BoxDecoration(
-                              color: p.textTertiary.withValues(alpha: .42),
-                              borderRadius: BorderRadius.circular(4),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [glassTop, glassBottom],
+                      ),
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(30)),
+                      border: Border.all(
+                        color: p.glassRimBright.withValues(alpha: .56),
+                        width: 1.1,
+                      ),
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final scrollAll = constraints.maxHeight <
+                              200 * media.textScaler.scale(1).clamp(1.0, 2.0);
+                          final children = <Widget>[
+                            Container(
+                              width: 36,
+                              height: 4,
+                              margin:
+                                  const EdgeInsets.only(top: 10, bottom: 14),
+                              decoration: BoxDecoration(
+                                color: p.textTertiary.withValues(alpha: .42),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
                             ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 0, 12, 14),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 38,
-                                  height: 38,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [
-                                        p.primary.withValues(alpha: .26),
-                                        p.accent.withValues(alpha: .14),
-                                      ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(13),
-                                    border: Border.all(
-                                      color: p.primary.withValues(alpha: .42),
-                                    ),
-                                  ),
-                                  child: Icon(widget.icon,
-                                      color: p.primary, size: 19),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        widget.title,
-                                        style: TextStyle(
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.w800,
-                                          color: p.textPrimary,
-                                        ),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 0, 12, 14),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 38,
+                                    height: 38,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          p.primary.withValues(alpha: .26),
+                                          p.accent.withValues(alpha: .14),
+                                        ],
                                       ),
-                                      if (widget.subtitle != null &&
-                                          widget.subtitle!.isNotEmpty) ...[
-                                        const SizedBox(height: 2),
+                                      borderRadius: BorderRadius.circular(13),
+                                      border: Border.all(
+                                        color: p.primary.withValues(alpha: .42),
+                                      ),
+                                    ),
+                                    child: Icon(widget.icon,
+                                        color: p.primary, size: 19),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
                                         Text(
-                                          widget.subtitle!,
+                                          widget.title,
                                           style: TextStyle(
-                                            fontSize: 12,
-                                            color: p.textSecondary,
+                                            fontSize: 17,
+                                            fontWeight: FontWeight.w800,
+                                            color: p.textPrimary,
                                           ),
                                         ),
+                                        if (widget.subtitle != null &&
+                                            widget.subtitle!.isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            widget.subtitle!,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: p.textSecondary,
+                                            ),
+                                          ),
+                                        ],
                                       ],
-                                    ],
+                                    ),
                                   ),
-                                ),
-                                IconButton(
-                                  tooltip: '关闭',
-                                  onPressed: () => Navigator.pop(context),
-                                  icon: Icon(
-                                    Icons.close_rounded,
-                                    size: 20,
-                                    color: p.textSecondary,
+                                  IconButton(
+                                    tooltip: '关闭',
+                                    onPressed: () => Navigator.pop(context),
+                                    icon: Icon(
+                                      Icons.close_rounded,
+                                      size: 20,
+                                      color: p.textSecondary,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                          Divider(
-                            height: 1,
-                            color: p.glassRimBright.withValues(alpha: .22),
-                          ),
-                          if (scrollAll)
-                            Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(20, 16, 20, 20),
-                              child: body,
-                            )
-                          else
-                            Flexible(
-                              child: SingleChildScrollView(
-                                keyboardDismissBehavior:
-                                    ScrollViewKeyboardDismissBehavior.onDrag,
+                            Divider(
+                              height: 1,
+                              color: p.glassRimBright.withValues(alpha: .22),
+                            ),
+                            if (scrollAll)
+                              Padding(
                                 padding:
                                     const EdgeInsets.fromLTRB(20, 16, 20, 20),
                                 child: body,
-                              ),
-                            ),
-                          if (widget.footer != null)
-                            Container(
-                              padding:
-                                  const EdgeInsets.fromLTRB(20, 12, 20, 16),
-                              decoration: BoxDecoration(
-                                border: Border(
-                                  top: BorderSide(
-                                    color:
-                                        p.glassRimBright.withValues(alpha: .22),
-                                  ),
+                              )
+                            else
+                              Flexible(
+                                child: SingleChildScrollView(
+                                  keyboardDismissBehavior:
+                                      ScrollViewKeyboardDismissBehavior.onDrag,
+                                  padding:
+                                      const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                                  child: body,
                                 ),
                               ),
-                              child: widget.footer,
-                            ),
-                        ];
-                        final content = Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: children,
-                        );
-                        return scrollAll
-                            ? SingleChildScrollView(
-                                keyboardDismissBehavior:
-                                    ScrollViewKeyboardDismissBehavior.onDrag,
-                                child: content,
-                              )
-                            : content;
-                      },
+                            if (widget.footer != null)
+                              Container(
+                                padding:
+                                    const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                                decoration: BoxDecoration(
+                                  border: Border(
+                                    top: BorderSide(
+                                      color: p.glassRimBright
+                                          .withValues(alpha: .22),
+                                    ),
+                                  ),
+                                ),
+                                child: widget.footer,
+                              ),
+                          ];
+                          final content = Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: children,
+                          );
+                          return scrollAll
+                              ? SingleChildScrollView(
+                                  keyboardDismissBehavior:
+                                      ScrollViewKeyboardDismissBehavior.onDrag,
+                                  child: content,
+                                )
+                              : content;
+                        },
+                      ),
                     ),
                   ),
                 ),

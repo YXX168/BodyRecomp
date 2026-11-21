@@ -403,6 +403,15 @@ ThemeData buildThemeData(AppTheme mode) {
     scaffoldBackgroundColor: p.canvas,
     hintColor: p.textTertiary,
     dividerColor: p.borderSubtle,
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.windows: CupertinoPageTransitionsBuilder(),
+      },
+    ),
     extensions: [p],
     textTheme: baseText.copyWith(
       displaySmall: baseText.displaySmall?.copyWith(

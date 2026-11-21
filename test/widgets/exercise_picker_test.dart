@@ -69,7 +69,8 @@ void main() {
     await tap(tester, 'pick_1_0');
     await tap(tester, 'picker-template-push');
     await tap(tester, 'toggle-visible-selection');
-    expect(find.text('6 项已选'), findsOneWidget);
+    expect(find.text('${defaultTemplates.first.exercises.length + 1} 项已选'),
+        findsOneWidget);
     expect(find.text('取消全选'), findsOneWidget);
     await tap(tester, 'toggle-visible-selection');
     expect(find.text('1 项已选'), findsOneWidget);

@@ -1,11 +1,15 @@
 import 'package:body_recomp/data/workout_templates.dart';
 import 'package:body_recomp/main.dart';
 import 'package:body_recomp/models/daily_workout.dart';
+import 'package:body_recomp/pages/template_manager_page.dart';
 import 'package:body_recomp/pages/workout_page.dart';
 import 'package:body_recomp/services/daily_workout_service.dart';
 import 'package:body_recomp/services/data_service.dart';
 import 'package:body_recomp/services/rest_countdown.dart';
+import 'package:body_recomp/widgets/ambient_background.dart';
+import 'package:body_recomp/widgets/horizontal_day_swipe.dart';
 import 'package:body_recomp/widgets/rest_timer_pill.dart';
+import 'package:body_recomp/widgets/week_strip_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -37,20 +41,20 @@ void main() {
 
   testWidgets('coaching note expands reliably on an unmodified scheduled day',
       (tester) async {
-    // Saturday 2026-11-14 loads the built-in cardio template whose first block
-    // ('爬坡快走') includes a coaching note.
-    final saturday = DateTime(2026, 11, 14, 12);
-    await pumpWorkout(tester, WorkoutPage(now: () => saturday));
+    // Monday 2026-11-16 loads the built-in push template whose first block
+    // ('平板卧推') includes a coaching note.
+    final monday = DateTime(2026, 11, 16, 12);
+    await pumpWorkout(tester, WorkoutPage(now: () => monday));
 
-    const expectedNote = '参考坡度 8–12，速度 4.5–5.0 km/h；不慢跑。';
+    const expectedNote = '沉肩锁背，杠铃下放至下胸附近控制离心，双脚蹬地稳定核心。';
     expect(find.text(expectedNote), findsNothing);
 
-    await tester.tap(find.text('爬坡快走'));
+    await tester.tap(find.text('平板卧推'));
     await tester.pumpAndSettle();
     expect(find.text(expectedNote), findsOneWidget);
 
     // Still unmaterialized (preview mode) until the user logs or edits.
-    expect((await loadDailyWorkouts())[dayKey(saturday)], isNull);
+    expect((await loadDailyWorkouts())[dayKey(monday)], isNull);
     expect(tester.takeException(), isNull);
   });
 
@@ -150,7 +154,7 @@ void main() {
   testWidgets(
       'future-date preview works via next arrow and survives tab visibility toggle',
       (tester) async {
-    final thursday = DateTime(2026, 11, 19, 12);
+    final wednesday = DateTime(2026, 11, 18, 12);
     var visible = true;
     late StateSetter setVisible;
 
@@ -162,7 +166,7 @@ void main() {
             setVisible = setState;
             return TickerMode(
               enabled: visible,
-              child: Scaffold(body: WorkoutPage(now: () => thursday)),
+              child: Scaffold(body: WorkoutPage(now: () => wednesday)),
             );
           },
         ),
@@ -177,7 +181,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('未来日期预览'), findsOneWidget);
-    expect(find.text('上肢 · 泵感与手臂'), findsOneWidget);
+    expect(find.text('上肢 · 轮廓与代谢'), findsOneWidget);
 
     // Switching tab away and back keeps the chosen future date intact.
     setVisible(() => visible = false);
@@ -186,7 +190,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('未来日期预览'), findsOneWidget);
-    expect(find.text('上肢 · 泵感与手臂'), findsOneWidget);
+    expect(find.text('上肢 · 轮廓与代谢'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -304,6 +308,125 @@ void main() {
     await tester.tap(find.byKey(const Key('previous-date')));
     await tester.pumpAndSettle();
     expect(find.text('今日休整'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('WeekStripBar slides selection smoothly between days',
+      (tester) async {
+    var selected = DateTime(2026, 11, 18); // Wednesday
+    final today = DateTime(2026, 11, 19); // Thursday
+    late StateSetter rebuild;
+
+    await pumpWorkout(
+      tester,
+      StatefulBuilder(
+        builder: (context, setState) {
+          rebuild = setState;
+          return WeekStripBar(
+            date: selected,
+            today: today,
+            allowFutureSelection: true,
+            statusForDay: (_) => DayStripStatus.planned,
+            onChanged: (d) => setState(() => selected = d),
+          );
+        },
+      ),
+    );
+
+    final wedRect =
+        tester.getRect(find.byKey(const ValueKey('week-strip-day-2')));
+    await tester.tap(find.byKey(const ValueKey('week-strip-day-0')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 90));
+    expect(selected, DateTime(2026, 11, 16));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(find.byKey(const ValueKey('week-strip-day-2'))).height,
+      closeTo(wedRect.height, 0.01),
+    );
+
+    // Jumping across week boundary resets cleanly without errors.
+    rebuild(() => selected = DateTime(2026, 11, 10));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'HorizontalDaySwipe tracks finger drag smoothly and glides on switch',
+      (tester) async {
+    var day = 18;
+    await pumpWorkout(
+      tester,
+      StatefulBuilder(
+        builder: (context, setState) => SizedBox(
+          width: 390,
+          height: 300,
+          child: HorizontalDaySwipe(
+            onPrevious: () => setState(() => day--),
+            onNext: () => setState(() => day++),
+            child: Center(child: Text('Day $day')),
+          ),
+        ),
+      ),
+    );
+
+    final gesture = await tester.startGesture(const Offset(260, 150));
+    await gesture.moveBy(const Offset(-40, 0));
+    await tester.pump();
+    // Follows finger smoothly with rubber-band damping before release.
+    expect(tester.getCenter(find.text('Day 18')).dx, lessThan(195));
+
+    await gesture.moveBy(const Offset(-70, 0));
+    await gesture.up();
+    await tester.pump();
+    expect(find.text('Day 19'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(tester.getCenter(find.text('Day 19')).dx, closeTo(195, 0.5));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('QingranBrandMark renders cleanly across light and dark themes',
+      (tester) async {
+    for (final mode in [AppTheme.blue, AppTheme.green]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: RecompApp.themeFor(mode),
+          home: const Scaffold(body: Center(child: QingranBrandMark())),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(QingranBrandMark), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
+  });
+
+  testWidgets('TemplateManagerPage resets schedule to Mon-Thu 4-day preset',
+      (tester) async {
+    await saveWeeklySchedule(['', '', '', '', 'cardio', 'cardio', 'recovery']);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: RecompApp.themeFor(AppTheme.blue),
+        home: const TemplateManagerPage(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final resetBtn = find.byKey(const Key('reset-default-templates'));
+    await tester.scrollUntilVisible(
+      resetBtn,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(resetBtn);
+    await tester.tap(resetBtn);
+    await tester.pumpAndSettle();
+
+    expect(find.text('恢复默认 4 练课表？'), findsOneWidget);
+    await tester.tap(find.text('恢复默认'));
+    await tester.pumpAndSettle();
+
+    expect(await loadWeeklySchedule(), defaultSchedule);
     expect(tester.takeException(), isNull);
   });
 }

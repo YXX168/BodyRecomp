@@ -3,9 +3,18 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('UserProfile', () {
-    test('defaults weight to 69kg', () {
-      expect(UserProfile().weightKg, 69.0);
-      expect(UserProfile.fromJson(const {}).weightKg, 69.0);
+    test('defaults to custom male body-recomp baseline profile', () {
+      final profile = UserProfile();
+      expect(profile.weightKg, 69.0);
+      expect(profile.heightCm, 173.5);
+      expect(profile.birthday, '1999-02-03');
+      expect(profile.gender, 'male');
+
+      final parsed = UserProfile.fromJson(const {});
+      expect(parsed.weightKg, 69.0);
+      expect(parsed.heightCm, 173.5);
+      expect(parsed.birthday, '1999-02-03');
+      expect(parsed.gender, 'male');
     });
 
     test('calculates BMI and survives JSON round-trip', () {

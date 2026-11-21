@@ -5,8 +5,8 @@ class UserProfile {
   String gender;
 
   UserProfile({
-    this.birthday = '',
-    this.heightCm = 176.0,
+    this.birthday = '1999-02-03',
+    this.heightCm = 173.5,
     this.weightKg = 69.0,
     this.gender = 'male',
   });
@@ -39,8 +39,8 @@ class UserProfile {
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     final profile = UserProfile(
-      birthday: json['birthday'] as String? ?? '',
-      heightCm: (json['heightCm'] as num?)?.toDouble() ?? 176.0,
+      birthday: json['birthday'] as String? ?? '1999-02-03',
+      heightCm: (json['heightCm'] as num?)?.toDouble() ?? 173.5,
       weightKg: (json['weightKg'] as num?)?.toDouble() ?? 69.0,
       gender: json['gender'] as String? ?? 'male',
     );

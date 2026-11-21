@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
+import '../data/workout_templates.dart';
 import '../models/daily_workout.dart';
 import '../models/library_exercise.dart';
 import '../models/recomp_models.dart';
@@ -47,8 +48,9 @@ class WorkoutPage extends StatefulWidget {
 }
 
 class _WorkoutPageState extends State<WorkoutPage>
-    with WidgetsBindingObserver, DailyRecordDate {
+    with WidgetsBindingObserver, DailyRecordDate, TickerProviderStateMixin {
   static final DateTime _minDate = DateTime(2000);
+  static const Curve _dayCurve = Cubic(0.22, 1.0, 0.36, 1.0);
 
   @override
   DateTime get now => (widget.now ?? DateTime.now)();
@@ -83,6 +85,53 @@ class _WorkoutPageState extends State<WorkoutPage>
   Map<String, ExerciseLog> _latestLogByExercise = {};
   Map<String, ExerciseLog> _prByExercise = {};
   bool _autoRest = false;
+
+  late final AnimationController _dayAnim = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 190),
+    value: 1.0,
+  );
+  int _dayTransitionDir = 0;
+  bool _skipNextDayAnim = false;
+
+  @override
+  void selectRecordDate(DateTime date) {
+    final prev = dateOnly(recordDate);
+    final next = dateOnly(date);
+    super.selectRecordDate(next);
+    if (next == prev) return;
+    if (_skipNextDayAnim || MediaQuery.disableAnimationsOf(context)) {
+      _skipNextDayAnim = false;
+      _dayTransitionDir = 0;
+      _dayAnim.value = 1.0;
+      return;
+    }
+    _dayTransitionDir = next.isAfter(prev) ? 1 : -1;
+    _dayAnim.forward(from: 0.0).whenComplete(() {
+      if (mounted) _dayTransitionDir = 0;
+    });
+  }
+
+  Widget _dayTransitionWrap(Widget child) {
+    if (_dayTransitionDir == 0 && !_dayAnim.isAnimating) return child;
+    return AnimatedBuilder(
+      animation: _dayAnim,
+      child: child,
+      builder: (context, inner) {
+        final raw = _dayAnim.value.clamp(0.0, 1.0);
+        if (raw >= 0.999) return inner!;
+        final t = _dayCurve.transform(raw);
+        final dx = _dayTransitionDir * 16.0 * (1.0 - t);
+        return Transform.translate(
+          offset: Offset(dx, 0),
+          child: Opacity(
+            opacity: (0.72 + 0.28 * t).clamp(0.0, 1.0),
+            child: inner,
+          ),
+        );
+      },
+    );
+  }
 
   @override
   void initState() {
@@ -258,6 +307,7 @@ class _WorkoutPageState extends State<WorkoutPage>
     _scrollController
       ..removeListener(_onScrollChanged)
       ..dispose();
+    _dayAnim.dispose();
     _ownedRest?.dispose();
     super.dispose();
   }
@@ -1007,8 +1057,14 @@ class _WorkoutPageState extends State<WorkoutPage>
           ),
         Expanded(
           child: HorizontalDaySwipe(
-            onPrevious: () => stepDate(-1),
-            onNext: () => stepDate(1),
+            onPrevious: () {
+              _skipNextDayAnim = true;
+              stepDate(-1);
+            },
+            onNext: () {
+              _skipNextDayAnim = true;
+              stepDate(1);
+            },
             child: CustomScrollView(
               controller: _scrollController,
               slivers: [
@@ -1043,18 +1099,20 @@ class _WorkoutPageState extends State<WorkoutPage>
                           );
                         }
                       },
-                      child: _buildHeroCard(
-                        context: context,
-                        targetDate: currentDate,
-                        heroTitle: heroTitle,
-                        completed: completed,
-                        planned: planned,
-                        progress: progress,
-                        muscles: muscles,
-                        session: session,
-                        existingSession: existingSession,
-                        scheduledTpl: scheduledTpl,
-                        isFuture: isFuture,
+                      child: _dayTransitionWrap(
+                        _buildHeroCard(
+                          context: context,
+                          targetDate: currentDate,
+                          heroTitle: heroTitle,
+                          completed: completed,
+                          planned: planned,
+                          progress: progress,
+                          muscles: muscles,
+                          session: session,
+                          existingSession: existingSession,
+                          scheduledTpl: scheduledTpl,
+                          isFuture: isFuture,
+                        ),
                       ),
                     ),
                   ),
@@ -1064,12 +1122,14 @@ class _WorkoutPageState extends State<WorkoutPage>
                     padding: const EdgeInsets.fromLTRB(16, 2, 16, 112),
                     sliver: blocks.isEmpty
                         ? SliverToBoxAdapter(
-                            child: _buildEmptyOrRestCard(
-                              context: context,
-                              targetDate: currentDate,
-                              rested: session.rested,
-                              hasScheduled: scheduledTpl != null,
-                              isFuture: isFuture,
+                            child: _dayTransitionWrap(
+                              _buildEmptyOrRestCard(
+                                context: context,
+                                targetDate: currentDate,
+                                rested: session.rested,
+                                hasScheduled: scheduledTpl != null,
+                                isFuture: isFuture,
+                              ),
                             ),
                           )
                         : SliverList(
@@ -1077,19 +1137,23 @@ class _WorkoutPageState extends State<WorkoutPage>
                               for (var i = 0; i < blocks.length; i++)
                                 Padding(
                                   padding: const EdgeInsets.only(bottom: 12),
-                                  child: _buildBlockCard(
-                                    context: context,
-                                    targetDate: currentDate,
-                                    dateKeyStr: currentKey,
-                                    index: i,
-                                    block: blocks[i],
-                                    totalBlocks: blocks.length,
-                                    isFuture: isFuture,
+                                  child: _dayTransitionWrap(
+                                    _buildBlockCard(
+                                      context: context,
+                                      targetDate: currentDate,
+                                      dateKeyStr: currentKey,
+                                      index: i,
+                                      block: blocks[i],
+                                      totalBlocks: blocks.length,
+                                      isFuture: isFuture,
+                                    ),
                                   ),
                                 ),
                               if (!isFuture) ...[
                                 const SizedBox(height: 2),
-                                _buildBottomAddBar(context, currentDate),
+                                _dayTransitionWrap(
+                                  _buildBottomAddBar(context, currentDate),
+                                ),
                               ],
                             ]),
                           ),
@@ -1347,6 +1411,18 @@ class _WorkoutPageState extends State<WorkoutPage>
               color: p.textPrimary,
             ),
           ),
+          if (recoveryNotes[targetDate.weekday - 1].isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              recoveryNotes[targetDate.weekday - 1],
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.45,
+                color: p.textSecondary,
+              ),
+            ),
+          ],
           if (!isFuture) ...[
             const SizedBox(height: 16),
             Wrap(

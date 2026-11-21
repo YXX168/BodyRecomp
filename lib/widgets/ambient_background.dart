@@ -41,7 +41,7 @@ class LiquidBackdrop extends StatelessWidget {
     final p = context.palette;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     final duration =
-        reduceMotion ? Duration.zero : const Duration(milliseconds: 520);
+        reduceMotion ? Duration.zero : const Duration(milliseconds: 300);
     final phase = pagePhase.abs() % 4;
     final dark = p.isDark;
 
@@ -59,30 +59,36 @@ class LiquidBackdrop extends StatelessWidget {
                     alignment: _orb1Aligns[phase],
                     duration: duration,
                     curve: Curves.easeOutCubic,
-                    child: _AuroraOrb(
-                      size: 420,
-                      color: p.orb1.withValues(alpha: dark ? .26 : .25),
-                      midColor: p.orb1.withValues(alpha: dark ? .09 : .10),
+                    child: RepaintBoundary(
+                      child: _AuroraOrb(
+                        size: 420,
+                        color: p.orb1.withValues(alpha: dark ? .26 : .25),
+                        midColor: p.orb1.withValues(alpha: dark ? .09 : .10),
+                      ),
                     ),
                   ),
                   AnimatedAlign(
                     alignment: _orb2Aligns[phase],
                     duration: duration,
                     curve: Curves.easeOutCubic,
-                    child: _AuroraOrb(
-                      size: 380,
-                      color: p.orb2.withValues(alpha: dark ? .22 : .20),
-                      midColor: p.orb2.withValues(alpha: dark ? .07 : .08),
+                    child: RepaintBoundary(
+                      child: _AuroraOrb(
+                        size: 380,
+                        color: p.orb2.withValues(alpha: dark ? .22 : .20),
+                        midColor: p.orb2.withValues(alpha: dark ? .07 : .08),
+                      ),
                     ),
                   ),
                   AnimatedAlign(
                     alignment: _orb3Aligns[phase],
                     duration: duration,
                     curve: Curves.easeOutCubic,
-                    child: _AuroraOrb(
-                      size: 360,
-                      color: p.orb3.withValues(alpha: dark ? .16 : .20),
-                      midColor: p.orb3.withValues(alpha: dark ? .05 : .06),
+                    child: RepaintBoundary(
+                      child: _AuroraOrb(
+                        size: 360,
+                        color: p.orb3.withValues(alpha: dark ? .16 : .20),
+                        midColor: p.orb3.withValues(alpha: dark ? .05 : .06),
+                      ),
                     ),
                   ),
                 ],
@@ -536,7 +542,7 @@ class _GlassMenuRoute<T> extends PopupRoute<T> {
 
   @override
   Duration get transitionDuration =>
-      reduceMotion ? Duration.zero : const Duration(milliseconds: 160);
+      reduceMotion ? Duration.zero : const Duration(milliseconds: 150);
 
   @override
   Widget buildPage(
@@ -563,7 +569,15 @@ class _GlassMenuRoute<T> extends PopupRoute<T> {
       openAbove ? 1.0 : -1.0,
     );
 
-    final menuCard = _GlassMenuCard<T>(title: title, items: items);
+    final menuCard = RepaintBoundary(
+      child: _GlassMenuCard<T>(title: title, items: items),
+    );
+    const liquidCurve = Cubic(0.22, 1.0, 0.36, 1.0);
+    final fadeAnim = animation.drive(CurveTween(curve: Curves.easeOutCubic));
+    final scaleAnim = animation.drive(
+      Tween<double>(begin: 0.94, end: 1.0)
+          .chain(CurveTween(curve: liquidCurve)),
+    );
 
     return themes.wrap(
       SafeArea(
@@ -578,23 +592,13 @@ class _GlassMenuRoute<T> extends PopupRoute<T> {
           ),
           child: disableMotion
               ? menuCard
-              : AnimatedBuilder(
-                  animation: animation,
-                  child: menuCard,
-                  builder: (context, child) {
-                    final raw = animation.value.clamp(0.0, 1.0);
-                    final t = animation.status == AnimationStatus.reverse
-                        ? Curves.easeInCubic.transform(raw)
-                        : Curves.easeOutCubic.transform(raw);
-                    return Opacity(
-                      opacity: t,
-                      child: Transform.scale(
-                        scale: 0.92 + 0.08 * t,
-                        alignment: scaleAlignment,
-                        child: child,
-                      ),
-                    );
-                  },
+              : FadeTransition(
+                  opacity: fadeAnim,
+                  child: ScaleTransition(
+                    scale: scaleAnim,
+                    alignment: scaleAlignment,
+                    child: menuCard,
+                  ),
                 ),
         ),
       ),
@@ -718,7 +722,11 @@ class _GlassMenuCard<T> extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(22),
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              filter: ImageFilter.blur(
+                sigmaX: 12,
+                sigmaY: 12,
+                tileMode: TileMode.clamp,
+              ),
               child: CustomPaint(
                 foregroundPainter: _LiquidRimPainter(
                   radius: 22,
@@ -958,7 +966,11 @@ class GlassDialogFrame extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(26),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                    filter: ImageFilter.blur(
+                      sigmaX: 12,
+                      sigmaY: 12,
+                      tileMode: TileMode.clamp,
+                    ),
                     child: CustomPaint(
                       foregroundPainter: _LiquidRimPainter(
                         radius: 26,
@@ -1093,24 +1105,27 @@ Future<T?> showGlassDialogBuilder<T>({
 }) {
   final p = context.palette;
   final reduceMotion = MediaQuery.disableAnimationsOf(context);
+  const liquidCurve = Cubic(0.22, 1.0, 0.36, 1.0);
   return showGeneralDialog<T>(
     context: context,
     barrierDismissible: barrierDismissible,
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-    barrierColor: Colors.black.withValues(alpha: p.isDark ? 0.54 : 0.26),
+    barrierColor: Colors.black.withValues(alpha: p.isDark ? 0.50 : 0.24),
     transitionDuration:
-        reduceMotion ? Duration.zero : const Duration(milliseconds: 190),
-    pageBuilder: (ctx, animation, secondaryAnimation) => builder(ctx),
+        reduceMotion ? Duration.zero : const Duration(milliseconds: 170),
+    pageBuilder: (ctx, animation, secondaryAnimation) =>
+        RepaintBoundary(child: builder(ctx)),
     transitionBuilder: (ctx, animation, secondaryAnimation, child) {
       if (reduceMotion || MediaQuery.disableAnimationsOf(ctx)) return child;
-      final raw = animation.value.clamp(0.0, 1.0);
-      final t = animation.status == AnimationStatus.reverse
-          ? Curves.easeInCubic.transform(raw)
-          : Curves.easeOutCubic.transform(raw);
-      return Opacity(
-        opacity: t,
-        child: Transform.scale(
-          scale: 0.94 + 0.06 * t,
+      final fade = animation.drive(CurveTween(curve: Curves.easeOutCubic));
+      final scale = animation.drive(
+        Tween<double>(begin: 0.94, end: 1.0)
+            .chain(CurveTween(curve: liquidCurve)),
+      );
+      return FadeTransition(
+        opacity: fade,
+        child: ScaleTransition(
+          scale: scale,
           child: child,
         ),
       );
@@ -1187,3 +1202,143 @@ Future<bool?> showGlassConfirm({
         ];
       },
     );
+
+/// Bespoke frosted Liquid Glass emblem for the 青燃 top-left brand mark.
+class QingranBrandMark extends StatelessWidget {
+  final double size;
+
+  const QingranBrandMark({super.key, this.size = 30});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final radius = size * 0.34;
+    return RepaintBoundary(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(radius),
+          boxShadow: [
+            BoxShadow(
+              color: p.primary.withValues(alpha: p.isDark ? 0.24 : 0.14),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: CustomPaint(
+          foregroundPainter: _LiquidRimPainter(
+            radius: radius,
+            brightRim:
+                p.glassRimBright.withValues(alpha: p.isDark ? 0.56 : 0.90),
+            accentRim: p.primary.withValues(alpha: p.isDark ? 0.38 : 0.26),
+            strokeWidth: 0.95,
+          ),
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(radius),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  p.primary.withValues(alpha: p.isDark ? 0.24 : 0.16),
+                  p.accent.withValues(alpha: p.isDark ? 0.11 : 0.08),
+                ],
+              ),
+            ),
+            child: CustomPaint(
+              painter: _QingranMarkPainter(
+                primary: p.primary,
+                bright: p.primaryBright,
+                accent: p.accent,
+                coreColor: p.isDark
+                    ? Colors.white.withValues(alpha: 0.94)
+                    : Color.lerp(Colors.white, p.primaryBright, 0.22)!
+                        .withValues(alpha: 0.96),
+                isDark: p.isDark,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QingranMarkPainter extends CustomPainter {
+  final Color primary;
+  final Color bright;
+  final Color accent;
+  final Color coreColor;
+  final bool isDark;
+
+  const _QingranMarkPainter({
+    required this.primary,
+    required this.bright,
+    required this.accent,
+    required this.coreColor,
+    required this.isDark,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.scale(size.width / 100.0, size.height / 100.0);
+
+    // Primary sculpted ascending flame ribbon.
+    final outerFlame = Path()
+      ..moveTo(54, 14)
+      ..cubicTo(61, 29, 77, 39, 77, 57)
+      ..cubicTo(77, 74, 65, 86, 49.5, 86)
+      ..cubicTo(34, 86, 23, 74.5, 23, 59)
+      ..cubicTo(23, 46, 31.5, 36.5, 37.5, 30)
+      ..cubicTo(38.5, 37.5, 42.5, 42, 46.5, 43.5)
+      ..cubicTo(43.5, 33, 46.5, 22, 54, 14)
+      ..close();
+
+    final flamePaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.bottomLeft,
+        end: Alignment.topRight,
+        colors: [primary, bright, accent.withValues(alpha: 0.92)],
+        stops: const [0.0, 0.62, 1.0],
+      ).createShader(const Rect.fromLTWH(22, 14, 56, 72));
+    canvas.drawPath(outerFlame, flamePaint);
+
+    // Subtle glass specular highlight along left-upper curve.
+    final highlightPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round
+      ..color = Colors.white.withValues(alpha: isDark ? 0.36 : 0.55);
+    final edgeHighlight = Path()
+      ..moveTo(53.5, 19.5)
+      ..cubicTo(48.5, 26, 47.5, 34, 49.5, 42);
+    canvas.drawPath(edgeHighlight, highlightPaint);
+
+    // Inner luminous ember spark droplet.
+    final innerSpark = Path()
+      ..moveTo(52, 48)
+      ..cubicTo(57.5, 55, 63, 60.5, 62.5, 67.5)
+      ..cubicTo(62, 74, 56.8, 78.5, 50.2, 78.5)
+      ..cubicTo(43.5, 78.5, 39, 73.8, 39, 67.2)
+      ..cubicTo(39, 60.8, 45, 55.2, 52, 48)
+      ..close();
+
+    canvas.drawPath(
+      innerSpark,
+      Paint()..color = coreColor,
+    );
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _QingranMarkPainter oldDelegate) =>
+      primary != oldDelegate.primary ||
+      bright != oldDelegate.bright ||
+      accent != oldDelegate.accent ||
+      coreColor != oldDelegate.coreColor ||
+      isDark != oldDelegate.isDark;
+}
